@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Garten der Verteidigung — Idle → Plants vs Zombies</title>
+<style>
+  :root{
+    --grass1:#7cb342; --grass2:#8bc34a; --soil:#6d4c41;
+    --sun:#ffd54f; --panel:#1e2a1a; --panel2:#25361f;
+    --txt:#eaf5e0; --accent:#9ccc65; --danger:#e57373;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;
+    background:radial-gradient(circle at 50% 0%,#2c3e26,#141c11 70%);
+    color:var(--txt);
+    min-height:100vh;
+    display:flex;flex-direction:column;align-items:center;
+    user-select:none;
+  }
+  h1{margin:14px 0 2px;font-size:26px;text-shadow:2px 2px 0 #000;}
+  .subtitle{opacity:.7;font-size:13px;margin-bottom:10px;}
+
+  #app{width:min(960px,96vw);}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex;gap:14px;align-items:center;justify-content:center;
+    background:var(--panel);border:2px solid #000;border-radius:12px;
+    padding:10px 16px;margin-bottom:12px;flex-wrap:wrap;
+  }
+  .stat{font-size:18px;font-weight:bold;}
+  .stat .big{color:var(--sun);font-size:22px;}
+  .muted{opacity:.75;font-size:13px;font-weight:normal;}
+
+  /* ---------- generic panels ---------- */
+  .panel{
+    background:var(--panel);border:2px solid #000;border-radius:12px;
+    padding:16px;margin-bottom:14px;
+  }
+  .panel h2{margin:0 0 10px;font-size:18px;border-bottom:1px solid #3a4d30;padding-bottom:6px;}
+
+  button{
+    font-family:inherit;cursor:pointer;border:2px solid #000;border-radius:8px;
+    background:linear-gradient(#8bc34a,#689f38);color:#0d1a05;font-weight:bold;
+    padding:8px 14px;font-size:14px;transition:transform .05s, filter .1s;
+  }
+  button:hover:not(:disabled){filter:brightness(1.08);}
+  button:active:not(:disabled){transform:translateY(2px);}
+  button:disabled{filter:grayscale(.7) brightness(.7);cursor:not-allowed;}
+  button.secondary{background:linear-gradient(#607d8b,#455a64);color:#fff;}
+  button.big{font-size:18px;padding:14px 22px;}
+
+  /* ---------- clicker ---------- */
+  #clicker{
+    display:flex;flex-direction:column;align-items:center;gap:8px;
+  }
+  #sunButton{
+    width:150px;height:150px;border-radius:50%;font-size:80px;line-height:150px;
+    background:radial-gradient(circle at 35% 30%,#fff59d,#ffca28 70%,#fb8c00);
+    border:4px solid #000;box-shadow:0 0 30px #ffd54f88;
+  }
+  #sunButton:active{transform:scale(.94);}
+
+  .shop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;}
+  .card{
+    background:var(--panel2);border:1px solid #3a4d30;border-radius:10px;padding:10px;
+    display:flex;flex-direction:column;gap:6px;
+  }
+  .card .name{font-weight:bold;font-size:15px;}
+  .card .desc{font-size:12px;opacity:.8;flex:1;}
+  .card .row{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .locked{opacity:.45;filter:grayscale(.6);}
+
+  /* ---------- milestones ---------- */
+  .ms{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:14px;border-bottom:1px dashed #3a4d3055;}
+  .ms .icon{font-size:22px;width:30px;text-align:center;}
+  .ms.done{color:var(--accent);}
+  .ms.done .icon{filter:none;}
+  .ms.todo .icon{filter:grayscale(1) opacity(.5);}
+
+  /* ---------- floating text ---------- */
+  .float{position:fixed;pointer-events:none;font-weight:bold;color:var(--sun);
+    text-shadow:1px 1px 2px #000;animation:floatUp 1s ease-out forwards;z-index:50;font-size:20px;}
+  @keyframes floatUp{from{opacity:1;transform:translateY(0);}to{opacity:0;transform:translateY(-50px);}}
+
+  .hidden{display:none !important;}
+
+  /* ---------- defense mode ---------- */
+  #battleWrap{display:flex;flex-direction:column;align-items:center;gap:10px;}
+  #seedbar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;
+    background:#3e2723;border:2px solid #000;border-radius:10px;padding:8px;}
+  .seed{
+    width:74px;background:#d7ccc8;border:2px solid #000;border-radius:8px;
+    display:flex;flex-direction:column;align-items:center;padding:4px 2px;color:#2e2013;
+    cursor:pointer;font-size:11px;font-weight:bold;position:relative;
+  }
+  .seed .emoji{font-size:26px;line-height:1;}
+  .seed .cost{color:#5d4037;}
+  .seed.selected{outline:3px solid #ffeb3b;box-shadow:0 0 12px #ffeb3b;}
+  .seed.cant{filter:grayscale(.5) brightness(.85);cursor:not-allowed;}
+  .seed .cd{position:absolute;inset:0;background:rgba(0,0,0,.55);border-radius:6px;
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;}
+  #lawn{border:4px solid #3e2723;border-radius:8px;cursor:pointer;background:#000;touch-action:none;}
+  #battleHud{display:flex;gap:18px;align-items:center;font-size:16px;font-weight:bold;}
+  #battleHud .sun{color:var(--sun);}
+  #waveInfo{font-size:14px;opacity:.85;}
+
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;
+    align-items:center;justify-content:center;z-index:100;}
+  .overlay .box{background:var(--panel);border:3px solid #000;border-radius:16px;
+    padding:26px 34px;text-align:center;max-width:420px;}
+  .overlay h2{font-size:26px;margin:0 0 10px;}
+  .toolbtns{display:flex;gap:10px;justify-content:center;margin-top:8px;flex-wrap:wrap;}
+  .tip{font-size:12px;opacity:.7;margin-top:8px;}
+  footer{opacity:.5;font-size:12px;margin:10px 0 24px;text-align:center;}
+</style>
+</head>
+<body>
+<h1>🌻 Garten der Verteidigung 🧟</h1>
+<div class="subtitle">Sammle Sonne · schalte Pflanzen frei · verteidige den Rasen</div>
+
+<div id="app">
+  <div class="topbar">
+    <div class="stat">☀️ <span class="big" id="sunCount">0</span> <span class="muted">Sonne</span></div>
+    <div class="stat muted">⚡ <span id="spsCount">0</span>/s</div>
+    <div class="stat muted">🏆 <span id="totalCount">0</span> gesamt</div>
+    <div style="flex:1"></div>
+    <button class="secondary" id="resetBtn" title="Alles zurücksetzen">Reset</button>
+  </div>
+
+  <!-- ======== GARDEN / IDLE PHASE ======== -->
+  <div id="gardenPhase">
+    <div class="panel" id="clicker">
+      <h2 style="align-self:flex-start">Dein Garten</h2>
+      <button id="sunButton" title="Klick für Sonne">☀️</button>
+      <div class="muted">Klicke die Sonne für <b id="clickPowerLbl">1</b> Sonne</div>
+    </div>
+
+    <div class="panel">
+      <h2>🛒 Laden</h2>
+      <div class="shop-grid" id="shopGrid"></div>
+    </div>
+
+    <div class="panel">
+      <h2>🎯 Meilensteine</h2>
+      <div id="milestones"></div>
+    </div>
+
+    <div class="panel hidden" id="defenseUnlockPanel" style="text-align:center;">
+      <h2>🛡️ Verteidigungs-Modus freigeschaltet!</h2>
+      <p class="muted">Die Zombies kommen. Setze deine Pflanzen ein und verteidige dein Haus!</p>
+      <button class="big" id="startDefenseBtn">🧟 Rasen verteidigen 🧟</button>
+    </div>
+  </div>
+
+  <!-- ======== DEFENSE / PvZ PHASE ======== -->
+  <div id="defensePhase" class="hidden">
+    <div class="panel" id="battleWrap">
+      <div id="battleHud">
+        <span class="sun">☀️ <span id="battleSun">50</span></span>
+        <span id="waveInfo">Welle 0</span>
+        <button class="secondary" id="leaveBtn">← Zurück in den Garten</button>
+      </div>
+      <div id="seedbar"></div>
+      <canvas id="lawn" width="900" height="500"></canvas>
+      <div class="tip">Wähle oben eine Pflanze und klicke auf ein Feld zum Pflanzen · sammle fallende ☀️ durch Anklicken</div>
+    </div>
+  </div>
+</div>
+
+<footer>Ein inkrementelles Spiel · von Kiro für dich gebaut · Fortschritt wird automatisch gespeichert</footer>
+
+<script>
+"use strict";
+/* =====================================================================
+   GARTEN DER VERTEIDIGUNG
+   Ein Incremental-Game, das im Plants-vs-Zombies-Modus gipfelt.
+   Phasen: (1) Garten/Idle  ->  (2) Verteidigung/PvZ
+   ===================================================================== */
+
+/* ---------------------------------------------------------------------
+   1. GLOBALER SPIELZUSTAND
+   ------------------------------------------------------------------- */
+const SAVE_KEY = "garten_der_verteidigung_v1";
+
+const state = {
+  sun: 0,
+  totalSun: 0,        // insgesamt jemals verdiente Sonne (für Meilensteine)
+  clickPower: 1,
+  clickLevel: 0,
+  sunflowers: 0,      // Idle-Sonnenblumen
+  boostLevel: 0,      // Multiplikator auf Sonnenblumen-Produktion
+  unlocked: {},       // freigeschaltete Pflanzen-Baupläne
+  defenseUnlocked: false,
+  battlesWon: 0,
+};
+
+/* Kosten-Definitionen für den Idle-Laden */
+const shop = {
+  clickUpgrade: { baseCost: 15, level: () => state.clickLevel },
+  sunflower:    { baseCost: 20, level: () => state.sunflowers },
+  boost:        { baseCost: 250, level: () => state.boostLevel },
+};
+
+function sunflowerCost(){ return Math.floor(shop.sunflower.baseCost * Math.pow(1.15, state.sunflowers)); }
+function clickUpgradeCost(){ return Math.floor(shop.clickUpgrade.baseCost * Math.pow(1.25, state.clickLevel)); }
+function boostCost(){ return Math.floor(shop.boost.baseCost * Math.pow(1.8, state.boostLevel)); }
+
+/* Sonne pro Sekunde aus Idle-Produktion */
+function sps(){ return state.sunflowers * 1 * (1 + state.boostLevel * 0.5); }
+
+/* ---------------------------------------------------------------------
+   2. PFLANZEN-KATALOG (gilt für Idle-Freischaltung UND Kampf)
+   ------------------------------------------------------------------- */
+const PLANTS = {
+  sunflower:  { key:"sunflower",  name:"Sonnenblume", emoji:"🌻", cost:50,  hp:60,  cooldown:6,
+                desc:"Produziert im Kampf regelmäßig Sonne.", milestone:0 },
+  peashooter: { key:"peashooter", name:"Erbsenschütze", emoji:"🌱", cost:100, hp:60,  cooldown:6,
+                desc:"Schießt Erbsen auf Zombies in seiner Reihe.", milestone:50 },
+  wallnut:    { key:"wallnut",    name:"Walnuss", emoji:"🌰", cost:50,  hp:400, cooldown:12,
+                desc:"Zäher Blocker mit sehr viel Leben.", milestone:200 },
+  snowpea:    { key:"snowpea",    name:"Eis-Erbse", emoji:"❄️", cost:175, hp:60,  cooldown:8,
+                desc:"Schießt und verlangsamt getroffene Zombies.", milestone:600 },
+  repeater:   { key:"repeater",   name:"Doppel-Schütze", emoji:"🌿", cost:200, hp:60,  cooldown:8,
+                desc:"Feuert zwei Erbsen pro Schuss.", milestone:1200 },
+  cherrybomb: { key:"cherrybomb", name:"Kirschbombe", emoji:"🍒", cost:150, hp:1,   cooldown:20,
+                desc:"Explodiert und vernichtet Zombies im Umkreis.", milestone:2000 },
+};
+
+/* Meilensteine: an totalSun gekoppelt. Schalten Pflanzen + Defense-Modus frei. */
+const MILESTONES = [
+  { at:50,   text:"Erbsenschütze freigeschaltet 🌱", key:"peashooter" },
+  { at:150,  text:"Verteidigungs-Modus freigeschaltet 🛡️", defense:true },
+  { at:200,  text:"Walnuss freigeschaltet 🌰", key:"wallnut" },
+  { at:600,  text:"Eis-Erbse freigeschaltet ❄️", key:"snowpea" },
+  { at:1200, text:"Doppel-Schütze freigeschaltet 🌿", key:"repeater" },
+  { at:2000, text:"Kirschbombe freigeschaltet 🍒", key:"cherrybomb" },
+];
+
+/* Sonnenblume ist von Anfang an im Kampf nutzbar */
+state.unlocked.sunflower = true;
+
+/* ---------------------------------------------------------------------
+   3. FREISCHALTUNGEN NEU BERECHNEN
+   ------------------------------------------------------------------- */
+recalcUnlocks = function(){
+  MILESTONES.forEach(m => {
+    if(state.totalSun >= m.at){
+      if(m.key)  state.unlocked[m.key] = true;
+      if(m.defense) state.defenseUnlocked = true;
+    }
+  });
+};
+
+/* ---------------------------------------------------------------------
+   4. DOM-REFERENZEN
+   ------------------------------------------------------------------- */
+const $ = id => document.getElementById(id);
+const ui = {
+  sunCount:$("sunCount"), spsCount:$("spsCount"), totalCount:$("totalCount"),
+  clickPowerLbl:$("clickPowerLbl"), sunButton:$("sunButton"),
+  shopGrid:$("shopGrid"), milestones:$("milestones"),
+  defenseUnlockPanel:$("defenseUnlockPanel"), startDefenseBtn:$("startDefenseBtn"),
+  gardenPhase:$("gardenPhase"), defensePhase:$("defensePhase"),
+  resetBtn:$("resetBtn"),
+};
+
+function fmt(n){
+  n = Math.floor(n);
+  if(n < 1000) return ""+n;
+  if(n < 1e6)  return (n/1000).toFixed(n<1e4?1:0)+"k";
+  return (n/1e6).toFixed(2)+"M";
+}
+
+/* schwebender +Text beim Klicken */
+function floatText(x,y,txt){
+  const el = document.createElement("div");
+  el.className = "float"; el.textContent = txt;
+  el.style.left = x+"px"; el.style.top = y+"px";
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 1000);
+}
+
+/* ---------------------------------------------------------------------
+   5. SONNE VERDIENEN
+   ------------------------------------------------------------------- */
+function addSun(amount){
+  state.sun += amount;
+  state.totalSun += amount;
+  recalcUnlocks();
+}
+
+ui.sunButton.addEventListener("click", (e)=>{
+  addSun(state.clickPower);
+  floatText(e.clientX-10, e.clientY-20, "+"+state.clickPower);
+  renderTop();
+});
+
+/* ---------------------------------------------------------------------
+   6. LADEN / SHOP RENDERN
+   ------------------------------------------------------------------- */
+function buyClickUpgrade(){
+  const c = clickUpgradeCost();
+  if(state.sun < c) return;
+  state.sun -= c; state.clickLevel++; state.clickPower++;
+  renderAll();
+}
+function buySunflower(){
+  const c = sunflowerCost();
+  if(state.sun < c) return;
+  state.sun -= c; state.sunflowers++;
+  renderAll();
+}
+function buyBoost(){
+  const c = boostCost();
+  if(state.sun < c) return;
+  state.sun -= c; state.boostLevel++;
+  renderAll();
+}
+
+function renderShop(){
+  const cards = [
+    {
+      name:"👆 Klick-Upgrade", cost:clickUpgradeCost(),
+      desc:`+1 Sonne pro Klick (aktuell ${state.clickPower}). Level ${state.clickLevel}.`,
+      buy:buyClickUpgrade, locked:false,
+    },
+    {
+      name:"🌻 Sonnenblume (Idle)", cost:sunflowerCost(),
+      desc:`Erzeugt automatisch Sonne. Besitzt: ${state.sunflowers}.`,
+      buy:buySunflower, locked:false,
+    },
+    {
+      name:"⚡ Wachstums-Boost", cost:boostCost(),
+      desc:`+50% Sonnenblumen-Produktion pro Level. Level ${state.boostLevel}.`,
+      buy:buyBoost, locked:state.totalSun < 100,
+      lockMsg:"Ab 100 gesamter Sonne",
+    },
+  ];
+  ui.shopGrid.innerHTML = "";
+  cards.forEach(c=>{
+    const div = document.createElement("div");
+    div.className = "card" + (c.locked ? " locked" : "");
+    div.innerHTML = `
+      <div class="name">${c.name}</div>
+      <div class="desc">${c.locked ? (c.lockMsg||"Gesperrt") : c.desc}</div>
+      <div class="row">
+        <span class="muted">☀️ ${fmt(c.cost)}</span>
+        <button ${(c.locked || state.sun < c.cost) ? "disabled":""}>Kaufen</button>
+      </div>`;
+    if(!c.locked) div.querySelector("button").addEventListener("click", c.buy);
+    ui.shopGrid.appendChild(div);
+  });
+}
+
+/* ---------------------------------------------------------------------
+   7. MEILENSTEINE RENDERN
+   ------------------------------------------------------------------- */
+function renderMilestones(){
+  ui.milestones.innerHTML = "";
+  MILESTONES.forEach(m=>{
+    const done = state.totalSun >= m.at;
+    const div = document.createElement("div");
+    div.className = "ms " + (done ? "done":"todo");
+    div.innerHTML = `<span class="icon">${done?"✅":"🔒"}</span>
+      <span>${m.text} <span class="muted">(${fmt(m.at)} Sonne gesamt)</span></span>`;
+    ui.milestones.appendChild(div);
+  });
+}
+
+/* ---------------------------------------------------------------------
+   8. TOP-LEISTE + GESAMT-RENDER
+   ------------------------------------------------------------------- */
+function renderTop(){
+  ui.sunCount.textContent = fmt(state.sun);
+  ui.spsCount.textContent = fmt(sps());
+  ui.totalCount.textContent = fmt(state.totalSun);
+  ui.clickPowerLbl.textContent = state.clickPower;
+}
+function renderAll(){
+  renderTop();
+  renderShop();
+  renderMilestones();
+  ui.defenseUnlockPanel.classList.toggle("hidden", !state.defenseUnlocked);
+}
+
+/* ---------------------------------------------------------------------
+   9. IDLE-SCHLEIFE (Produktion) + SPEICHERN
+   ------------------------------------------------------------------- */
+let acc = 0;
+setInterval(()=>{
+  const gain = sps()/10;   // alle 100ms
+  if(gain>0){ addSun(gain); }
+  acc += 0.1;
+  renderTop();
+  if(acc>=1){ acc=0; ui.defenseUnlockPanel.classList.toggle("hidden", !state.defenseUnlocked); renderShop(); renderMilestones(); }
+}, 100);
+
+function save(){ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }
+function load(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) return;
+    Object.assign(state, JSON.parse(raw));
+    if(!state.unlocked) state.unlocked = {};
+    state.unlocked.sunflower = true;
+    recalcUnlocks();
+  }catch(e){ console.warn("Laden fehlgeschlagen", e); }
+}
+setInterval(save, 5000);
+window.addEventListener("beforeunload", save);
+
+ui.resetBtn.addEventListener("click", ()=>{
+  if(confirm("Wirklich ALLES zurücksetzen?")){
+    localStorage.removeItem(SAVE_KEY);
+    location.reload();
+  }
+});
+
+/* ---------------------------------------------------------------------
+   10. PHASENWECHSEL
+   ------------------------------------------------------------------- */
+ui.startDefenseBtn.addEventListener("click", ()=>{
+  ui.gardenPhase.classList.add("hidden");
+  ui.defensePhase.classList.remove("hidden");
+  Battle.start();
+});
+$("leaveBtn").addEventListener("click", ()=>{
+  Battle.stop();
+  ui.defensePhase.classList.add("hidden");
+  ui.gardenPhase.classList.remove("hidden");
+  renderAll();
+});
+
+/* Battle wird im nächsten Script-Block definiert */
+</script>
+
+<script>
+"use strict";
+/* =====================================================================
+   VERTEIDIGUNGS-MODUS — Plants vs Zombies
+   ===================================================================== */
+const Battle = (function(){
+  const canvas = document.getElementById("lawn");
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  const ROWS = 5, COLS = 9;
+  const HUD_H = 0;                          // reserve top (fallende Sonne)
+  const cellW = W / COLS;
+  const cellH = H / ROWS;
+
+  let running = false;
+  let rafId = null;
+  let lastTime = 0;
+
+  // Laufzeit-Zustand
+  let sun, plants, zombies, peas, suns, effects;
+  let selected = null;                      // gewählte Pflanze (key)
+  let cooldowns = {};                       // key -> restliche Sekunden
+  let wave, totalWaves, zombiesToSpawn, spawnTimer, waveDelay, inWave, betweenWaveTimer;
+  let skySunTimer;
+  let gameOver = false;
+
+  const seedbar = document.getElementById("seedbar");
+  const battleSunLbl = document.getElementById("battleSun");
+  const waveInfoLbl = document.getElementById("waveInfo");
+
+  /* ----- Zombie-Typen ----- */
+  function makeZombie(row, kind){
+    const base = { basic:{hp:180,speed:16,dmg:40,emoji:"🧟"},
+                   cone: {hp:340,speed:15,dmg:40,emoji:"🧟‍♂️"},
+                   bucket:{hp:560,speed:14,dmg:45,emoji:"🧟‍♀️"} }[kind];
+    return {
+      row, kind,
+      x: W + 20,
+      y: row*cellH + cellH/2,
+      hp: base.hp, maxHp: base.hp,
+      speed: base.speed, dmg: base.dmg, emoji: base.emoji,
+      slowTimer: 0, eating:false,
+    };
+  }
+
+  /* ----- Start / Stop ----- */
+  function start(){
+    sun = 50;
+    plants = [];
+    zombies = [];
+    peas = [];
+    suns = [];
+    effects = [];
+    cooldowns = {};
+    selected = null;
+    gameOver = false;
+
+    // Wellenanzahl steigt mit gewonnenen Kämpfen
+    totalWaves = 3 + Math.min(state.battlesWon, 4);
+    wave = 0;
+    inWave = false;
+    betweenWaveTimer = 3;      // Vorbereitungszeit
+    skySunTimer = 5;
+
+    buildSeedbar();
+    updateHud();
+    running = true;
+    lastTime = performance.now();
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function stop(){
+    running = false;
+    if(rafId) cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+
+  /* ----- Seedbar (Pflanzenauswahl) ----- */
+  function buildSeedbar(){
+    seedbar.innerHTML = "";
+    Object.values(PLANTS).forEach(p=>{
+      if(!state.unlocked[p.key]) return;
+      const el = document.createElement("div");
+      el.className = "seed";
+      el.dataset.key = p.key;
+      el.innerHTML = `<span class="emoji">${p.emoji}</span>
+        <span>${p.name.split(" ")[0].slice(0,7)}</span>
+        <span class="cost">☀️${p.cost}</span>
+        <div class="cd hidden"></div>`;
+      el.addEventListener("click", ()=>selectSeed(p.key));
+      seedbar.appendChild(el);
+    });
+  }
+  function selectSeed(key){
+    if((cooldowns[key]||0) > 0) return;
+    if(sun < PLANTS[key].cost) return;
+    selected = (selected===key) ? null : key;
+    refreshSeedbar();
+  }
+  function refreshSeedbar(){
+    [...seedbar.children].forEach(el=>{
+      const key = el.dataset.key;
+      const p = PLANTS[key];
+      const cd = cooldowns[key]||0;
+      el.classList.toggle("selected", selected===key);
+      el.classList.toggle("cant", sun < p.cost || cd>0);
+      const cdEl = el.querySelector(".cd");
+      if(cd>0){ cdEl.classList.remove("hidden"); cdEl.textContent = Math.ceil(cd); }
+      else cdEl.classList.add("hidden");
+    });
+  }
+
+  /* ----- Pflanzen platzieren ----- */
+  canvas.addEventListener("click", (e)=>{
+    if(gameOver) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left) * (W/rect.width);
+    const my = (e.clientY - rect.top)  * (H/rect.height);
+
+    // Zuerst: fallende Sonne einsammeln?
+    for(let i=suns.length-1;i>=0;i--){
+      const s = suns[i];
+      if(Math.hypot(mx-s.x, my-s.y) < 26){
+        sun += s.value; suns.splice(i,1); updateHud(); refreshSeedbar();
+        return;
+      }
+    }
+    if(!selected) return;
+    const col = Math.floor(mx / cellW);
+    const row = Math.floor(my / cellH);
+    if(col<0||col>=COLS||row<0||row>=ROWS) return;
+    if(plants.some(p=>p.col===col && p.row===row)) return;   // besetzt
+    const p = PLANTS[selected];
+    if(sun < p.cost) return;
+
+    sun -= p.cost;
+    plantAt(selected, row, col);
+    cooldowns[selected] = p.cooldown;
+    selected = null;
+    updateHud(); refreshSeedbar();
+  });
+
+  function plantAt(key, row, col){
+    const def = PLANTS[key];
+    const plant = {
+      key, row, col,
+      x: col*cellW + cellW/2,
+      y: row*cellH + cellH/2,
+      hp: def.hp, maxHp: def.hp,
+      emoji: def.emoji,
+      timer: 0,                 // für Schuss/Sonnen-Produktion
+    };
+    if(key==="cherrybomb"){
+      // sofort explodieren
+      explode(plant.x, plant.y, 1);
+      // kurze Anzeige, dann verschwinden -> als effect
+      effects.push({type:"boom", x:plant.x, y:plant.y, t:0.5});
+      return;
+    }
+    plants.push(plant);
+  }
+
+  function explode(x,y,rangeCells){
+    const r = rangeCells * cellW * 1.4;
+    zombies.forEach(z=>{ if(Math.hypot(z.x-x, z.y-y) < r) z.hp -= 1800; });
+    effects.push({type:"explosion", x, y, t:0.4, r});
+  }
+
+  /* ----- Update-Logik ----- */
+  function update(dt){
+    // Cooldowns
+    for(const k in cooldowns){ if(cooldowns[k]>0){ cooldowns[k]=Math.max(0,cooldowns[k]-dt); } }
+
+    // Himmels-Sonne
+    skySunTimer -= dt;
+    if(skySunTimer<=0){
+      skySunTimer = 8 + Math.random()*4;
+      suns.push({ x:60+Math.random()*(W-120), y:-20, targetY:80+Math.random()*(H-160),
+                  value:25, vy:60, life:12, falling:true });
+    }
+
+    // Wellensteuerung
+    if(!inWave){
+      betweenWaveTimer -= dt;
+      if(betweenWaveTimer<=0){
+        wave++;
+        if(wave>totalWaves){
+          if(zombies.length===0){ win(); return; }
+        }else{
+          startWave();
+        }
+      }
+    } else {
+      // Zombies spawnen
+      spawnTimer -= dt;
+      if(zombiesToSpawn>0 && spawnTimer<=0){
+        spawnTimer = 1.4 + Math.random()*1.6;
+        const row = Math.floor(Math.random()*ROWS);
+        const roll = Math.random();
+        let kind = "basic";
+        if(wave>=2 && roll>0.7) kind = "cone";
+        if(wave>=3 && roll>0.88) kind = "bucket";
+        zombies.push(makeZombie(row, kind));
+        zombiesToSpawn--;
+      }
+      if(zombiesToSpawn<=0 && zombies.length===0){
+        inWave = false;
+        betweenWaveTimer = (wave>=totalWaves) ? 0.5 : 6;
+      }
+    }
+
+    // Pflanzen
+    plants.forEach(p=>{
+      p.timer += dt;
+      if(p.key==="sunflower"){
+        if(p.timer>=7){ p.timer=0; spawnPlantSun(p); }
+      } else if(p.key==="peashooter"||p.key==="snowpea"||p.key==="repeater"){
+        const shootInterval = 1.5;
+        const zombieAhead = zombies.some(z=>z.row===p.row && z.x>p.x-10);
+        if(p.timer>=shootInterval && zombieAhead){
+          p.timer = 0;
+          firePea(p);
+          if(p.key==="repeater"){
+            // zweite Erbse leicht versetzt
+            setTimeout(()=>{ if(running) firePea(p, 12); }, 130);
+          }
+        }
+      }
+    });
+
+    // Erbsen
+    for(let i=peas.length-1;i>=0;i--){
+      const pea = peas[i];
+      pea.x += pea.vx*dt;
+      if(pea.x>W+20){ peas.splice(i,1); continue; }
+      // Treffer?
+      const hit = zombies.find(z=>z.row===pea.row && Math.abs(z.x-pea.x)<26 && z.hp>0);
+      if(hit){
+        hit.hp -= pea.dmg;
+        if(pea.slow) hit.slowTimer = 3;
+        effects.push({type:"splat", x:pea.x, y:pea.y, t:0.15, slow:pea.slow});
+        peas.splice(i,1);
+      }
+    }
+
+    // Zombies bewegen / fressen
+    for(let i=zombies.length-1;i>=0;i--){
+      const z = zombies[i];
+      if(z.hp<=0){ zombies.splice(i,1); continue; }
+      const slowFactor = z.slowTimer>0 ? 0.5 : 1;
+      if(z.slowTimer>0) z.slowTimer -= dt;
+
+      // Pflanze im Weg?
+      const target = plants.find(p=>p.row===z.row &&
+                     z.x - (p.col*cellW+cellW/2) < cellW*0.55 &&
+                     z.x - (p.col*cellW+cellW/2) > -6);
+      if(target){
+        z.eating = true;
+        target.hp -= z.dmg*dt;
+        if(target.hp<=0){ plants.splice(plants.indexOf(target),1); z.eating=false; }
+      } else {
+        z.eating = false;
+        z.x -= z.speed*slowFactor*dt;
+      }
+      if(z.x < -10){ lose(); return; }
+    }
+
+    // Fallende / erzeugte Sonne
+    for(let i=suns.length-1;i>=0;i--){
+      const s = suns[i];
+      if(s.falling && s.y<s.targetY){ s.y += s.vy*dt; }
+      else s.falling=false;
+      s.life -= dt;
+      if(s.life<=0) suns.splice(i,1);
+    }
+
+    // Effekte
+    for(let i=effects.length-1;i>=0;i--){
+      effects[i].t -= dt;
+      if(effects[i].t<=0) effects.splice(i,1);
+    }
+
+    refreshSeedbar();
+  }
+
+  function startWave(){
+    inWave = true;
+    zombiesToSpawn = 4 + wave*2 + Math.floor(state.battlesWon/2);
+    spawnTimer = 1;
+    updateHud();
+    if(wave===totalWaves) effects.push({type:"banner", text:"🚩 LETZTE WELLE!", t:2.5});
+    else effects.push({type:"banner", text:"Welle "+wave, t:1.8});
+  }
+
+  function firePea(p, yOff=0){
+    peas.push({
+      x:p.x+18, y:p.y-6+yOff, vx:320, row:p.row,
+      dmg: p.key==="repeater"?30:40,
+      slow: p.key==="snowpea",
+    });
+  }
+  function spawnPlantSun(p){
+    suns.push({ x:p.x+ (Math.random()*20-10), y:p.y, targetY:p.y, value:25, vy:0, life:12, falling:false });
+  }
+
+  /* ----- Sieg / Niederlage ----- */
+  function win(){
+    if(gameOver) return;
+    gameOver = true; running=false;
+    state.battlesWon++;
+    const reward = 300 + state.battlesWon*200;
+    addSun(reward);
+    save();
+    showOverlay("🏆 Rasen verteidigt!",
+      `Du hast alle ${totalWaves} Wellen überlebt!<br><br>
+       Belohnung: <b style="color:#ffd54f">☀️ ${reward} Sonne</b><br>
+       Gewonnene Kämpfe: ${state.battlesWon}<br>
+       <span class="tip">Der nächste Kampf hat mehr Wellen!</span>`, true);
+  }
+  function lose(){
+    if(gameOver) return;
+    gameOver = true; running=false;
+    showOverlay("🧟 Die Zombies haben dein Haus erreicht!",
+      `Du hast Welle ${wave} von ${totalWaves} erreicht.<br><br>
+       <span class="tip">Kaufe im Garten mehr Sonnenblumen und schalte stärkere Pflanzen frei, dann versuch's erneut!</span>`, false);
+  }
+
+  function showOverlay(title, html, won){
+    stop();
+    const ov = document.createElement("div");
+    ov.className = "overlay";
+    ov.innerHTML = `<div class="box">
+        <h2>${title}</h2><p>${html}</p>
+        <div class="toolbtns">
+          <button id="ovRetry" class="big">🔁 Nochmal</button>
+          <button id="ovGarden" class="secondary big">🌻 Zum Garten</button>
+        </div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector("#ovRetry").addEventListener("click", ()=>{ ov.remove(); start(); });
+    ov.querySelector("#ovGarden").addEventListener("click", ()=>{
+      ov.remove();
+      document.getElementById("defensePhase").classList.add("hidden");
+      document.getElementById("gardenPhase").classList.remove("hidden");
+      renderAll();
+    });
+  }
+
+  /* ----- HUD ----- */
+  function updateHud(){
+    battleSunLbl.textContent = Math.floor(sun);
+    const label = inWave ? `Welle ${wave}/${totalWaves}` :
+                  (wave>=totalWaves ? "Räumen…" : `Nächste Welle in ${Math.ceil(betweenWaveTimer)}s`);
+    waveInfoLbl.textContent = label;
+  }
+
+  /* ----- Zeichnen ----- */
+  function draw(){
+    // Rasen
+    for(let r=0;r<ROWS;r++){
+      for(let c=0;c<COLS;c++){
+        ctx.fillStyle = ((r+c)%2===0) ? "#7cb342" : "#8bc34a";
+        ctx.fillRect(c*cellW, r*cellH, cellW, cellH);
+      }
+    }
+    // Platzierungs-Vorschau
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+
+    // Pflanzen
+    plants.forEach(p=>{
+      ctx.font = Math.floor(cellH*0.62)+"px serif";
+      ctx.fillText(p.emoji, p.x, p.y+2);
+      drawHpBar(p.x, p.y+cellH*0.32, p.hp/p.maxHp, "#4caf50");
+    });
+
+    // Erbsen
+    peas.forEach(pea=>{
+      ctx.beginPath();
+      ctx.fillStyle = pea.slow ? "#81d4fa" : "#7cb342";
+      ctx.arc(pea.x, pea.y, 7, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle="#33691e"; ctx.stroke();
+    });
+
+    // Zombies
+    zombies.forEach(z=>{
+      ctx.font = Math.floor(cellH*0.6)+"px serif";
+      if(z.slowTimer>0){ ctx.globalAlpha=0.85; }
+      ctx.fillText(z.emoji, z.x, z.y+2);
+      ctx.globalAlpha=1;
+      drawHpBar(z.x, z.y-cellH*0.34, z.hp/z.maxHp, "#e53935");
+      if(z.slowTimer>0){ ctx.font="16px serif"; ctx.fillText("❄️", z.x+16, z.y-cellH*0.30); }
+    });
+
+    // Sonne
+    suns.forEach(s=>{
+      ctx.font = "34px serif";
+      const wobble = Math.sin(Date.now()/200 + s.x)*2;
+      ctx.fillText("☀️", s.x, s.y+wobble);
+    });
+
+    // Effekte
+    effects.forEach(ef=>{
+      if(ef.type==="splat"){
+        ctx.beginPath(); ctx.fillStyle= ef.slow?"#b3e5fc":"#aed581";
+        ctx.globalAlpha = ef.t/0.15;
+        ctx.arc(ef.x, ef.y, 12, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+      } else if(ef.type==="explosion"||ef.type==="boom"){
+        ctx.font = Math.floor(cellH*1.1)+"px serif";
+        ctx.globalAlpha = Math.max(0, ef.t/0.4);
+        ctx.fillText("💥", ef.x, ef.y); ctx.globalAlpha=1;
+      } else if(ef.type==="banner"){
+        ctx.globalAlpha = Math.min(1, ef.t);
+        ctx.fillStyle="rgba(0,0,0,.55)"; ctx.fillRect(0,H/2-34,W,68);
+        ctx.fillStyle="#fff"; ctx.font="bold 34px Trebuchet MS";
+        ctx.fillText(ef.text, W/2, H/2);
+        ctx.globalAlpha=1;
+      }
+    });
+  }
+
+  function drawHpBar(x,y,frac,color){
+    if(frac>=1) return;
+    frac = Math.max(0,frac);
+    const w=cellW*0.6, h=5;
+    ctx.fillStyle="rgba(0,0,0,.5)"; ctx.fillRect(x-w/2, y, w, h);
+    ctx.fillStyle=color; ctx.fillRect(x-w/2, y, w*frac, h);
+  }
+
+  /* ----- Hauptschleife ----- */
+  function loop(now){
+    if(!running) return;
+    let dt = (now - lastTime)/1000;
+    lastTime = now;
+    if(dt>0.1) dt = 0.1;          // Sprünge begrenzen
+    update(dt);
+    updateHud();
+    draw();
+    rafId = requestAnimationFrame(loop);
+  }
+
+  return { start, stop };
+})();
+
+/* ---------------------------------------------------------------------
+   INITIALISIERUNG
+   ------------------------------------------------------------------- */
+load();
+recalcUnlocks();
+renderAll();
+console.log("Garten der Verteidigung bereit.");
+</script>
+</body>
+</html>
