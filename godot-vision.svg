@@ -1,0 +1,249 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="860" viewBox="0 0 1280 860" font-family="'Trebuchet MS','Segoe UI',sans-serif">
+<defs>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#8fd3ff"/><stop offset="0.5" stop-color="#bfe9d0"/><stop offset="1" stop-color="#dff3bd"/>
+  </linearGradient>
+  <radialGradient id="sunG" cx="0.35" cy="0.3" r="0.75"><stop offset="0" stop-color="#fff7c8"/><stop offset="0.55" stop-color="#ffd84a"/><stop offset="1" stop-color="#f39c12"/></radialGradient>
+  <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#84cf5f"/><stop offset="1" stop-color="#67ad49"/></linearGradient>
+  <linearGradient id="gB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fd968"/><stop offset="1" stop-color="#72b953"/></linearGradient>
+  <linearGradient id="leaf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8ee86a"/><stop offset="1" stop-color="#3f9e34"/></linearGradient>
+  <linearGradient id="hudG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d3327"/><stop offset="1" stop-color="#0d1c14"/></linearGradient>
+  <linearGradient id="btnG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7ef7a6"/><stop offset="1" stop-color="#34c06a"/></linearGradient>
+  <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6d4a2b"/><stop offset="1" stop-color="#4e3319"/></linearGradient>
+  <linearGradient id="sci" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#123036"/><stop offset="1" stop-color="#0a1a1e"/></linearGradient>
+  <radialGradient id="vig" cx="0.5" cy="0.45" r="0.75"><stop offset="0.6" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.28"/></radialGradient>
+  <filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#123" flood-opacity="0.35"/></filter>
+  <filter id="glow"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+
+  <!-- ===== SYMBOLS (wie 'PNG-Sprites') ===== -->
+  <g id="sunflower">
+    <ellipse cx="0" cy="46" rx="26" ry="9" fill="#000" opacity="0.15"/>
+    <rect x="-7" y="8" width="14" height="40" rx="6" fill="url(#leaf)"/>
+    <path d="M-6 30 Q-34 22 -40 40 Q-18 44 -6 34Z" fill="url(#leaf)"/>
+    <g>
+      <g id="pet"><ellipse cx="0" cy="-30" rx="9" ry="18" fill="#ffd84a" stroke="#e8a81f" stroke-width="2"/></g>
+      <use href="#pet" transform="rotate(40)"/><use href="#pet" transform="rotate(80)"/><use href="#pet" transform="rotate(120)"/>
+      <use href="#pet" transform="rotate(160)"/><use href="#pet" transform="rotate(200)"/><use href="#pet" transform="rotate(240)"/>
+      <use href="#pet" transform="rotate(280)"/><use href="#pet" transform="rotate(320)"/>
+    </g>
+    <circle cx="0" cy="0" r="21" fill="#8a5a1a"/><circle cx="0" cy="0" r="21" fill="url(#sunG)" opacity="0.35"/>
+    <circle cx="-8" cy="-4" r="4.5" fill="#fff"/><circle cx="8" cy="-4" r="4.5" fill="#fff"/>
+    <circle cx="-7" cy="-3" r="2.4" fill="#241708"/><circle cx="9" cy="-3" r="2.4" fill="#241708"/>
+    <path d="M-8 9 Q0 16 8 9" stroke="#241708" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <g id="peashooter">
+    <ellipse cx="0" cy="48" rx="24" ry="8" fill="#000" opacity="0.15"/>
+    <rect x="-9" y="6" width="18" height="44" rx="9" fill="url(#leaf)"/>
+    <path d="M-8 34 Q-32 30 -36 46 Q-16 46 -8 38Z" fill="#4fae3e"/>
+    <ellipse cx="4" cy="-4" rx="24" ry="20" fill="url(#leaf)"/>
+    <circle cx="26" cy="-4" r="11" fill="#3f9e34"/><circle cx="34" cy="-4" r="6" fill="#2b6e22"/>
+    <circle cx="-2" cy="-9" r="4" fill="#fff"/><circle cx="-1" cy="-8" r="2" fill="#173"/>
+  </g>
+
+  <g id="wallnut">
+    <ellipse cx="0" cy="42" rx="26" ry="8" fill="#000" opacity="0.15"/>
+    <ellipse cx="0" cy="4" rx="30" ry="38" fill="#9a6535" stroke="#6e451f" stroke-width="3"/>
+    <ellipse cx="-6" cy="-6" rx="16" ry="18" fill="#b57e46" opacity="0.7"/>
+    <circle cx="-10" cy="2" r="4.5" fill="#fff"/><circle cx="10" cy="2" r="4.5" fill="#fff"/>
+    <circle cx="-9" cy="3" r="2.4" fill="#2a1a0e"/><circle cx="11" cy="3" r="2.4" fill="#2a1a0e"/>
+    <path d="M-10 18 Q0 24 10 18" stroke="#2a1a0e" stroke-width="3" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <g id="zombie">
+    <ellipse cx="0" cy="56" rx="20" ry="7" fill="#000" opacity="0.18"/>
+    <rect x="-15" y="2" width="30" height="46" rx="9" fill="#5f7a6b"/>
+    <rect x="-15" y="24" width="30" height="10" fill="#4d6559"/>
+    <rect x="-19" y="10" width="9" height="26" rx="4" fill="#88958c"/>
+    <rect x="14" y="4" width="9" height="24" rx="4" fill="#88958c"/>
+    <circle cx="0" cy="-16" r="17" fill="#9db08c"/>
+    <path d="M-17 -16 a17 17 0 0 1 34 0" fill="#8aa07a"/>
+    <circle cx="-6" cy="-18" r="3" fill="#1a1a1a"/><circle cx="6" cy="-18" r="3" fill="#c0392b"/>
+    <path d="M-7 -6 h14" stroke="#3a2a20" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+
+  <g id="conezombie">
+    <use href="#zombie"/>
+    <path d="M-13 -30 L0 -60 L13 -30 Z" fill="#e08b3a" stroke="#a5641f" stroke-width="3"/>
+    <path d="M-8 -40 h16 M-11 -33 h22" stroke="#a5641f" stroke-width="2"/>
+  </g>
+
+  <g id="mower">
+    <ellipse cx="18" cy="30" rx="24" ry="6" fill="#000" opacity="0.2"/>
+    <rect x="0" y="2" width="40" height="22" rx="6" fill="#d84a3a" stroke="#9c2f22" stroke-width="2"/>
+    <rect x="6" y="-6" width="14" height="12" rx="3" fill="#b23a2c"/>
+    <circle cx="10" cy="26" r="9" fill="#333"/><circle cx="10" cy="26" r="4" fill="#777"/>
+    <circle cx="32" cy="26" r="9" fill="#333"/><circle cx="32" cy="26" r="4" fill="#777"/>
+  </g>
+</defs>
+
+<!-- ===================== MAIN SCENE (Tag) ===================== -->
+<rect width="1280" height="860" fill="#0a120c"/>
+<rect x="0" y="58" width="1280" height="560" fill="url(#sky)"/>
+<!-- clouds -->
+<g fill="#ffffff" opacity="0.8"><ellipse cx="300" cy="120" rx="55" ry="22"/><ellipse cx="340" cy="112" rx="40" ry="20"/><ellipse cx="900" cy="150" rx="60" ry="24"/><ellipse cx="850" cy="158" rx="42" ry="18"/></g>
+<circle cx="1150" cy="120" r="58" fill="url(#sunG)" filter="url(#glow)"/>
+
+<!-- house / lab on the left the zombies march toward -->
+<g transform="translate(150,300)">
+  <rect x="-4" y="-40" width="70" height="250" fill="#3a2e5a"/>
+  <rect x="6" y="-10" width="48" height="40" rx="4" fill="#6b5fa0"/>
+  <rect x="6" y="60" width="48" height="40" rx="4" fill="#6b5fa0"/>
+  <rect x="14" y="140" width="34" height="70" rx="4" fill="#241a3a"/>
+  <path d="M-14 -40 L30 -78 L74 -40 Z" fill="#2a2046"/>
+  <circle cx="30" cy="-52" r="10" fill="#5ee8e8" opacity="0.8"/>
+</g>
+
+<!-- ===== LAWN (5 rows) ===== -->
+<g transform="translate(210,120)">
+  <g>
+    <rect x="0" y="0"   width="900" height="96" fill="url(#gA)"/>
+    <rect x="0" y="96"  width="900" height="96" fill="url(#gB)"/>
+    <rect x="0" y="192" width="900" height="96" fill="url(#gA)"/>
+    <rect x="0" y="288" width="900" height="96" fill="url(#gB)"/>
+    <rect x="0" y="384" width="900" height="96" fill="url(#gA)"/>
+  </g>
+  <!-- grass blades texture -->
+  <g stroke="#4f9a3e" stroke-width="2" opacity="0.35" stroke-linecap="round">
+    <path d="M40 90 l4 -12 M120 186 l4 -12 M300 282 l4 -12 M520 90 l4 -12 M700 378 l4 -12 M820 186 l-4 -12 M420 474 l4 -12 M640 282 l-4 -12"/>
+  </g>
+  <g stroke="#ffffff" stroke-opacity="0.07"><line x1="100" y1="0" x2="100" y2="480"/><line x1="200" y1="0" x2="200" y2="480"/><line x1="300" y1="0" x2="300" y2="480"/><line x1="400" y1="0" x2="400" y2="480"/><line x1="500" y1="0" x2="500" y2="480"/><line x1="600" y1="0" x2="600" y2="480"/><line x1="700" y1="0" x2="700" y2="480"/><line x1="800" y1="0" x2="800" y2="480"/></g>
+  <rect x="0" y="0" width="900" height="480" fill="none" stroke="#3a2b18" stroke-width="5" rx="8"/>
+
+  <!-- mowers -->
+  <use href="#mower" transform="translate(-46,30)"/>
+  <use href="#mower" transform="translate(-46,222)"/>
+  <use href="#mower" transform="translate(-46,414)"/>
+
+  <!-- plants -->
+  <use href="#sunflower" transform="translate(52,52)"/>
+  <use href="#sunflower" transform="translate(52,436)"/>
+  <use href="#peashooter" transform="translate(150,150)"/>
+  <use href="#peashooter" transform="translate(150,340)"/>
+  <use href="#peashooter" transform="translate(250,340)"/>
+  <use href="#wallnut" transform="translate(360,240)"/>
+
+  <!-- peas -->
+  <g fill="#9cf06a" stroke="#3f9e34" stroke-width="2" filter="url(#soft)"><circle cx="330" cy="146" r="8"/><circle cx="430" cy="146" r="8"/><circle cx="360" cy="336" r="8"/><circle cx="470" cy="336" r="8"/></g>
+
+  <!-- sun tokens -->
+  <g filter="url(#glow)"><circle cx="120" cy="60" r="16" fill="url(#sunG)"/><circle cx="620" cy="300" r="16" fill="url(#sunG)"/></g>
+
+  <!-- zombies -->
+  <use href="#zombie" transform="translate(760,58)"/>
+  <use href="#conezombie" transform="translate(840,250)"/>
+  <use href="#zombie" transform="translate(700,346)"/>
+  <use href="#conezombie" transform="translate(860,442)"/>
+</g>
+
+<rect x="210" y="120" width="900" height="480" fill="url(#vig)" pointer-events="none"/>
+
+<!-- ===== TOP HUD ===== -->
+<rect x="0" y="0" width="1280" height="58" fill="url(#hudG)"/>
+<rect x="0" y="56" width="1280" height="3" fill="#5ee88a" opacity="0.35"/>
+<text x="26" y="38" fill="#5ee88a" font-size="22" font-weight="bold" letter-spacing="3">🧬 BOTANIK-LABOR</text>
+<g font-size="18" font-weight="bold" filter="url(#soft)">
+  <rect x="338" y="13" width="118" height="32" rx="16" fill="#0c1a12" stroke="#ffd84a" stroke-width="2"/><text x="356" y="36" fill="#ffd84a">☀ 320</text>
+  <rect x="466" y="13" width="106" height="32" rx="16" fill="#0c1a12" stroke="#5ee8e8" stroke-width="2"/><text x="484" y="36" fill="#5ee8e8">🧬 47</text>
+  <rect x="582" y="13" width="106" height="32" rx="16" fill="#0c1a12" stroke="#ffcf4d" stroke-width="2"/><text x="600" y="36" fill="#ffcf4d">🪙 62</text>
+  <rect x="698" y="13" width="96" height="32" rx="16" fill="#0c1a12" stroke="#e0aaff" stroke-width="2"/><text x="716" y="36" fill="#e0aaff">🧠 9</text>
+</g>
+<g font-size="13" font-weight="bold">
+  <rect x="928" y="14" width="104" height="30" rx="11" fill="#13241a" stroke="#5ee8e8" stroke-width="1.5"/><text x="942" y="34" fill="#5ee8e8">🔬 Forschung</text>
+  <rect x="1040" y="14" width="82" height="30" rx="11" fill="#13241a" stroke="#23402c" stroke-width="1.5"/><text x="1052" y="34" fill="#eaf2e6">🪙 Laden</text>
+  <rect x="1130" y="14" width="128" height="30" rx="11" fill="#13241a" stroke="#e0aaff" stroke-width="1.5"/><text x="1144" y="34" fill="#e0aaff">🧠 Wiedergeburt</text>
+</g>
+
+<!-- ===== LEFT SEED SHELF ===== -->
+<rect x="0" y="58" width="150" height="560" fill="#0c1710"/>
+<text x="75" y="84" text-anchor="middle" fill="#7a8f7c" font-size="10" letter-spacing="2">PFLANZEN</text>
+<g>
+  <g transform="translate(20,94)"><rect width="110" height="70" rx="12" fill="url(#wood)" stroke="#5ee88a" stroke-width="2.5"/><use href="#sunflower" transform="translate(30,36) scale(0.6)"/><text x="66" y="30" fill="#eaf2e6" font-size="11">Sonne</text><text x="66" y="52" fill="#ffd84a" font-size="13" font-weight="bold">☀50</text></g>
+  <g transform="translate(20,172)"><rect width="110" height="70" rx="12" fill="url(#wood)" stroke="#23402c" stroke-width="2.5"/><use href="#peashooter" transform="translate(30,38) scale(0.55)"/><text x="66" y="30" fill="#eaf2e6" font-size="11">Erbse</text><text x="66" y="52" fill="#ffd84a" font-size="13" font-weight="bold">☀100</text></g>
+  <g transform="translate(20,250)"><rect width="110" height="70" rx="12" fill="url(#wood)" stroke="#23402c" stroke-width="2.5"/><use href="#wallnut" transform="translate(30,38) scale(0.5)"/><text x="66" y="30" fill="#eaf2e6" font-size="11">Wand</text><text x="66" y="52" fill="#ffd84a" font-size="13" font-weight="bold">☀50</text></g>
+  <g transform="translate(20,328)" opacity="0.45"><rect width="110" height="70" rx="12" fill="url(#wood)" stroke="#23402c" stroke-width="2.5"/><rect x="16" y="20" width="28" height="30" rx="8" fill="#7bbf4a"/><text x="60" y="30" fill="#eaf2e6" font-size="11">Werfer</text><text x="60" y="52" fill="#7a8f7c" font-size="12">🔒 🧬40</text></g>
+</g>
+<text x="75" y="430" text-anchor="middle" fill="#7a8f7c" font-size="10" letter-spacing="2">WERKZEUG</text>
+<g transform="translate(38,440)"><rect width="74" height="54" rx="12" fill="#13241a" stroke="#3a2c1c" stroke-width="2"/><text x="37" y="36" text-anchor="middle" font-size="24">🔧</text></g>
+
+<!-- wave status -->
+<g filter="url(#soft)"><rect x="470" y="76" width="220" height="34" rx="17" fill="#000000bb"/><text x="580" y="99" text-anchor="middle" fill="#eaf2e6" font-size="15" font-weight="bold">⚔ Welle 5 / 100 · Tag</text></g>
+
+<!-- ===== RESEARCH ATOM PANEL ===== -->
+<g transform="translate(1120,120)">
+  <rect x="0" y="0" width="150" height="480" rx="16" fill="url(#sci)" stroke="#2f6a6a" stroke-width="2"/>
+  <text x="75" y="28" text-anchor="middle" fill="#5ee8e8" font-size="13" letter-spacing="2" font-weight="bold">⚛ LABOR</text>
+  <g transform="translate(75,82)" filter="url(#glow)">
+    <ellipse rx="36" ry="15" fill="none" stroke="#5ee8e8" stroke-width="2.5" opacity="0.6"/>
+    <ellipse rx="36" ry="15" fill="none" stroke="#5ee8e8" stroke-width="2.5" opacity="0.6" transform="rotate(60)"/>
+    <ellipse rx="36" ry="15" fill="none" stroke="#5ee8e8" stroke-width="2.5" opacity="0.6" transform="rotate(120)"/>
+    <circle r="9" fill="#5ee8e8"/><circle r="15" fill="#5ee8e8" opacity="0.25"/>
+    <circle cx="36" cy="0" r="4.5" fill="#dffdff"/><circle cx="-18" cy="31" r="4.5" fill="#dffdff"/><circle cx="-18" cy="-31" r="4.5" fill="#dffdff"/>
+  </g>
+  <g font-size="11" font-weight="bold">
+    <g transform="translate(12,124)"><rect width="126" height="40" rx="10" fill="#0e2226" stroke="#2f6a6a"/><text x="9" y="17" fill="#bff">⚔ Schaden L3</text><rect x="82" y="22" width="38" height="14" rx="7" fill="#5ee8e8"/><text x="101" y="33" text-anchor="middle" fill="#052424" font-size="10">🧬9</text></g>
+    <g transform="translate(12,170)"><rect width="126" height="40" rx="10" fill="#0e2226" stroke="#2f6a6a"/><text x="9" y="17" fill="#bff">💨 Rate L2</text><rect x="82" y="22" width="38" height="14" rx="7" fill="#5ee8e8"/><text x="101" y="33" text-anchor="middle" fill="#052424" font-size="10">🧬8</text></g>
+    <g transform="translate(12,216)"><rect width="126" height="40" rx="10" fill="#0e2226" stroke="#2f6a6a"/><text x="9" y="17" fill="#bff">👆 Klick L1</text><rect x="82" y="22" width="38" height="14" rx="7" fill="#5ee8e8"/><text x="101" y="33" text-anchor="middle" fill="#052424" font-size="10">🧬5</text></g>
+    <g transform="translate(12,262)"><rect width="126" height="40" rx="10" fill="#0e2226" stroke="#2f6a6a"/><text x="9" y="17" fill="#bff">🧬 FP-Drang</text><rect x="82" y="22" width="38" height="14" rx="7" fill="#5ee8e8"/><text x="101" y="33" text-anchor="middle" fill="#052424" font-size="10">🧬14</text></g>
+  </g>
+  <text x="75" y="330" text-anchor="middle" fill="#7fb8b8" font-size="9">🌱 CHASSIS</text>
+  <g transform="translate(20,342)"><rect width="44" height="44" rx="10" fill="#13241a" stroke="#5ee88a"/><use href="#peashooter" transform="translate(22,26) scale(0.42)"/></g>
+  <g transform="translate(86,342)" opacity="0.5"><rect width="44" height="44" rx="10" fill="#13241a" stroke="#23402c"/><text x="22" y="30" text-anchor="middle" font-size="20">🥬</text></g>
+  <text x="75" y="410" text-anchor="middle" fill="#7fb8b8" font-size="9">🛠 AUSRÜSTUNG</text>
+  <g transform="translate(16,420)" font-size="18"><rect width="118" height="44" rx="10" fill="#13241a" stroke="#23402c"/><text x="59" y="30" text-anchor="middle">📖 🔧 ⏩ 🌊</text></g>
+</g>
+
+<!-- ===== START WAVE BUTTON ===== -->
+<g filter="url(#soft)" transform="translate(480,556)">
+  <rect width="360" height="60" rx="30" fill="url(#btnG)"/>
+  <text x="180" y="39" text-anchor="middle" fill="#062012" font-size="22" font-weight="bold">🌊 Welle 6 starten</text>
+</g>
+
+<!-- ===================== BOTTOM STRIP: dynamische Welt ===================== -->
+<g transform="translate(0,632)">
+  <text x="26" y="16" fill="#7a8f7c" font-size="12" letter-spacing="2">DYNAMISCHE WELT — dieselbe Rasenfläche verändert sich</text>
+  <!-- Tag -->
+  <g transform="translate(26,26)">
+    <rect width="290" height="160" rx="12" fill="#67ad49"/><rect y="0" width="290" height="160" rx="12" fill="url(#gA)"/>
+    <use href="#sunflower" transform="translate(50,70) scale(0.7)"/><use href="#peashooter" transform="translate(130,80) scale(0.7)"/><use href="#zombie" transform="translate(240,70) scale(0.8)"/>
+    <rect width="290" height="160" rx="12" fill="none" stroke="#3a2b18" stroke-width="3"/>
+    <rect x="10" y="10" width="70" height="24" rx="12" fill="#000a"/><text x="45" y="27" text-anchor="middle" fill="#ffd84a" font-size="13" font-weight="bold">☀ TAG</text>
+  </g>
+  <!-- Nacht -->
+  <g transform="translate(336,26)">
+    <rect width="290" height="160" rx="12" fill="#1a2838"/>
+    <circle cx="245" cy="35" r="18" fill="#dfe7ff"/><circle cx="238" cy="30" r="14" fill="#1a2838"/>
+    <g fill="#fff" opacity="0.7"><circle cx="60" cy="30" r="1.6"/><circle cx="110" cy="20" r="1.4"/><circle cx="170" cy="40" r="1.6"/><circle cx="90" cy="55" r="1.2"/></g>
+    <use href="#sunflower" transform="translate(50,86) scale(0.7)"/><use href="#peashooter" transform="translate(130,96) scale(0.7)"/><use href="#conezombie" transform="translate(240,88) scale(0.8)"/>
+    <rect width="290" height="160" rx="12" fill="#0a1428" opacity="0.35"/>
+    <rect width="290" height="160" rx="12" fill="none" stroke="#3a2b18" stroke-width="3"/>
+    <rect x="10" y="10" width="90" height="24" rx="12" fill="#000a"/><text x="55" y="27" text-anchor="middle" fill="#9fb8ff" font-size="13" font-weight="bold">🌙 NACHT</text>
+  </g>
+  <!-- Teich -->
+  <g transform="translate(646,26)">
+    <rect width="290" height="160" rx="12" fill="url(#gA)"/>
+    <rect y="96" width="290" height="64" rx="0" fill="#2c7d94"/><rect y="96" width="290" height="64" fill="#3a97af" opacity="0.5"/>
+    <g fill="#bfe9ff" opacity="0.5"><ellipse cx="60" cy="120" rx="20" ry="4"/><ellipse cx="180" cy="140" rx="24" ry="5"/></g>
+    <ellipse cx="120" cy="128" rx="18" ry="10" fill="#4caf50"/><circle cx="120" cy="122" r="5" fill="#ff87b2"/>
+    <use href="#sunflower" transform="translate(50,60) scale(0.62)"/><use href="#zombie" transform="translate(240,60) scale(0.75)"/>
+    <rect width="290" height="160" rx="12" fill="none" stroke="#3a2b18" stroke-width="3"/>
+    <rect x="10" y="10" width="90" height="24" rx="12" fill="#000a"/><text x="55" y="27" text-anchor="middle" fill="#8fe0ff" font-size="13" font-weight="bold">🌊 TEICH</text>
+  </g>
+  <!-- Boss -->
+  <g transform="translate(956,26)">
+    <rect width="298" height="160" rx="12" fill="#2a1836"/><rect width="298" height="160" rx="12" fill="url(#gB)" opacity="0.25"/>
+    <g transform="translate(150,95)">
+      <ellipse cx="0" cy="52" rx="46" ry="10" fill="#000" opacity="0.3"/>
+      <rect x="-40" y="-20" width="80" height="70" rx="14" fill="#7a3b3b"/>
+      <rect x="-52" y="-10" width="20" height="50" rx="9" fill="#8a4a4a"/><rect x="32" y="-10" width="20" height="50" rx="9" fill="#8a4a4a"/>
+      <circle cx="0" cy="-38" r="26" fill="#8a4a4a"/>
+      <circle cx="-9" cy="-40" r="5" fill="#ffcf4d"/><circle cx="9" cy="-40" r="5" fill="#ffcf4d"/>
+      <path d="M-12 -26 h24" stroke="#2a1010" stroke-width="4" stroke-linecap="round"/>
+    </g>
+    <rect width="298" height="160" rx="12" fill="none" stroke="#3a2b18" stroke-width="3"/>
+    <rect x="10" y="10" width="120" height="24" rx="12" fill="#000a"/><text x="70" y="27" text-anchor="middle" fill="#ff7a7a" font-size="13" font-weight="bold">👹 BOSS · 🧠</text>
+  </g>
+</g>
+
+<text x="26" y="852" fill="#3a5230" font-size="13">Godot-Konzept (Cartoon-Stil) · Sprites sind Platzhalter für deine gemalten PNGs / Addon-Assets · Wellen startest du selbst, Welt wechselt Tag→Nacht→Teich</text>
+</svg>
