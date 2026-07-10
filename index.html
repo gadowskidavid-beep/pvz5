@@ -101,6 +101,16 @@
   .rovl .rb{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px}
   .rovl .rb button{font-family:inherit;font-size:13px;padding:10px 18px;border-radius:18px;border:none;cursor:pointer;letter-spacing:1px}
   .rovl .rb .prim{background:var(--brain);color:#1a0a24} .rovl .rb .alt{background:#24402c;color:var(--paper)}
+  .rovl .box.win{border-color:#ffcf4d}
+  /* Münzen + Shop */
+  .res.coin{border-color:#ffcf4d;color:#ffcf4d}
+  .shopcard{background:#101c14;border:2px solid #f0c14b55;border-radius:12px;padding:10px;text-align:center}
+  .shopcard .e{font-size:26px}.shopcard .n{font-size:12px;margin:3px 0}
+  .shopcard .d{font-size:10px;color:var(--dim);min-height:26px;line-height:1.4}
+  .shopcard button{background:#ffcf4d;border:none;color:#2a1e05;font-family:inherit;font-size:12px;
+    padding:7px 12px;border-radius:14px;cursor:pointer;margin-top:4px}
+  .shopcard button:disabled{opacity:.35}
+  .shoplvl{font-size:10px;color:#ffcf4d}
 </style>
 </head>
 <body>
@@ -110,6 +120,7 @@
   <span class="res sun">☀ <b id="rSun">50</b></span>
   <span class="res fp">🧬 <b id="rFP">0</b></span>
   <span class="res brain">🧠 <b id="rBrain">0</b></span>
+  <span class="res coin">🪙 <b id="rCoin">0</b></span>
   <span class="sp"></span>
   <div class="timec" id="timeCtl">
     <button class="tbtn" id="tPause" title="Pause/Weiter">⏸</button>
@@ -120,6 +131,7 @@
   <button class="tbtn locked" id="btnAlmanac">📖 Almanach</button>
   <button class="tbtn locked" id="btnZombies">🧟 Zombie-Buch</button>
   <button class="tbtn locked" id="btnLab">🧪 Labor</button>
+  <button class="tbtn" id="btnShop">🪙 Laden</button>
   <button class="tbtn" id="btnPrestige">🧠 Wiedergeburt</button>
 </div>
 
@@ -164,8 +176,19 @@
 <div class="ov" id="ovPrestige"><div class="sheet"><h2 class="px">🧠 Wiedergeburt</h2>
   <div style="font-size:13px;color:var(--brain)">Verfügbar: 🧠 <b id="presBrains">0</b></div>
   <div class="grid" id="presGrid"></div>
+  <h3 class="px" style="color:#ffd0ff;font-size:13px">💠 Einzigartige Upgrades (Chain)</h3>
+  <div class="grid" id="uqGrid"></div>
   <p style="color:var(--dim);font-size:11px;max-width:460px;text-align:center;line-height:1.7">
-    Gehirne kommen von besiegten <b>Bossen</b> und bleiben dauerhaft. Kaufe permanente Boni und starte stärker.</p>
+    Gehirne kommen von besiegten <b>Bossen</b> und bleiben dauerhaft.</p>
+  </div><button class="ovclose" onclick="closeOv()">✕ Schließen</button></div>
+
+<!-- IN-RUN LADEN -->
+<div class="ov" id="ovShop"><div class="sheet"><h2 class="px">🪙 Laden — Münzen ausgeben</h2>
+  <div style="font-size:13px;color:#ffcf4d">Verfügbar: 🪙 <b id="shopCoins">0</b> <span style="color:var(--dim)">· gilt nur für diesen Run</span></div>
+  <h3 class="px" style="color:#ffcf4d;font-size:12px">Items (sofort)</h3>
+  <div class="grid" id="shopItems"></div>
+  <h3 class="px" style="color:#ffcf4d;font-size:12px">Passive (ganzer Run)</h3>
+  <div class="grid" id="shopPass"></div>
   </div><button class="ovclose" onclick="closeOv()">✕ Schließen</button></div>
 
 <!-- RUN-ENDE -->
@@ -183,9 +206,11 @@ const $=id=>document.getElementById(id);
 const TAU=Math.PI*2;
 
 /* ---------- Ressourcen / State ---------- */
-let FP=0, brains=0, prestige={};
+let FP=0, brains=0, prestige={}, coins=0, carryCoins=0;
+let runShop={}, won=false;                      // Run-Shop-Level & Sieg-Flag
 const unlocked=new Set(["root","c_sonne"]);   // erforschte Baum-Knoten
 const seenZombies=new Set();                    // fürs Zombie-Buch
+const uniques=new Set();                        // gekaufte einzigartige Gehirn-Upgrades
 
 /* ---------- CHASSIS (platzierbare Pflanzen) ---------- */
 const CHASSIS={
@@ -216,6 +241,7 @@ const MUT={
  p_ice:{e:"❄",n:"Eis-Erbse",ch:"pea",fp:5,d:"Verlangsamt Zombies",ap:s=>s.effects.push("slow")},
  p_pierce:{e:"➤",n:"Durchschuss",ch:"pea",fp:7,d:"Durchdringt alle Zombies",ap:s=>s.pierce=true},
  p_poison:{e:"☠",n:"Gift-Erbse",ch:"pea",fp:6,d:"Vergiftet (Schaden über Zeit)",ap:s=>s.effects.push("poison")},
+ p_crit:{e:"🎯",n:"Kritischer Treffer",ch:"pea",fp:8,d:"12% Chance auf 2,5× Schaden",ap:s=>s.crit+=0.12},
  /* Wall */
  w_hp:{e:"🛡",n:"Dicke Schale",ch:"wall",fp:3,d:"+320 HP",ap:s=>s.hp+=320},
  w_thorns:{e:"🌵",n:"Dornen",ch:"wall",fp:5,d:"Verletzt fressende Zombies",ap:s=>s.thorns=10},
@@ -239,6 +265,7 @@ const MUT={
  be_dmg:{e:"💪",n:"Fokus-Linse",ch:"beam",fp:6,d:"+20 Schaden",ap:s=>s.dmg+=20},
  be_rate:{e:"💨",n:"Rapid-Beam",ch:"beam",fp:7,d:"+50% Rate",ap:s=>s.rate*=1.5},
  be_flak:{e:"🎯",n:"Flak-Optik",ch:"beam",fp:6,d:"Trifft fliegende Zombies",ap:s=>s.canAir=true},
+ be_slow:{e:"❄",n:"Frost-Strahl",ch:"beam",fp:6,d:"Beam verlangsamt Zombies",ap:s=>s.effects.push("slow")},
 };
 
 /* ---------- META (globale Baum-Upgrades) ---------- */
@@ -272,6 +299,37 @@ const FIELD={
  f_mowerspawn:{e:"🔁",n:"Mäher-Werkstatt",fp:12,d:"Benutzte Rasenmäher respawnen alle 5 Min",req:"f_mowerclick"},
  f_mowerpow:{e:"🚜",n:"Turbo-Mäher",    fp:8, d:"Rasenmäher fahren schneller",req:"f_mowerspawn"},
 };
+/* ---------- KLICK & MÜNZEN (Baum-Zweig) ---------- */
+const ECON={
+ e_coin:     {e:"🪙",n:"Münzsammler",   fp:4, d:"Zombies droppen +50% Münzen"},
+ e_click:    {e:"👆",n:"Starker Finger", fp:4, d:"+15 Klick-Schaden"},
+ e_clickcoin:{e:"💰",n:"Klick-Gold",    fp:7, d:"Zombies anklicken gibt Münzen",req:"e_coin"},
+ e_coin2:    {e:"💰",n:"Goldrausch",    fp:11,d:"Nochmal +100% Münzen",req:"e_clickcoin"},
+ e_click2:   {e:"🔨",n:"Presslufthammer",fp:11,d:"+45 Klick-Schaden",req:"e_click"},
+ e_clickcrit:{e:"⚡",n:"Blitzfinger",   fp:14,d:"Klicks treffen 3 Zombies gleichzeitig",req:"e_click2"},
+};
+/* ---------- IN-RUN LADEN (Münzen) ---------- */
+const SHOP_ITEMS={
+ isun:   {e:"🌞",n:"Sofort-Sonne",  cost:8, d:"+250 Sonne sofort"},
+ ifreeze:{e:"🧊",n:"Schockfrost",   cost:16,d:"Alle Zombies einfrieren"},
+ inuke:  {e:"🍒",n:"Bomben-Regen",  cost:28,d:"800 Schaden auf ALLE Zombies"},
+ imower: {e:"🚜",n:"Mäher-Service", cost:22,d:"Alle Rasenmäher reparieren"},
+};
+const SHOP_PASS={
+ s_dmg:  {e:"⚔",n:"Kampfrausch", base:12,d:"+12% Schaden (ganzer Run)"},
+ s_rate: {e:"💨",n:"Adrenalin",  base:12,d:"+12% Feuerrate (ganzer Run)"},
+ s_sun:  {e:"☀",n:"Sonnenkraft", base:10,d:"+15% Sonne (ganzer Run)"},
+ s_click:{e:"👆",n:"Eisenfaust", base:8, d:"+25 Klick-Schaden (Run)"},
+ s_coin: {e:"🧲",n:"Münz-Magnet", base:14,d:"+50% Münzen (Run)"},
+};
+/* ---------- EINZIGARTIGE GEHIRN-UPGRADES (Chain) ---------- */
+const UNIQUE={
+ uq_head:  {e:"🌱",n:"Erststart",    cost:5, d:"Starte jeden Run mit 1 Erbsenschützen"},
+ uq_mower: {e:"🚜",n:"Ersatz-Mäher", cost:12,d:"Jede Reihe hat 1 Ersatz-Rasenmäher",req:"uq_head"},
+ uq_coins: {e:"🪙",n:"Sparschwein",  cost:16,d:"Behalte 25% Münzen in den nächsten Run",req:"uq_mower"},
+ uq_crit:  {e:"💥",n:"Overkill",     cost:22,d:"+10% Krit-Chance auf ALLE Pflanzen",req:"uq_coins"},
+ uq_revive:{e:"💖",n:"Zweites Leben",cost:32,d:"Einmal pro Run eine Niederlage überleben",req:"uq_crit"},
+};
 
 /* ---------- Prestige (Gehirne) ---------- */
 const PRESTIGE={
@@ -293,12 +351,14 @@ const ZTYPES={
  vaulter:{hp:220,speed:22,dmg:40,e:"🏃",  n:"Stangenspringer", fp:3,vault:true},
  balloon:{hp:110,speed:22,dmg:40,e:"🎈",  n:"Ballon-Zombie",   fp:3,flying:true},
  boss:   {hp:4000,speed:9,dmg:120,e:"👹", n:"Gargantuar (BOSS)",fp:12,boss:true,brain:6},
+ miniboss:{hp:1600,speed:11,dmg:80, e:"👺",n:"Mini-Boss",       fp:6, boss:true,brain:3},
+ megaboss:{hp:26000,speed:7,dmg:220,e:"👿",n:"Ober-Gargantuar", fp:60,boss:true,brain:35,final:true},
 };
 
 /* ---------- BAUM-LAYOUT (programmatisch, groß) ---------- */
 let nodes=[], sel=null, cam={x:0,y:0}, zoom=0.85;
 function mkNode(id,x,y,kind,ref,req,fp,e,n,d,c){ nodes.push({id,x,y,kind,ref,req,fp,e,n,d,c}); }
-const COL={chassis:"#5ee88a",mut:"#ff7a7a",meta:"#f0c14b",util:"#6ab8ff",field:"#4fd0c0"};
+const COL={chassis:"#5ee88a",mut:"#ff7a7a",meta:"#f0c14b",util:"#6ab8ff",field:"#4fd0c0",econ:"#ffcf4d"};
 /* Chassis-Hubs mit Fächer-Richtung */
 const HUBS={
  sonne:  {x:-170,y:0,   req:["root"], dir:[-1,0]},
@@ -342,6 +402,11 @@ function buildTree(){
   fk.forEach((k,i)=>{ const f=FIELD[k];
     const req=f.req?["field_"+f.req]:(i===0?["root"]:["field_"+fk[i-1]]);
     mkNode("field_"+k,-520-(i%2)*60,-190+i*62,"field",k,req,f.fp,f.e,f.n,f.d,COL.field); });
+  // KLICK & MÜNZEN rechts (eigener Ast)
+  const ek=Object.keys(ECON);
+  ek.forEach((k,i)=>{ const en=ECON[k];
+    const req=en.req?["econ_"+en.req]:(i===0?["root"]:["econ_"+ek[i-1]]);
+    mkNode("econ_"+k,600+(i%2)*70,-60+i*66,"econ",k,req,en.fp,en.e,en.n,en.d,COL.econ); });
 }
 function chassisFP(ck){ return {pea:3,wall:5,werfer:8,stachel:8,nebler:12,bombe:15,beam:20}[ck]||0; }
 buildTree();
@@ -373,6 +438,18 @@ const presHpMul=()=>1+0.08*presLvl("hp");
 const fpMul=()=>{ let m=1; if(hasMeta("x_fp"))m+=0.5; if(hasMeta("x_fp2"))m+=1; if(hasMeta("x_haste"))m+=0.5; return m; };
 const spawnMul=()=>hasMeta("x_haste")?1.4:1;
 const metaDmgMul=()=>(hasMeta("x_dmg")?1.15:1)*(hasMeta("x_dmg2")?1.2:1);
+/* Klick / Münzen / Run-Shop / Welt */
+const hasEcon=k=>has("econ_"+k);
+const hasUnique=k=>uniques.has(k);
+function clickDmg(){ let d=12; if(hasEcon("e_click"))d+=15; if(hasEcon("e_click2"))d+=45; d+=25*(runShop.s_click||0); return Math.round(d*presDmgMul()); }
+function coinMul(){ let m=1; if(hasEcon("e_coin"))m+=0.5; m*=(hasEcon("e_coin2")?2:1); m*=(1+0.5*(runShop.s_coin||0)); return m; }
+const runDmgMul=()=>1+0.12*(runShop.s_dmg||0);
+const runRateMul=()=>1+0.12*(runShop.s_rate||0);
+const runSunMul=()=>1+0.15*(runShop.s_sun||0);
+function worldOf(w){ if(w>=25)return{name:"Teich",night:false,pond:true,g1:"#20404c",g2:"#274c58"};
+  if(w>=20)return{name:"Tag",night:false,pond:false,g1:"#26402c",g2:"#2e4a33"};
+  if(w>=10)return{name:"Nacht",night:true,pond:false,g1:"#161f2c",g2:"#1c2836"};
+  return{name:"Tag",night:false,pond:false,g1:"#26402c",g2:"#2e4a33"}; }
 
 /* Chunk B/C/D folgen */
 
@@ -387,23 +464,25 @@ function toast(m){ const t=document.createElement("div"); t.className="toast"; t
   document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
 
 function upd(){
-  $("rFP").textContent=FP; $("rBrain").textContent=Math.floor(brains);
+  $("rFP").textContent=FP; $("rBrain").textContent=Math.floor(brains); $("rCoin").textContent=Math.floor(coins);
   renderSeeds(); save();
 }
 function setSunLbl(v){ $("rSun").textContent=Math.floor(v); }
 
 /* ---------- OVERLAYS ---------- */
-const OVS=["ovTree","ovAlmanac","ovZombies","ovLab","ovPrestige"];
+const OVS=["ovTree","ovAlmanac","ovZombies","ovLab","ovPrestige","ovShop"];
 function openOv(id){ overlayOpen=true; OVS.forEach(o=>$(o).classList.toggle("open",o===id));
   if(id==="ovTree"){ $("tPanel").style.display="none"; sel=null; resizeTree(); }
   if(id==="ovAlmanac") renderAlmanac();
   if(id==="ovZombies") renderZombies();
   if(id==="ovPrestige") renderPrestige();
+  if(id==="ovShop") renderShop();
 }
 function closeOv(){ overlayOpen=false; OVS.forEach(o=>$(o).classList.remove("open")); $("tPanel").style.display="none"; }
 
 $("btnTree").onclick=()=>openOv("ovTree");
 $("btnPrestige").onclick=()=>openOv("ovPrestige");
+$("btnShop").onclick=()=>openOv("ovShop");
 $("btnAlmanac").onclick=()=>{ if(hasUtil("u_almanac")) openOv("ovAlmanac"); else toast("📖 Erst im Fokusbaum freischalten!"); };
 $("btnZombies").onclick=()=>{ if(hasUtil("u_zombiebook")) openOv("ovZombies"); else toast("🧟 Erst im Fokusbaum freischalten!"); };
 $("btnLab").onclick=()=>{ if(hasUtil("u_lab")) openOv("ovLab"); else toast("🧪 Erst im Fokusbaum freischalten!"); };
@@ -497,6 +576,37 @@ function renderPrestige(){
       toast(p.e+" "+p.n+" → Stufe "+(lv+1)); renderPrestige(); upd(); if(k==="lane"&&typeof Battle!=="undefined")Battle.resizeLawn(); } };
     g.appendChild(d);
   });
+  renderUniques();
+}
+function renderUniques(){
+  const g=$("uqGrid"); if(!g)return; g.innerHTML="";
+  Object.keys(UNIQUE).forEach(k=>{ const u=UNIQUE[k], owned=hasUnique(k);
+    const ok=!owned && (!u.req || hasUnique(u.req));
+    const d=document.createElement("div"); d.className="card pcard";
+    d.innerHTML=`<div class="e">${u.e}</div><div class="n">${u.n}</div><div class="d">${u.d}</div>
+      <div class="plv">${owned?"✓ aktiv":(u.req&&!hasUnique(u.req)?"benötigt "+UNIQUE[u.req].n:"")}</div>
+      ${owned?"":`<button ${(!ok||brains<u.cost)?"disabled":""}>🧠 ${u.cost}</button>`}`;
+    if(!owned){ const b=d.querySelector("button"); if(b) b.onclick=()=>{ if(ok&&brains>=u.cost){ brains-=u.cost; uniques.add(k); toast("💠 "+u.n+" freigeschaltet!"); renderPrestige(); upd(); } }; }
+    g.appendChild(d); });
+}
+/* ---------- IN-RUN LADEN ---------- */
+function passCost(k){ return SHOP_PASS[k].base*((runShop[k]||0)+1); }
+function renderShop(){
+  $("shopCoins").textContent=Math.floor(coins);
+  const gi=$("shopItems"); gi.innerHTML="";
+  Object.keys(SHOP_ITEMS).forEach(k=>{ const it=SHOP_ITEMS[k];
+    const d=document.createElement("div"); d.className="shopcard";
+    d.innerHTML=`<div class="e">${it.e}</div><div class="n">${it.n}</div><div class="d">${it.d}</div>
+      <button ${coins<it.cost?"disabled":""}>🪙 ${it.cost}</button>`;
+    d.querySelector("button").onclick=()=>{ if(coins>=it.cost && Battle.buyItem(k)){ coins-=it.cost; toast(it.e+" "+it.n+"!"); renderShop(); upd(); } };
+    gi.appendChild(d); });
+  const gp=$("shopPass"); gp.innerHTML="";
+  Object.keys(SHOP_PASS).forEach(k=>{ const p=SHOP_PASS[k], c=passCost(k), lv=runShop[k]||0;
+    const d=document.createElement("div"); d.className="shopcard";
+    d.innerHTML=`<div class="e">${p.e}</div><div class="n">${p.n}</div><div class="d">${p.d}</div>
+      <div class="shoplvl">Stufe ${lv}</div><button ${coins<c?"disabled":""}>🪙 ${c}</button>`;
+    d.querySelector("button").onclick=()=>{ if(coins>=c){ coins-=c; runShop[k]=lv+1; if(typeof Battle!=="undefined")Battle.rebuffPlants(); toast(p.e+" "+p.n+" Stufe "+(lv+1)); renderShop(); upd(); } };
+    gp.appendChild(d); });
 }
 
 /* ================= FOKUSBAUM-RENDERING ================= */
@@ -574,9 +684,12 @@ function computeChassisStats(ck){
   const s={arch:c.arch,key:ck,cost:b.cost||0,hp:b.hp||60,cd:b.cd||6,
     dmg:b.dmg||0,rate:b.rate||0,speed:b.speed||0,splash:b.splash||0,range:b.range||0,
     amount:b.amount||0,interval:b.interval||0,radius:b.radius||0,
-    effects:[],pierce:false,n:1,lanes:1,canAir:false,thorns:0,regen:0,laser:false,laserDmg:0,laserInt:4};
+    effects:[],pierce:false,n:1,lanes:1,canAir:false,thorns:0,regen:0,laser:false,laserDmg:0,laserInt:4,crit:0};
   Object.keys(MUT).forEach(mk=>{ if(MUT[mk].ch===ck && hasMut(mk)) MUT[mk].ap(s); });
-  s.dmg=Math.round(s.dmg*metaDmgMul()*presDmgMul());
+  s.crit+=hasUnique("uq_crit")?0.1:0;
+  s.dmg=Math.round(s.dmg*metaDmgMul()*presDmgMul()*runDmgMul());
+  s.amount=Math.round((s.amount||0)*runSunMul());
+  s.rate=+(s.rate*runRateMul()).toFixed(3);
   s.hp=Math.round(s.hp*presHpMul());
   s.cost=Math.max(0,Math.round(s.cost));
   s.shotInt=s.rate>0?1/s.rate:0;
@@ -587,7 +700,7 @@ const Battle=(function(){
   const cv=$("lawnCv"), ctx=cv.getContext("2d");
   const COLS=9, cell=76, MOWER_X=6, TRIGGER_X=26;
   let ROWS=1, W=COLS*cell, H=cell;
-  let sun,plants,zombies,shots,suns,fx,mowers,cd,wave,toSpawn,spawnT,inWave,betweenT,skyT,autoT,gameOver,started=false;
+  let sun,plants,zombies,shots,suns,fx,mowers,cd,wave,toSpawn,spawnT,inWave,betweenT,skyT,autoT,gameOver,started=false,runRevived=false,shakeT=0,themeName="Tag";
 
   function resizeLawn(){ ROWS=lanesCount(); W=COLS*cell; H=ROWS*cell; cv.width=W; cv.height=H;
     if(mowers){ while(mowers.length<ROWS) mowers.push({row:mowers.length,x:MOWER_X,active:false,used:false,respawnT:0});
@@ -596,10 +709,13 @@ const Battle=(function(){
   function startRun(){
     resizeLawn();
     sun=startSun(); plants=[];zombies=[];shots=[];suns=[];fx=[];cd={};
-    mowers=[]; for(let r=0;r<ROWS;r++) mowers.push({row:r,x:MOWER_X,active:false,used:false,respawnT:0});
+    coins=hasUnique("uq_coins")?Math.floor(carryCoins*0.25):0; carryCoins=0;
+    runShop={}; won=false; runRevived=false; shakeT=0; themeName=worldOf(0).name;
+    mowers=[]; for(let r=0;r<ROWS;r++) mowers.push({row:r,x:MOWER_X,active:false,used:false,respawnT:0,spare:hasUnique("uq_mower")});
     wave=0; inWave=false; betweenT=6; skyT=6; autoT=3; gameOver=false; started=true;
+    if(hasUnique("uq_head") && hasChassis("pea")){ const ps=computeChassisStats("pea"); place("pea",ps,0,1); }
     selectedSeed=hasChassis("pea")?selectedSeed:"sonne";
-    renderSeeds();
+    renderSeeds(); upd();
   }
 
   function info(){ return {sun:sun||0, cd:cd||{}}; }
@@ -623,6 +739,14 @@ const Battle=(function(){
     }
     // Sonne einsammeln
     for(let i=suns.length-1;i>=0;i--){ if(Math.hypot(mx-suns[i].x,my-suns[i].y)<30){ sun+=suns[i].value; suns.splice(i,1); refreshSeeds(); return; } }
+    // KLICK-KAMPF: Zombie anklicken (wenn keine Pflanze/Schaufel gewählt)
+    if(!selectedSeed && selectedTool!=="shovel"){
+      const near=zombies.filter(z=>z.hp>0&&Math.hypot(mx-z.x,my-z.y)<cell*0.5).sort((a,b)=>Math.hypot(mx-a.x,my-a.y)-Math.hypot(mx-b.x,my-b.y));
+      if(near.length){ const n=hasEcon("e_clickcrit")?3:1, dmg=clickDmg();
+        near.slice(0,n).forEach(z=>{ z.hp-=dmg; fx.push({t:"click",x:z.x,y:z.y,life:0.3,v:dmg}); });
+        if(hasEcon("e_clickcoin")){ coins+=Math.max(1,Math.round(coinMul())); refreshTop(); }
+        return; }
+    }
     // Pflanzen
     if(!selectedSeed||!hasChassis(selectedSeed)) return;
     if(col<0||col>=COLS||row<0||row>=ROWS) return;
@@ -653,7 +777,16 @@ const Battle=(function(){
 
   function startWave(){ inWave=true; toSpawn=3+wave*2+lanesCount()+Math.floor(wave/4)*lanesCount();
     spawnT=0.6; zombies.push(makeZ(rrow(),"flag")); toSpawn--;
-    if(wave%5===0 && wave>0){ zombies.push(makeZ(rrow(),"boss")); toast("👹 BOSS erscheint! (Welle "+wave+")"); } }
+    if(wave===100){ zombies.push(makeZ(rrow(),"megaboss")); toast("👿 OBER-GARGANTUAR — der finale Boss!"); }
+    else if(wave===9){ zombies.push(makeZ(rrow(),"miniboss")); toast("👺 Mini-Boss bei Welle 9!"); }
+    else if(wave%15===0 && wave>0){ zombies.push(makeZ(rrow(),"boss")); toast("👹 BOSS erscheint! (Welle "+wave+")"); } }
+  function announceTheme(){ const w=worldOf(wave); if(w.name!==themeName){ themeName=w.name;
+    toast(w.pond?"🌊 Ein Teich erscheint!":(w.night?"🌙 Es wird Nacht — weniger Sonne!":"☀ Der Tag bricht an!")); } }
+  function winGame(){ if(won)return; won=true; gameOver=true; started=false;
+    const rew=150+Math.round(brains*0.25); brains+=rew;
+    $("reTitle").textContent="🏆 SIEG — Welle 100 geschafft!";
+    $("reBody").innerHTML=`Du hast die Apokalypse überstanden!<br>Belohnung: +🧠 <b>${rew}</b> Gehirne<br><br><span style="color:var(--brain)">Investiere in einzigartige Upgrades & starte für die ultimative Herausforderung neu.</span>`;
+    $("runEnd").querySelector(".box").classList.add("win"); $("runEnd").classList.add("open"); upd(); }
   function rrow(){ return Math.floor(Math.random()*ROWS); }
   function spawnOne(){ const r=Math.random(), w=wave; let k="basic";
     if(w>=1&&r>0.6)k="cone"; if(w>=2&&r>0.8)k="vaulter";
@@ -664,12 +797,15 @@ const Battle=(function(){
   function update(dt){
     for(const k in cd) if(cd[k]>0) cd[k]=Math.max(0,cd[k]-dt);
     sun += sunPassive()*dt;
-    skyT-=dt; if(skyT<=0){ skyT=(9+Math.random()*4)*sunRateMul(); suns.push({x:60+Math.random()*(W-120),y:-16,ty:50+Math.random()*(H-100),value:25+sunBonus(),vy:60,life:12,fall:true}); }
+    const wo=worldOf(wave);
+    if(shakeT>0)shakeT-=dt;
+    skyT-=dt; if(skyT<=0){ skyT=(9+Math.random()*4)*sunRateMul()*(wo.night?1.7:1);
+      suns.push({x:60+Math.random()*(W-120),y:-16,ty:50+Math.random()*(H-100),value:Math.round((25+sunBonus())*(wo.night?0.5:1)),vy:60,life:12,fall:true}); }
 
-    // Wellen (endlos) — spawnMul macht Pausen kürzer
-    if(!inWave){ betweenT-=dt*spawnMul(); if(betweenT<=0){ wave++; startWave(); } }
+    // Wellen — Ziel: Welle 100 überstehen!
+    if(!inWave){ betweenT-=dt*spawnMul(); if(betweenT<=0){ wave++; announceTheme(); startWave(); } }
     else { spawnT-=dt*spawnMul(); if(toSpawn>0&&spawnT<=0){ spawnT=(1+Math.random()*1.3)/spawnMul(); spawnOne(); toSpawn--; }
-      if(toSpawn<=0&&zombies.length===0){ inWave=false; betweenT=6; FP+=1; refreshTop(); } }
+      if(toSpawn<=0&&zombies.length===0){ if(wave>=100){ return winGame(); } inWave=false; betweenT=6; FP+=1; refreshTop(); } }
 
     if(presLvl("auto")>0){ autoT-=dt; if(autoT<=0){ autoT=1.6; autoPlant(); } }
 
@@ -697,6 +833,7 @@ const Battle=(function(){
         if(Math.abs(z.x-sh.x)<26){ if(sh.hit&&sh.hit.has(z))continue;
           z.hp-=sh.dmg; applyFx(z,sh.effects,sh.dmg);
           fx.push({t:"splat",x:sh.x,y:sh.y,life:0.13,c:sh.effects.includes("slow")?"#8fd3ff":"#aef0a0"});
+          if(sh.crit) fx.push({t:"crit",x:sh.x,y:sh.y-10,life:0.5});
           if(sh.pierce)sh.hit.add(z); else { rm=true; break; } } }
       if(rm) shots.splice(i,1);
     }
@@ -731,15 +868,18 @@ const Battle=(function(){
 
   function mow(row){ const m=mowers.find(mm=>mm.row===row&&!mm.used); if(!m)return false; if(!m.active){m.active=true; toast("🚜 Rasenmäher!");} return true; }
   function killZombie(z){ if(z.dropped)return; z.dropped=true;
-    if(z.boss){ const b=Math.max(1,Math.round((z.brain+Math.floor(wave/5))*brainMul())); brains+=b; fx.push({t:"brain",x:z.x,y:z.y,life:1.1,v:b}); toast("👹 Boss besiegt! +🧠 "+b); }
-    const f=Math.max(1,Math.round(z.fp*fpMul())); FP+=f; fx.push({t:"fp",x:z.x,y:z.y,life:0.9,v:f}); refreshTop(); }
+    if(z.boss){ const b=Math.max(1,Math.round((z.brain+Math.floor(wave/5))*brainMul())); brains+=b; fx.push({t:"brain",x:z.x,y:z.y,life:1.1,v:b}); toast((z.final?"👿 OBER-BOSS":"👹 Boss")+" besiegt! +🧠 "+b); shakeT=0.45; }
+    const f=Math.max(1,Math.round(z.fp*fpMul())); FP+=f;
+    const cn=Math.max(1,Math.round((1+wave*0.08+(z.boss?8:0))*coinMul())); coins+=cn;
+    fx.push({t:"fp",x:z.x,y:z.y,life:0.9,v:f}); fx.push({t:"coin",x:z.x+8,y:z.y+8,life:0.9,v:cn}); refreshTop(); }
 
   function laneHas(pl,s){ const rows=s.lanes>1?[pl.row-1,pl.row,pl.row+1]:[pl.row];
     return zombies.some(z=>rows.includes(z.row)&&z.x>pl.x-10&&z.hp>0&&(s.canAir||!z.flying)); }
   function rowsOf(pl,s){ return (s.lanes>1?[pl.row-1,pl.row,pl.row+1]:[pl.row]).filter(r=>r>=0&&r<ROWS); }
-  function shoot(pl,s){ rowsOf(pl,s).forEach(r=>{ for(let k=0;k<s.n;k++)
-    shots.push({x:pl.x+16,y:r*cell+cell/2-4+(k*7-3),row:r,vx:s.speed||340,dmg:s.dmg,
-      effects:s.effects,pierce:s.pierce,hit:s.pierce?new Set():null,air:s.canAir,lob:false}); }); }
+  function shoot(pl,s){ rowsOf(pl,s).forEach(r=>{ for(let k=0;k<s.n;k++){
+    const crit=s.crit&&Math.random()<s.crit, dmg=crit?Math.round(s.dmg*2.5):s.dmg;
+    shots.push({x:pl.x+16,y:r*cell+cell/2-4+(k*7-3),row:r,vx:s.speed||340,dmg:dmg,crit:crit,
+      effects:s.effects,pierce:s.pierce,hit:s.pierce?new Set():null,air:s.canAir,lob:false}); } }); }
   function laserShot(pl,s){ zombies.forEach(z=>{ if(z.row===pl.row&&z.x>pl.x&&z.hp>0){ z.hp-=s.laserDmg; } });
     fx.push({t:"beam",x:pl.x+12,y:pl.y,life:0.14,c:"#ffe082"}); }
   function beam(pl,s){ rowsOf(pl,s).forEach(r=>{ zombies.forEach(z=>{ if(z.row===r&&z.x>pl.x&&z.hp>0&&(s.canAir||!z.flying)){ z.hp-=s.dmg; applyFx(z,s.effects,s.dmg); } });
@@ -764,16 +904,25 @@ const Battle=(function(){
     for(let c=startCol;c<COLS;c++)for(let r=0;r<ROWS;r++){ if(!plants.some(pl=>pl.col===c&&pl.row===r)){ sun-=cs.cost; cd[cand]=cs.cd; place(cand,cs,r,c); return; } }
   }
 
-  function lose(){ if(gameOver)return; gameOver=true; started=false;
+  function lose(){ if(gameOver)return;
+    if(hasUnique("uq_revive") && !runRevived){ runRevived=true; zombies=[]; mowers.forEach(m=>{m.used=false;m.active=false;m.x=MOWER_X;}); shakeT=0.5; toast("💖 Zweites Leben! Alle Zombies weggefegt!"); return; }
+    gameOver=true; started=false; carryCoins=coins;
     $("reTitle").textContent="🧟 Rasen überrannt!";
-    $("reBody").innerHTML=`Erreichte Welle <b>${wave}</b>.<br>Gesamt: 🧬 <b>${FP}</b> FP · 🧠 <b>${Math.floor(brains)}</b><br><br>
-      <span style="color:var(--brain)">Forsche im Fokusbaum & investiere Gehirne — dann neuer Run!</span>`;
+    $("reBody").innerHTML=`Erreichte Welle <b>${wave}</b> / 100.<br>Gesamt: 🧬 <b>${FP}</b> FP · 🧠 <b>${Math.floor(brains)}</b><br><br>
+      <span style="color:var(--brain)">Forsche & investiere Gehirne (auch einzigartige Chains!) — dann neuer Run!</span>`;
+    $("runEnd").querySelector(".box").classList.remove("win");
     $("runEnd").classList.add("open"); upd();
   }
 
   /* ---- Zeichnen ---- */
   function draw(){
-    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){ ctx.fillStyle=((r+c)%2===0)?"#26402c":"#2e4a33"; ctx.fillRect(c*cell,r*cell,cell,cell); }
+    const wo=worldOf(wave);
+    ctx.save(); if(shakeT>0) ctx.translate((Math.random()*2-1)*4,(Math.random()*2-1)*4);
+    for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+      const pond=wo.pond&&r===ROWS-1;
+      ctx.fillStyle=pond?((r+c)%2===0?"#1c5566":"#226374"):((r+c)%2===0?wo.g1:wo.g2);
+      ctx.fillRect(c*cell,r*cell,cell,cell); }
+    if(wo.night){ ctx.fillStyle="rgba(20,30,64,.30)"; ctx.fillRect(0,0,W,H); }
     // Platzierungs-Preview
     ctx.textAlign="center"; ctx.textBaseline="middle";
     mowers.forEach(m=>{ if(m.used)return; ctx.font=Math.floor(cell*0.5)+"px serif"; ctx.fillText("🚜",m.x+8,m.row*cell+cell/2); });
@@ -794,11 +943,15 @@ const Battle=(function(){
       else if(e.t==="puff"){ctx.globalAlpha=e.life/0.25;ctx.font="18px serif";ctx.fillText("💨",e.x,e.y);ctx.globalAlpha=1;}
       else if(e.t==="bolt"){ctx.globalAlpha=e.life/0.2;ctx.strokeStyle="#fff176";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(e.x1,e.y1);ctx.lineTo(e.x2,e.y2);ctx.stroke();ctx.lineWidth=1;ctx.globalAlpha=1;}
       else if(e.t==="fp"){ctx.globalAlpha=Math.min(1,e.life);ctx.fillStyle="#5ee88a";ctx.font="12px 'Courier New'";ctx.fillText("🧬+"+e.v,e.x,e.y-(0.9-e.life)*40);ctx.globalAlpha=1;}
-      else if(e.t==="brain"){ctx.globalAlpha=Math.min(1,e.life);ctx.fillStyle="#e0aaff";ctx.font="15px 'Courier New'";ctx.fillText("🧠+"+e.v,e.x,e.y-(1.1-e.life)*44);ctx.globalAlpha=1;} });
+      else if(e.t==="brain"){ctx.globalAlpha=Math.min(1,e.life);ctx.fillStyle="#e0aaff";ctx.font="15px 'Courier New'";ctx.fillText("🧠+"+e.v,e.x,e.y-(1.1-e.life)*44);ctx.globalAlpha=1;}
+      else if(e.t==="coin"){ctx.globalAlpha=Math.min(1,e.life);ctx.fillStyle="#ffcf4d";ctx.font="12px 'Courier New'";ctx.fillText("🪙+"+e.v,e.x,e.y-(0.9-e.life)*38);ctx.globalAlpha=1;}
+      else if(e.t==="click"){ctx.globalAlpha=Math.min(1,e.life/0.3);ctx.fillStyle="#fff";ctx.font="13px 'Courier New'";ctx.fillText("👆"+e.v,e.x,e.y-(0.3-e.life)*30);ctx.globalAlpha=1;}
+      else if(e.t==="crit"){ctx.globalAlpha=Math.min(1,e.life/0.5);ctx.fillStyle="#ff5252";ctx.font="bold 14px 'Courier New'";ctx.fillText("KRIT!",e.x,e.y-(0.5-e.life)*30);ctx.globalAlpha=1;} });
     // Wellen-Info oben
     ctx.textAlign="left"; ctx.fillStyle="#eaf2e6cc"; ctx.font="13px 'Courier New'";
-    ctx.fillText(inWave?("Welle "+wave):(wave===0?"Bereit…":"Welle "+wave+" — Pause "+Math.ceil(betweenT)+"s"),8,16);
+    ctx.fillText((inWave?("Welle "+wave+"/100"):(wave===0?"Bereit…":"Welle "+wave+"/100 — Pause "+Math.ceil(betweenT)+"s"))+"  ["+wo.name+"]",8,16);
     ctx.textBaseline="alphabetic";
+    ctx.restore();
   }
   function hpbar(x,y,f,c){ if(f>=1)return; f=Math.max(0,f); const w=cell*0.6,h=4; ctx.fillStyle="#0008";ctx.fillRect(x-w/2,y,w,h); ctx.fillStyle=c;ctx.fillRect(x-w/2,y,w*f,h); }
 
@@ -811,13 +964,21 @@ const Battle=(function(){
     if(started) draw();
     requestAnimationFrame(loop);
   }
-  function refreshTop(){ $("rFP").textContent=FP; $("rBrain").textContent=Math.floor(brains); }
+  function refreshTop(){ $("rFP").textContent=FP; $("rBrain").textContent=Math.floor(brains); $("rCoin").textContent=Math.floor(coins); }
   requestAnimationFrame(loop);
 
-  return { startRun, info, resizeLawn,
-    restart:()=>{ $("runEnd").classList.remove("open"); startRun(); },
-    _dbg:()=>({sun,plants,zombies,shots,fx,wave,inWave,gameOver,ROWS,brains,FP,mowers}),
-    _mowers:()=>mowers,
+  function buyItem(k){
+    if(k==="isun"){ sun+=250; return true; }
+    if(k==="ifreeze"){ zombies.forEach(z=>z.slow=6); fx.push({t:"boom",x:W/2,y:H/2,life:0.4}); return true; }
+    if(k==="inuke"){ zombies.forEach(z=>{ z.hp-=800; }); shakeT=0.4; return true; }
+    if(k==="imower"){ mowers.forEach(m=>{ m.used=false;m.active=false;m.x=MOWER_X; }); return true; }
+    return false;
+  }
+  function rebuffPlants(){ plants.forEach(pl=>{ const frac=pl.maxHp?pl.hp/pl.maxHp:1; const ns=computeChassisStats(pl.ck); pl.s=ns; pl.maxHp=ns.hp; pl.hp=Math.max(1,Math.round(ns.hp*frac)); }); }
+  return { startRun, info, resizeLawn, buyItem, rebuffPlants,
+    restart:()=>{ $("runEnd").classList.remove("open"); $("runEnd").querySelector(".box").classList.remove("win"); startRun(); },
+    _dbg:()=>({sun,plants,zombies,shots,fx,wave,inWave,gameOver,won,ROWS,brains,FP,coins,mowers}),
+    _mowers:()=>mowers, _setWave:w=>{wave=w;}, _spawn:(k,r)=>zombies.push(makeZ(r||0,k)), _winGame:()=>winGame(),
     _addSun:n=>{sun+=n;}, _tickWaveNow:()=>{betweenT=0.01;},
     _place:(ck,row,col)=>{ if(!hasChassis(ck))return false; const s=computeChassisStats(ck); if(sun<s.cost)return false; sun-=s.cost; place(ck,s,row,col); return true; } };
 })();
@@ -831,12 +992,14 @@ function beepPop(){}
    ================================================================ */
 const SAVE_KEY="botanik_labor_ss_v1";
 function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify({
-  FP,brains,prestige,unlocked:[...unlocked],seen:[...seenZombies] })); }catch(e){} }
+  FP,brains,prestige,unlocked:[...unlocked],seen:[...seenZombies],uniques:[...uniques],carryCoins })); }catch(e){} }
 function load(){ try{ const raw=localStorage.getItem(SAVE_KEY); if(!raw)return; const d=JSON.parse(raw);
   if(typeof d.FP==="number")FP=d.FP; if(typeof d.brains==="number")brains=d.brains;
   if(d.prestige)prestige=d.prestige;
   if(Array.isArray(d.unlocked))d.unlocked.forEach(x=>unlocked.add(x));
   if(Array.isArray(d.seen))d.seen.forEach(x=>seenZombies.add(x));
+  if(Array.isArray(d.uniques))d.uniques.forEach(x=>uniques.add(x));
+  if(typeof d.carryCoins==="number")carryCoins=d.carryCoins;
 }catch(e){ console.warn("Laden fehlgeschlagen",e); } }
 
 /* Run-Ende-Buttons */
