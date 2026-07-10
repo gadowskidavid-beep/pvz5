@@ -147,6 +147,84 @@
   .riskbox{margin-top:12px;padding:12px;border-radius:12px;background:#00000038;text-align:center}
   .riskbox .rl{font-size:18px;font-weight:bold;color:#ff9a5a}
   .rewrow{display:flex;gap:16px;justify-content:center;margin-top:8px;font-size:15px;font-weight:bold;color:#ffcf4d}
+
+  /* =================================================================
+     UI-POLISH v7 (Override-Layer — bessere Optik, mehr Tiefe)
+     ================================================================= */
+  :root{--grn:#6fe89a;--sci:#5ff0ea;--coin:#ffd45a;--brain:#e6b3ff;--line:#2c4a36}
+  body{background:
+    radial-gradient(1100px 620px at 50% -12%, #1d3a28 0%, transparent 58%),
+    radial-gradient(900px 520px at 50% 112%, #17301f 0%, transparent 60%),
+    #060c08;}
+  /* Topbar */
+  #topbar{background:linear-gradient(180deg,#1e3826,#0d1b12);border-bottom:1px solid #000;
+    box-shadow:inset 0 1px 0 #ffffff12, 0 6px 20px #0007;padding:9px 14px;gap:8px}
+  #topbar h1{font-size:16px;text-shadow:0 2px 5px #000,0 0 16px #6fe89a55}
+  .res{background:linear-gradient(#0f1b12,#0a130d);border-width:1.5px;border-radius:14px;padding:5px 13px;
+    box-shadow:0 2px 7px #0007, inset 0 1px 0 #ffffff12}
+  .tbtn{background:linear-gradient(#1c3222,#12211a);border:1px solid #305338;border-radius:12px;padding:8px 12px;
+    box-shadow:0 2px 7px #0006, inset 0 1px 0 #ffffff10;transition:.12s}
+  .tbtn:hover{background:linear-gradient(#26472f,#183025);border-color:var(--grn);color:var(--grn);transform:translateY(-1px)}
+  .tbtn.on{background:linear-gradient(#2e5a3c,#1d3a27);border-color:var(--grn);color:#eaffea}
+  .timec button{box-shadow:0 2px 6px #0006, inset 0 1px 0 #ffffff10}
+  /* Left HUD */
+  #left{width:128px;background:linear-gradient(#0f1c13,#0a130d);border-right:1px solid #000;box-shadow:inset -7px 0 14px #0004}
+  #left .lh{font-size:9px;color:#6d8f76;margin:7px 0 2px}
+  .seed{background:linear-gradient(#1a3020,#101f16);border:1px solid #305338;border-radius:14px;padding:7px 3px 6px;
+    box-shadow:0 3px 9px #0007, inset 0 1px 0 #ffffff12;transition:.12s}
+  .seed:hover{transform:translateY(-2px);border-color:var(--grn);box-shadow:0 7px 16px #0008}
+  .seed.sel{border-color:var(--grn);background:linear-gradient(#224730,#163020);box-shadow:0 0 0 2px #6fe89a66,0 7px 16px #0008}
+  .seed .se{font-size:30px;filter:drop-shadow(0 2px 3px #0008)} .seed .sn{font-size:9px;margin-top:2px} .seed .sc{font-size:11px}
+  .tool{background:linear-gradient(#2c2113,#1a140c);border:1px solid #5c4324;border-radius:14px;box-shadow:0 3px 9px #0007}
+  /* Stage / Lawn */
+  #stage{background:radial-gradient(ellipse at 50% 22%, #1d3826, #080f0a 76%)}
+  #lawnCv{border:5px solid #241811;border-radius:16px;box-shadow:0 12px 40px #000b, 0 0 0 3px #3c2c1a, inset 0 0 26px #0006}
+  #waveBtn{background:linear-gradient(#82f7ab,#2ec065);border-radius:26px;font-size:17px;padding:13px 30px;
+    box-shadow:0 5px 0 #1f8f4c, 0 9px 22px #0009, inset 0 2px 0 #ffffff77;text-shadow:0 1px 0 #ffffff44}
+  #waveBtn:active{transform:translateX(-50%) translateY(4px);box-shadow:0 1px 0 #1f8f4c,0 3px 10px #0009}
+  #waveStatus{background:linear-gradient(#122015ee,#0b140eee);border:1px solid #305338;box-shadow:0 5px 14px #0008;font-size:15px;padding:7px 18px}
+  #hint{background:#0a130daa;border:1px solid #ffffff10;color:#8aa090}
+  /* Overlays */
+  .ov{background:rgba(4,8,6,.74);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+  .sheet{padding:26px 14px 30px;gap:14px}
+  .sheet h2{font-size:20px;text-shadow:0 2px 8px #000,0 0 18px #6fe89a44}
+  .sheet h3{color:#93bca0;opacity:.95;font-size:12px}
+  .ovclose{background:linear-gradient(#3c1622,#25101a);border:1px solid #7e3040;box-shadow:0 3px 12px #0008}
+  .ovclose:hover{filter:brightness(1.12)}
+  /* Cards */
+  .card{background:linear-gradient(#182c1e,#101e16);border:1px solid #305338;border-radius:16px;padding:12px;
+    box-shadow:0 5px 14px #0007, inset 0 1px 0 #ffffff0e}
+  .card .e{font-size:32px;filter:drop-shadow(0 2px 3px #0008)} .card .n{font-size:12.5px}
+  .card.lock{opacity:.45}
+  .card button,.mcard button,.anode button,.zbtn{box-shadow:0 3px 0 #00000055, inset 0 1px 0 #ffffff55;transition:.1s}
+  .card button:hover:not(:disabled){filter:brightness(1.09);transform:translateY(-1px)}
+  .card button:active:not(:disabled){transform:translateY(1px);box-shadow:0 1px 0 #00000055}
+  .buyfp{background:linear-gradient(#83f2ec,#2fccc4);color:#04302e} .buysun{background:linear-gradient(#ffe27a,#f6b93a);color:#33240a}
+  .buybrain{background:linear-gradient(#eab6ff,#c583f2);color:#25073a} .buycoin{background:linear-gradient(#ffe48c,#f5bb3c);color:#33240a}
+  /* Atom-Forschung */
+  #sciAtom{width:500px;height:456px}
+  .bigatom{transform:translate(-50%,-50%) scale(2.15)}
+  .anode{width:124px;background:linear-gradient(#0f2a2e,#0a1c20);border:1px solid #3f8080;border-radius:15px;padding:8px 5px;
+    box-shadow:0 5px 16px #0008, 0 0 20px #5ff0ea22, inset 0 1px 0 #ffffff14}
+  .anode .e{filter:drop-shadow(0 0 6px #5ff0ea88)} .anode .n{color:#d3feff}
+  /* Mutations-Labor */
+  .mutcol{border-radius:18px;padding:16px;box-shadow:0 8px 24px #0008, inset 0 1px 0 #ffffff0e}
+  .mutcol.plants{background:linear-gradient(160deg,#143318,#0a1a0e)}
+  .mutcol.zomb{background:linear-gradient(160deg,#36162a,#180a12)}
+  .mgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .mcard{background:#0b1a0fcc;border:1px solid #2e6a3a;border-radius:13px;padding:10px;text-align:center}
+  .mcard.own{border-color:var(--grn);box-shadow:0 0 14px #6fe89a55, inset 0 0 12px #6fe89a11}
+  .mcard .ic{font-size:30px;filter:drop-shadow(0 2px 3px #0008)} .mcard .mn{font-size:12px;font-weight:bold;color:#c3f5c8;margin:3px 0}
+  .mcard .md{font-size:10px;color:#82bc93;min-height:34px;line-height:1.45}
+  .mcard .mown{color:var(--grn);font-size:12px;font-weight:bold}
+  .mcard button{background:linear-gradient(#83f2ec,#2fccc4);color:#04302e;font-family:inherit;font-weight:bold;font-size:11px;padding:6px 12px;border-radius:10px;border:none;cursor:pointer;margin-top:3px}
+  .mcard button:disabled{opacity:.35}
+  .zstat{background:#00000055;border:1px solid #5c2637;border-radius:12px}
+  .zbtn{background:linear-gradient(#ad4863,#7c3040)}
+  .riskbox{background:#00000055;border:1px solid #5c2637}
+  /* toast + run-ende */
+  .toast{background:linear-gradient(#183226,#0e1c14);border:1px solid var(--grn);border-radius:14px;box-shadow:0 7px 22px #0009;color:#a8f5c2}
+  .rovl .box{background:linear-gradient(#182c1e,#101e16);box-shadow:0 24px 70px #000d, inset 0 1px 0 #ffffff12}
 </style>
 </head>
 <body>
@@ -207,13 +285,8 @@
   <div class="mutwrap">
     <div class="mutcol plants">
       <h3 class="px" style="color:#7cf29a">🌿 Pflanzen verbessern</h3>
-      <div class="elrow">
-        <div class="elem"><span class="ic">🔥</span>Feuer<span class="lk">🔒</span></div>
-        <div class="elem"><span class="ic">❄️</span>Eis<span class="lk">🔒</span></div>
-        <div class="elem"><span class="ic">☠️</span>Gift<span class="lk">🔒</span></div>
-        <div class="elem"><span class="ic">⚡</span>Elektro<span class="lk">🔒</span></div>
-      </div>
-      <p style="font-size:11px;color:#7a8f7c;text-align:center;line-height:1.7">Bald verfügbar: Rüste deine Pflanzen mit Elementen auf — Feuer-Erbse, Eis, Gift, Elektro und mehr. 🔒</p>
+      <div class="mgrid" id="mutPlants"></div>
+      <p style="font-size:11px;color:#7a8f7c;text-align:center;line-height:1.7;margin-top:8px">Wirkt auf ALLE deine Angriffs-Pflanzen. Kombiniere mehrere Elemente! (Kosten: 🧬 FP)</p>
     </div>
     <div class="mutcol zomb">
       <h3 class="px" style="color:#ff9a9a">🧟 Zombies stärker machen</h3>
@@ -312,6 +385,13 @@ const EQUIP={
  e_clickcoin: {e:"💰",n:"Klick-Gold",     fp:10,req:"u_almanac", d:"Zombies anklicken gibt Münzen"},
  e_clickmulti:{e:"⚡",n:"Blitzfinger",    fp:22,req:"e_clickcoin",d:"Klicks treffen 3 Zombies"},
 };
+/* ---------- PFLANZEN-MUTATIONEN (Elemente — wirken auf ALLE Angriffs-Pflanzen) ---------- */
+const MUT={
+ m_fire:  {e:"🔥",n:"Feuer",  fp:16,eff:"burn",  d:"Schüsse setzen Zombies in Brand (Schaden über Zeit)"},
+ m_ice:   {e:"❄️",n:"Eis",    fp:16,eff:"slow",  d:"Schüsse verlangsamen Zombies"},
+ m_poison:{e:"☠️",n:"Gift",   fp:22,eff:"poison",d:"Schüsse vergiften Zombies (starker DoT)"},
+ m_elec:  {e:"⚡",n:"Elektro", fp:30,eff:"chain", d:"Treffer springen als Blitz auf 2 Nachbarn"},
+};
 
 /* ---------- IN-RUN LADEN (Münzen) ---------- */
 const SHOP_ITEMS={
@@ -361,7 +441,9 @@ const ZTYPES={
 const has=id=>unlocked.has(id);
 const hasChassis=ck=>unlocked.has(ck);
 const hasEquip=k=>unlocked.has(k);
+const hasMut=k=>unlocked.has(k);
 const hasUnique=k=>uniques.has(k);
+function activeEffects(){ return Object.keys(MUT).filter(k=>unlocked.has(k)).map(k=>MUT[k].eff); }
 const resLvl=k=>research[k]||0;
 const resCost=k=>Math.ceil(RESEARCH[k].base*Math.pow(RESEARCH[k].g,resLvl(k)));
 const resMul=k=>1+RESEARCH[k].per*resLvl(k);
@@ -390,10 +472,10 @@ function coinMul(){ return resMul("r_coin")*(1+0.5*(runShop.s_coin||0)); }
 function fpMul(){ return resMul("r_fp"); }
 const riskLevel=()=>(zlab.str||0)+(zlab.arm||0)+(zlab.spd||0);
 const rewardMul=()=>1+0.10*riskLevel();   // Zombie-Labor: +10% Belohnung pro Risiko-Stufe
-function worldOf(w){ if(w>=25)return{name:"Teich",night:false,pond:true,g1:"#20404c",g2:"#274c58"};
-  if(w>=20)return{name:"Tag",night:false,pond:false,g1:"#26402c",g2:"#2e4a33"};
-  if(w>=10)return{name:"Nacht",night:true,pond:false,g1:"#161f2c",g2:"#1c2836"};
-  return{name:"Tag",night:false,pond:false,g1:"#26402c",g2:"#2e4a33"}; }
+function worldOf(w){ if(w>=25)return{name:"Teich",night:false,pond:true,g1:"#245064",g2:"#2c5e70"};
+  if(w>=20)return{name:"Tag",night:false,pond:false,g1:"#3a6b40",g2:"#448049"};
+  if(w>=10)return{name:"Nacht",night:true,pond:false,g1:"#182338",g2:"#1f2e44"};
+  return{name:"Tag",night:false,pond:false,g1:"#3a6b40",g2:"#448049"}; }
 
 /* ---------- Chassis-Kampfwerte (ohne Mutationen) ---------- */
 function computeChassisStats(ck){
@@ -401,7 +483,7 @@ function computeChassisStats(ck){
   const s={arch:c.arch,key:ck,cost:b.cost||0,hp:b.hp||60,cd:b.cd||6,
     dmg:b.dmg||0,rate:b.rate||0,speed:b.speed||0,splash:b.splash||0,range:b.range||0,
     amount:b.amount||0,interval:b.interval||0,radius:b.radius||0,
-    n:1,lanes:1,canAir:false,effects:[],pierce:false,crit:hasUnique("uq_crit")?0.1:0,thorns:0,regen:0,laser:false};
+    n:1,lanes:1,canAir:false,effects:(["shooter","beam","fume","lobber"].includes(c.arch)?activeEffects():[]),pierce:false,crit:hasUnique("uq_crit")?0.1:0,thorns:0,regen:0,laser:false};
   s.dmg=Math.round(s.dmg*resMul("r_dmg")*presDmgMul()*runDmgMul());
   s.hp=Math.round(s.hp*resMul("r_hp")*presHpMul());
   s.amount=Math.round(s.amount*resMul("r_sun")*runSunMul());
@@ -500,6 +582,16 @@ function renderScience(){
   });
 }
 function renderMutations(){
+  // Pflanzen-Mutationen (links)
+  const mp=$("mutPlants"); if(mp){ mp.innerHTML="";
+    Object.keys(MUT).forEach(k=>{ const m=MUT[k], owned=hasMut(k);
+      const d=document.createElement("div"); d.className="mcard"+(owned?" own":"");
+      d.innerHTML=`<div class="ic">${m.e}</div><div class="mn">${m.n}</div><div class="md">${m.d}</div>
+        ${owned?'<div class="mown">✓ aktiv</div>':`<button ${FP<m.fp?"disabled":""}>🧬 ${m.fp}</button>`}`;
+      if(!owned){ const b=d.querySelector("button"); if(b)b.onclick=()=>{ if(FP>=m.fp){ FP-=m.fp; unlocked.add(k); if(typeof Battle!=="undefined")Battle.rebuffPlants(); toast(m.e+" "+m.n+"-Mutation aktiv!"); renderMutations(); upd(); } }; }
+      mp.appendChild(d);
+    });
+  }
   const zg=$("zlStats"); zg.innerHTML="";
   const stats=[["str","💪","Stärke"],["arm","🛡️","Rüstung"],["spd","⚡","Geschwindigkeit"]];
   stats.forEach(([key,ic,nm])=>{ const lv=zlab[key]||0;
@@ -664,6 +756,12 @@ const Battle=(function(){
     sun-=s.cost; cd[selectedSeed]=s.cd; place(selectedSeed,s,row,col); refreshSeeds();
   });
   function place(ck,s,row,col){ plants.push({ck,s,arch:s.arch,row,col,x:col*cell+cell/2,y:row*cell+cell/2,hp:s.hp,maxHp:s.hp,e:CHASSIS[ck].e,t:0,fuse:s.arch==="bomb"?0.7:0,done:false}); }
+  function applyFx(z,effs,dmg){ if(!effs||!effs.length)return; for(const e of effs){
+    if(e==="slow")z.slow=3; else if(e==="burn")z.burn={dps:8,t:4};
+    else if(e==="poison")z.poison={dps:9,t:5}; else if(e==="chain")chain(z,dmg); } }
+  function chain(z,dmg){ zombies.filter(o=>o!==z&&o.hp>0)
+    .sort((a,b)=>Math.hypot(a.x-z.x,a.y-z.y)-Math.hypot(b.x-z.x,b.y-z.y)).slice(0,2)
+    .forEach(o=>{ o.hp-=dmg*0.5; fx.push({t:"bolt",x1:z.x,y1:z.y,x2:o.x,y2:o.y,life:0.2}); }); }
 
   function makeZ(row,kind){ const b=ZTYPES[kind]; seenZombies.add(kind);
     const zHp=1+0.15*(zlab.str||0)+0.13*(zlab.arm||0), zSpd=1+0.08*(zlab.spd||0), zDmg=1+0.06*(zlab.str||0);
@@ -704,13 +802,16 @@ const Battle=(function(){
       let rm=false;
       for(const z of zombies){ if(z.row!==sh.row||z.hp<=0)continue; if(z.flying&&!sh.air)continue;
         if(Math.abs(z.x-sh.x)<26){ if(sh.hit&&sh.hit.has(z))continue;
-          z.hp-=sh.dmg; fx.push({t:"splat",x:sh.x,y:sh.y,life:0.13,c:"#aef0a0"}); if(sh.crit)fx.push({t:"crit",x:sh.x,y:sh.y-10,life:0.5});
+          z.hp-=sh.dmg; applyFx(z,sh.effects,sh.dmg);
+          fx.push({t:"splat",x:sh.x,y:sh.y,life:0.13,c:(sh.effects&&sh.effects.includes("slow"))?"#8fd3ff":(sh.effects&&sh.effects.includes("burn"))?"#ff9a4c":"#aef0a0"}); if(sh.crit)fx.push({t:"crit",x:sh.x,y:sh.y-10,life:0.5});
           if(sh.pierce)sh.hit.add(z); else { rm=true; break; } } }
       if(rm)shots.splice(i,1);
     }
 
     if(phase==="fight" || zombies.length){
       for(let i=zombies.length-1;i>=0;i--){ const z=zombies[i];
+        if(z.burn){ z.hp-=z.burn.dps*dt; z.burn.t-=dt; if(z.burn.t<=0)z.burn=null; }
+        if(z.poison){ z.hp-=z.poison.dps*dt; z.poison.t-=dt; if(z.poison.t<=0)z.poison=null; }
         if(z.slow>0)z.slow-=dt;
         if(z.hp<=0){ killZombie(z); fx.push({t:"puff",x:z.x,y:z.y,life:0.25}); zombies.splice(i,1); continue; }
         const sl=z.slow>0?0.5:1;
@@ -743,13 +844,13 @@ const Battle=(function(){
     return zombies.some(z=>rows.includes(z.row)&&z.x>pl.x-10&&z.hp>0&&(s.canAir||!z.flying)); }
   function rowsOf(pl,s){ return (s.lanes>1?[pl.row-1,pl.row,pl.row+1]:[pl.row]).filter(r=>r>=0&&r<ROWS); }
   function shoot(pl,s){ rowsOf(pl,s).forEach(r=>{ for(let k=0;k<s.n;k++){ const crit=s.crit&&Math.random()<s.crit, dmg=crit?Math.round(s.dmg*2.5):s.dmg;
-    shots.push({x:pl.x+16,y:r*cell+cell/2-4,row:r,vx:s.speed||340,dmg:dmg,crit:crit,pierce:s.pierce,hit:s.pierce?new Set():null,air:s.canAir,lob:false}); } }); }
-  function beam(pl,s){ rowsOf(pl,s).forEach(r=>{ zombies.forEach(z=>{ if(z.row===r&&z.x>pl.x&&z.hp>0){ z.hp-=s.dmg; } }); fx.push({t:"beam",x:pl.x+12,y:r*cell+cell/2,life:0.12,c:"#ff5252"}); }); }
-  function fume(pl,s){ const reach=pl.x+(s.range||2.6)*cell; rowsOf(pl,s).forEach(r=>{ zombies.forEach(z=>{ if(z.row===r&&z.x>pl.x-6&&z.x<reach&&z.hp>0){ z.hp-=s.dmg; } }); fx.push({t:"fume",x:pl.x,y:r*cell+cell/2,w:(s.range||2.6)*cell,life:0.2}); }); }
+    shots.push({x:pl.x+16,y:r*cell+cell/2-4,row:r,vx:s.speed||340,dmg:dmg,crit:crit,effects:s.effects,pierce:s.pierce,hit:s.pierce?new Set():null,air:s.canAir,lob:false}); } }); }
+  function beam(pl,s){ rowsOf(pl,s).forEach(r=>{ zombies.forEach(z=>{ if(z.row===r&&z.x>pl.x&&z.hp>0){ z.hp-=s.dmg; applyFx(z,s.effects,s.dmg); } }); fx.push({t:"beam",x:pl.x+12,y:r*cell+cell/2,life:0.12,c:"#ff5252"}); }); }
+  function fume(pl,s){ const reach=pl.x+(s.range||2.6)*cell; rowsOf(pl,s).forEach(r=>{ zombies.forEach(z=>{ if(z.row===r&&z.x>pl.x-6&&z.x<reach&&z.hp>0){ z.hp-=s.dmg; applyFx(z,s.effects,s.dmg); } }); fx.push({t:"fume",x:pl.x,y:r*cell+cell/2,w:(s.range||2.6)*cell,life:0.2}); }); }
   function lob(pl,s){ rowsOf(pl,s).forEach(r=>{ const fr=zombies.filter(z=>z.row===r&&z.hp>0).sort((a,b)=>a.x-b.x)[0]; const tx=fr?fr.x:pl.x+4*cell;
-    shots.push({lob:true,x:pl.x,y:pl.y,sx:pl.x,tx,row:r,pt:0,dur:0.85,dmg:s.dmg,splash:(s.splash||0.9)*cell,air:false}); }); }
-  function lobHit(sh){ zombies.forEach(z=>{ if(z.row===sh.row&&z.hp>0&&Math.abs(z.x-sh.tx)<sh.splash){ z.hp-=sh.dmg; } }); fx.push({t:"splat",x:sh.tx,y:sh.row*cell+cell/2,life:0.2,c:"#aef0a0"}); }
-  function bomb(pl){ const rr=(pl.s.radius||1.4)*cell; zombies.forEach(z=>{ if(Math.hypot(z.x-pl.x,z.y-pl.y)<rr) z.hp-=pl.s.dmg; }); fx.push({t:"boom",x:pl.x,y:pl.y,life:0.4}); shakeT=0.3; plants.splice(plants.indexOf(pl),1); }
+    shots.push({lob:true,x:pl.x,y:pl.y,sx:pl.x,tx,row:r,pt:0,dur:0.85,dmg:s.dmg,splash:(s.splash||0.9)*cell,effects:s.effects,air:false}); }); }
+  function lobHit(sh){ zombies.forEach(z=>{ if(z.row===sh.row&&z.hp>0&&Math.abs(z.x-sh.tx)<sh.splash){ z.hp-=sh.dmg; applyFx(z,sh.effects,sh.dmg); } }); fx.push({t:"splat",x:sh.tx,y:sh.row*cell+cell/2,life:0.2,c:"#aef0a0"}); }
+  function bomb(pl){ const rr=(pl.s.radius||1.4)*cell; zombies.forEach(z=>{ if(Math.hypot(z.x-pl.x,z.y-pl.y)<rr){ z.hp-=pl.s.dmg; if(pl.s.effects&&pl.s.effects.includes("burn"))z.burn={dps:12,t:3}; } }); fx.push({t:"boom",x:pl.x,y:pl.y,life:0.4}); shakeT=0.3; plants.splice(plants.indexOf(pl),1); }
 
   function winGame(){ if(won)return; won=true; gameOver=true; started=false; updateWaveBtn();
     const rew=150+Math.round(brains*0.25); brains+=rew;
@@ -776,13 +877,18 @@ const Battle=(function(){
     shots.forEach(sh=>{ if(sh.lob){ const arc=Math.sin(Math.PI*sh.pt)*cell*0.7; ctx.font="18px serif"; ctx.fillText("🟢",sh.x,sh.row*cell+cell/2-arc); return; }
       ctx.beginPath(); ctx.fillStyle="#aef0a0"; ctx.arc(sh.x,sh.y,6,0,TAU); ctx.fill(); });
     zombies.forEach(z=>{ ctx.font=Math.floor(cell*(z.boss?0.85:0.55))+"px serif"; if(z.slow>0)ctx.globalAlpha=0.85;
-      ctx.fillText(z.e,z.x,z.y+2); ctx.globalAlpha=1; hpbar(z.x,z.y-cell*0.34,z.hp/z.maxHp,z.boss?"#ff4fa0":"#ff7a7a"); });
+      ctx.fillText(z.e,z.x,z.y+2); ctx.globalAlpha=1; hpbar(z.x,z.y-cell*0.34,z.hp/z.maxHp,z.boss?"#ff4fa0":"#ff7a7a");
+      let ix=z.x+13; ctx.font="12px serif";
+      if(z.slow>0){ ctx.fillText("❄",ix,z.y-cell*0.28); ix+=12; }
+      if(z.burn){ ctx.fillText("🔥",ix,z.y-cell*0.28); ix+=12; }
+      if(z.poison){ ctx.fillText("☠",ix,z.y-cell*0.28); } });
     suns.forEach(s=>{ ctx.font="26px serif"; ctx.fillText("☀",s.x,s.y+Math.sin(Date.now()/200+s.x)*2); });
     fx.forEach(e=>{ if(e.t==="splat"){ctx.globalAlpha=e.life/0.2;ctx.fillStyle=e.c;ctx.beginPath();ctx.arc(e.x,e.y,10,0,TAU);ctx.fill();ctx.globalAlpha=1;}
       else if(e.t==="beam"){ctx.globalAlpha=e.life/0.12;ctx.strokeStyle=e.c;ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(e.x,e.y);ctx.lineTo(W,e.y);ctx.stroke();ctx.lineWidth=1;ctx.globalAlpha=1;}
       else if(e.t==="fume"){ctx.globalAlpha=e.life/0.2*0.5;ctx.fillStyle="#9e9e9e";ctx.fillRect(e.x,e.y-cell*0.4,e.w,cell*0.8);ctx.globalAlpha=1;}
       else if(e.t==="boom"){ctx.globalAlpha=Math.max(0,e.life/0.4);ctx.font=Math.floor(cell*1.2)+"px serif";ctx.fillText("💥",e.x,e.y);ctx.globalAlpha=1;}
       else if(e.t==="puff"){ctx.globalAlpha=e.life/0.25;ctx.font="18px serif";ctx.fillText("💨",e.x,e.y);ctx.globalAlpha=1;}
+      else if(e.t==="bolt"){ctx.globalAlpha=e.life/0.2;ctx.strokeStyle="#fff176";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(e.x1,e.y1);ctx.lineTo(e.x2,e.y2);ctx.stroke();ctx.lineWidth=1;ctx.globalAlpha=1;}
       else if(e.t==="fp"){ctx.globalAlpha=Math.min(1,e.life);ctx.fillStyle="#5ee8e8";ctx.font="12px monospace";ctx.fillText("🧬+"+e.v,e.x,e.y-(0.9-e.life)*40);ctx.globalAlpha=1;}
       else if(e.t==="coin"){ctx.globalAlpha=Math.min(1,e.life);ctx.fillStyle="#ffcf4d";ctx.font="12px monospace";ctx.fillText("🪙+"+e.v,e.x,e.y-(0.9-e.life)*38);ctx.globalAlpha=1;}
       else if(e.t==="click"){ctx.globalAlpha=Math.min(1,e.life/0.3);ctx.fillStyle="#fff";ctx.font="13px monospace";ctx.fillText("👆"+e.v,e.x,e.y-(0.3-e.life)*30);ctx.globalAlpha=1;}

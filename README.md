@@ -27,10 +27,12 @@ Tag (1–9) → 🌙 **Nacht** (10–19, weniger Himmels-Sonne) → Tag (20) →
 
 ## ⚛️ Forschung & 🧬 Mutations-Labor
 - **Forschungslabor** im **Atom-Layout**: die geleverten Upgrades kreisen als Knoten um einen leuchtenden Atomkern.
-- **Mutations-Labor** mit **Zombie-Risk-Reward**: Rechts machst du die Zombies per Reglern (Stärke/Rüstung/Geschwindigkeit) freiwillig stärker → höhere **Risiko-Stufe** → **mehr 🪙 Münzen, 🧬 FP & 🧠 Gehirne** auf alle Drops. Links steht bereits die Vorschau der Pflanzen-Elemente (Feuer/Eis/Gift/Elektro) — kommt als Nächstes.
+- **Mutations-Labor** — zweigeteilt:
+  - **Links „Pflanzen verbessern"** (aktiv!): Kaufe Element-Mutationen 🔥 Feuer (Brand), ❄️ Eis (verlangsamt), ☠️ Gift (DoT), ⚡ Elektro (Kettenblitz). Sie wirken auf **alle deine Angriffs-Pflanzen** und lassen sich kombinieren.
+  - **Rechts „Zombies stärker machen"** (Risk-Reward): Regler für Stärke/Rüstung/Geschwindigkeit → höhere **Risiko-Stufe** → **mehr 🪙/🧬/🧠** auf alle Drops.
 
 ## 🔜 Später geplant
-Pflanzen-Element-Mutationen (Feuer/Eis/Gift …), aquatische Teich-Mechaniken, mehr Zombie-Arten.
+Aquatische Teich-Mechaniken, mehr Zombie-Arten, weitere Pflanzen-Chassis.
 
 ## 🛠️ Technik
 Reines HTML/CSS/JS, Canvas, `localStorage` (nur Meta). Datengetrieben (`CHASSIS`, `RESEARCH`, `EQUIP`, `SHOP_*`, `PRESTIGE`, `UNIQUE`). Prototyp für die spätere **Godot/C#-Version**.
