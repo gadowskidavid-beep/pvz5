@@ -1,37 +1,37 @@
-# 🌻 Garten der Verteidigung 🧟
+# 🌻🧬 Botanik-Labor 🧟
 
-Ein **Incremental-/Idle-Spiel**, das im **Plants-vs-Zombies-Gameplay** gipfelt — komplett in einer einzigen `index.html` (kein Build, keine Abhängigkeiten).
+Ein **Incremental-Spiel**, in dem du dir deine Pflanzen **selbst baust** — statt fertige Pflanzen freizuschalten, erforschst du Gene im **Skilltree** und kombinierst sie im **Labor** zu eigenen Samenpacks. Danach verteidigst du damit den Rasen im **Plants-vs-Zombies-Stil**. Alles in einer einzigen `index.html`, ohne Build und ohne Abhängigkeiten.
 
 ## ▶️ Spielen
 
-Öffne einfach die Datei [`index.html`](index.html) in einem Browser.
+Öffne [`index.html`](index.html) in einem Browser.
 
-Alternativ über **GitHub Pages**: In den Repo-Einstellungen unter *Settings → Pages* den `main`-Branch als Quelle wählen — danach ist das Spiel unter `https://gadowskidavid-beep.github.io/pvz5/` spielbar.
+Oder per **GitHub Pages**: *Settings → Pages → Branch `main`* wählen → spielbar unter
+`https://gadowskidavid-beep.github.io/pvz5/`
 
-## 🎮 So funktioniert es
+## 🔁 Der Spielablauf
 
-### Phase 1 — Der Garten (Idle)
-- Klicke die große ☀️ **Sonne**, um Sonne zu sammeln.
-- Kaufe im **Laden**: Klick-Upgrades, Sonnenblumen (Auto-Produktion) und Wachstums-Boosts.
-- Erreiche **Meilensteine**, die nacheinander Pflanzen und schließlich den Verteidigungs-Modus freischalten:
+1. **🌱 Garten** — Klicke Sonne, kaufe Idle-Sonnenblumen & Upgrades. Sonne finanziert Forschung und platziert Pflanzen im Kampf.
+2. **🔬 Forschung (Skilltree)** — Gib Forschungspunkte aus (aus Siegen + mit Sonne finanziert). Schalte frei:
+   - **Chassis** (Basis): Schütze, Werfer, Nebler, Wand, Stachel, Sonne, Bombe, Beam
+   - **Gene**: Eis ❄️, Feuer 🔥, Gift ☠️, Elektro ⚡, Doppelschuss, Dreispur, Durchschlag, Reichweite+, Panzerung+, Sonnenbonus, Flugabwehr 🎈, Schnellfeuer
+   - **Passive**: +Schaden, +HP, +Sonne, günstigere Packs
+3. **🧪 Labor** — Kombiniere **1 Chassis + bis zu 3 Gene** zu deinem eigenen Samenpack. Beispiele:
+   - `Werfer + Feuer + Dreispur` = Flammen-Katapult über 3 Reihen 🔥
+   - `Beam + Durchschlag + Eis` = durchdringender Frost-Laser 🔺
+   - `Wand + Panzerung` = Panzermauer 🧱
+   Kosten & Werte werden automatisch aus den Bausteinen berechnet. Benenne es, wähle ein Emoji, speichere.
+4. **🛡️ Loadout & Kampf** — Wähle bis zu 8 deiner Packs, dann verteidige den 5×9-Rasen gegen Zombie-Wellen.
 
-| Gesamt-Sonne | Freischaltung |
-|---|---|
-| 50 | 🌱 Erbsenschütze |
-| 150 | 🛡️ **Verteidigungs-Modus** |
-| 200 | 🌰 Walnuss |
-| 600 | ❄️ Eis-Erbse (verlangsamt) |
-| 1200 | 🌿 Doppel-Schütze |
-| 2000 | 🍒 Kirschbombe (Flächenschaden) |
+## 🧟 Gegner & Hilfen
+- Zombie-Typen: normal, Hütchen, **Eimer**, **Fahne** (Anführer), **Ballon** (fliegt — nur mit Flugabwehr-Gen treffbar!), **Stangenspringer** (überspringt die erste Pflanze).
+- **Rasenmäher** 🚜 retten dich **einmal pro Reihe**.
+- Jeder Sieg gibt Sonne **und** Forschungspunkte und erhöht die Wellenzahl im nächsten Kampf.
 
-### Phase 2 — Die Verteidigung (Plants vs Zombies)
-- 5×9-Rasen: oben eine Pflanze wählen, dann aufs Feld klicken zum Pflanzen.
-- Fallende ☀️ anklicken und Sonnenblumen erzeugen Kampf-Sonne.
-- Zombie-Wellen (🧟 normal / Kegelhut / Eimer) laufen von rechts an.
-- Überlebe alle Wellen → **Sonnen-Belohnung** im Garten. Jeder Sieg macht den nächsten Kampf schwerer.
-- Erreicht ein Zombie dein Haus → verloren.
-
-Der Fortschritt wird automatisch im Browser (`localStorage`) gespeichert.
+## 🛠️ Technik
+- Reines HTML/CSS/JavaScript, Canvas-Rendering, `localStorage`-Speicherung.
+- Datengetriebenes System (`CHASSIS`, `GENES`, `PASSIVES`, `computeStats`) → beliebig viele eigene Pflanzen.
+- Prototyp für die spätere **Godot/C#-Version**.
 
 ---
 
