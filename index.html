@@ -257,8 +257,7 @@
     <button class="tbtn" id="tSlow" title="Zeitlupe (Ausrüstung)">🐢</button>
     <button class="tbtn" id="tFast" title="Schnell (Ausrüstung)">⏩</button>
   </div>
-  <button class="tbtn" id="btnResearch">🔬 Forschung</button>
-  <button class="tbtn" id="btnMut">🧬 Mutationen</button>
+  <button class="tbtn" id="btnMut">🔬 Labor</button>
   <button class="tbtn locked" id="btnAlmanac">📖 Almanach</button>
   <button class="tbtn locked" id="btnZombies">🧟 Zombie-Buch</button>
   <button class="tbtn" id="btnShop">🪙 Laden</button>
@@ -281,21 +280,18 @@
 </div>
 
 <!-- FORSCHUNG (Atom-Science) -->
-<div class="ov" id="ovResearch"><div class="sheet">
-  <h2 class="px" style="margin-top:6px;color:var(--sci)">⚛ Forschungslabor</h2>
-  <div style="font-size:12px;color:var(--dim)">🧬 <b id="resFP">0</b> Forschungspunkte · Upgrades unendlich levelbar (Kosten steigen)</div>
+<!-- LABOR: Forschung + Mutationen (zusammengelegt) -->
+<div class="ov" id="ovMutations"><div class="sheet">
   <div class="atomhead"><div class="atom"><div class="nuc"></div><div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div></div></div>
-  <h3 class="px" style="color:var(--sci)">⚛ Wissenschaft — Upgrades (unendlich levelbar)</h3>
+  <h2 class="px" style="color:var(--sci);margin-top:-4px">Labor</h2>
+  <div style="font-size:12px;color:var(--dim)">🧬 <b id="resFP">0</b> Forschungspunkte · Upgrades unendlich levelbar</div>
+  <h3 class="px" style="color:var(--sci)">⚛ Wissenschaft — Upgrades</h3>
   <div class="grid" id="sciGrid"></div>
   <h3 class="px" style="color:var(--grn)">🌱 Pflanzen freischalten</h3>
   <div class="grid" id="chasGrid"></div>
   <h3 class="px" style="color:#6ab8ff">🛠 Ausrüstung</h3>
   <div class="grid" id="equipGrid"></div>
-</div><button class="ovclose" onclick="closeOv()">✕ Schließen</button></div>
-
-<!-- MUTATIONS-LABOR (Bild 3) -->
-<div class="ov" id="ovMutations"><div class="sheet">
-  <h2 class="px">🧬 Mutations-Labor</h2>
+  <h3 class="px" style="color:#ff9a9a;margin-top:8px">🧬 Mutationen</h3>
   <div class="mutwrap">
     <div class="mutcol plants">
       <h3 class="px" style="color:#7cf29a">🌿 Pflanzen verbessern</h3>
@@ -527,17 +523,15 @@ function upd(){
 function setSunLbl(v){ $("rSun").textContent=Math.floor(v); }
 
 /* ---------- Overlays ---------- */
-const OVS=["ovResearch","ovMutations","ovAlmanac","ovZombies","ovShop","ovPrestige"];
+const OVS=["ovMutations","ovAlmanac","ovZombies","ovShop","ovPrestige"];
 function openOv(id){ overlayOpen=true; OVS.forEach(o=>$(o).classList.toggle("open",o===id));
-  if(id==="ovResearch") renderResearch();
-  if(id==="ovMutations") renderMutations();
+  if(id==="ovMutations") renderLab();
   if(id==="ovAlmanac") renderAlmanac();
   if(id==="ovZombies") renderZombies();
   if(id==="ovShop") renderShop();
   if(id==="ovPrestige") renderPrestige();
 }
 function closeOv(){ overlayOpen=false; OVS.forEach(o=>$(o).classList.remove("open")); }
-$("btnResearch").onclick=()=>openOv("ovResearch");
 $("btnMut").onclick=()=>openOv("ovMutations");
 $("btnShop").onclick=()=>openOv("ovShop");
 $("btnPrestige").onclick=()=>openOv("ovPrestige");
@@ -578,6 +572,7 @@ function selectSeed(ck){ selectedSeed=selectedSeed===ck?null:ck; selectedTool=nu
 function refreshSeeds(){ renderSeeds(); }
 
 /* ---------- FORSCHUNG (Atom-Layout) ---------- */
+function renderLab(){ renderResearch(); renderMutations(); }
 function renderScience(){
   const g=$("sciGrid"); if(!g) return; g.innerHTML="";
   Object.keys(RESEARCH).forEach(k=>{ const r=RESEARCH[k], lv=resLvl(k), c=resCost(k);
@@ -586,7 +581,7 @@ function renderScience(){
     d.innerHTML=`<div class="e">${r.e}</div><div class="n">${r.n}</div><div class="d">${r.d}</div>
       <div class="lv">Stufe ${lv} · <span style="color:#8fe6e6">${eff}</span></div>
       <button ${FP<c?"disabled":""}>🧬 ${c}</button>`;
-    d.querySelector("button").onclick=()=>{ if(FP>=c){ FP-=c; research[k]=lv+1; if(typeof Battle!=="undefined")Battle.rebuffPlants(); toast(r.e+" "+r.n+" → Stufe "+(lv+1)); renderResearch(); upd(); } };
+    d.querySelector("button").onclick=()=>{ if(FP>=c){ FP-=c; research[k]=lv+1; if(typeof Battle!=="undefined")Battle.rebuffPlants(); toast(r.e+" "+r.n+" → Stufe "+(lv+1)); renderLab(); upd(); } };
     g.appendChild(d);
   });
 }
@@ -597,7 +592,7 @@ function renderMutations(){
       const d=document.createElement("div"); d.className="mcard"+(owned?" own":"");
       d.innerHTML=`<div class="ic">${m.e}</div><div class="mn">${m.n}</div><div class="md">${m.d}</div>
         ${owned?'<div class="mown">✓ aktiv</div>':`<button ${FP<m.fp?"disabled":""}>🧬 ${m.fp}</button>`}`;
-      if(!owned){ const b=d.querySelector("button"); if(b)b.onclick=()=>{ if(FP>=m.fp){ FP-=m.fp; unlocked.add(k); if(typeof Battle!=="undefined")Battle.rebuffPlants(); toast(m.e+" "+m.n+"-Mutation aktiv!"); renderMutations(); upd(); } }; }
+      if(!owned){ const b=d.querySelector("button"); if(b)b.onclick=()=>{ if(FP>=m.fp){ FP-=m.fp; unlocked.add(k); if(typeof Battle!=="undefined")Battle.rebuffPlants(); toast(m.e+" "+m.n+"-Mutation aktiv!"); renderLab(); upd(); } }; }
       mp.appendChild(d);
     });
   }
@@ -626,7 +621,7 @@ function renderResearch(){
     d.innerHTML=`<div class="e">${c.e}</div><div class="n">${c.n}</div><div class="d">${c.d}</div>
       <div class="lv">${owned?'<span style="color:var(--grn)">✓ freigeschaltet</span>':(ok?"":"benötigt "+CHASSIS[c.req].n)}</div>
       ${owned?"":`<button class="buyfp" ${(!ok||FP<c.fp)?"disabled":""}>🧬 ${c.fp}</button>`}`;
-    if(!owned){ const b=d.querySelector("button"); if(b)b.onclick=()=>{ if(ok&&FP>=c.fp){ FP-=c.fp; unlocked.add(ck); selectedSeed=ck; toast(c.e+" "+c.n+" freigeschaltet!"); renderResearch(); upd(); } }; }
+    if(!owned){ const b=d.querySelector("button"); if(b)b.onclick=()=>{ if(ok&&FP>=c.fp){ FP-=c.fp; unlocked.add(ck); selectedSeed=ck; toast(c.e+" "+c.n+" freigeschaltet!"); renderLab(); upd(); } }; }
     cg.appendChild(d);
   });
   // Ausrüstung
@@ -636,7 +631,7 @@ function renderResearch(){
     d.innerHTML=`<div class="e">${u.e}</div><div class="n">${u.n}</div><div class="d">${u.d}</div>
       <div class="lv">${owned?'<span style="color:#6ab8ff">✓ aktiv</span>':(ok?"":"benötigt "+EQUIP[u.req].n)}</div>
       ${owned?"":`<button class="buyfp" ${(!ok||FP<u.fp)?"disabled":""}>🧬 ${u.fp}</button>`}`;
-    if(!owned){ const b=d.querySelector("button"); if(b)b.onclick=()=>{ if(ok&&FP>=u.fp){ FP-=u.fp; unlocked.add(k); toast(u.e+" "+u.n+" freigeschaltet!"); refreshTopButtons(); if((k==="f_lane2"||k==="f_lane3")&&typeof Battle!=="undefined")Battle.resizeLawn(); renderResearch(); upd(); } }; }
+    if(!owned){ const b=d.querySelector("button"); if(b)b.onclick=()=>{ if(ok&&FP>=u.fp){ FP-=u.fp; unlocked.add(k); toast(u.e+" "+u.n+" freigeschaltet!"); refreshTopButtons(); if((k==="f_lane2"||k==="f_lane3")&&typeof Battle!=="undefined")Battle.resizeLawn(); renderLab(); upd(); } }; }
     eg.appendChild(d);
   });
 }
