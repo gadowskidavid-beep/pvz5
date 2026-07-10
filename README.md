@@ -1,46 +1,35 @@
-# 🧬🧟 Botanik-Labor — Single-Screen Idle-Roguelike
+# 🧬🧟 Botanik-Labor — Incremental Tower-Defense
 
-Alles auf **einem Bildschirm**: Der **Rasen läuft immer**. Erforsche einen **riesigen Fokusbaum**, schalte Pflanzen (Chassis) + Mutationen frei, **klicke Zombies für Schaden & Münzen**, gib Münzen im **In-Run-Laden** für Items & Passive aus — und schaffe das große Ziel: **überlebe Welle 100!** Verlierst du, fängst du neu an, behältst aber **Gehirne** für **einzigartige Upgrade-Chains**. Alles in einer einzigen `index.html`.
+Ein aufgeräumtes, **einfaches** Incremental im Plants-vs-Zombies-Stil auf **einem Bildschirm**. Farme dich Stufe für Stufe hoch, **starte die Wellen selbst**, und schaffe das Ziel: **überlebe Welle 100**. Verlierst du, startest du neu — **Gehirne bleiben** für dauerhafte + einzigartige Upgrades. Alles in einer einzigen `index.html`.
 
 ## ▶️ Spielen
 [`index.html`](index.html) im Browser öffnen, oder per **GitHub Pages**
 (*Settings → Pages → Branch `main`*): `https://gadowskidavid-beep.github.io/pvz5/`
 
-## 🎯 Ziel & Loop
-- **Ziel:** Überlebe bis **Welle 100** → Sieg mit großer Gehirn-Belohnung.
-- **Niederlage:** Run startet neu — **Gehirne bleiben** und fließen in permanente + einzigartige Upgrades.
-- **Loop:** Zombies klicken/besiegen → 🧬 FP + 🪙 Münzen → forschen & im Laden kaufen → tiefer kommen → Bosse geben 🧠 → Prestige → stärker neu starten.
+## 🎮 So läuft's
+1. Du startest **nur mit der Sonnenblume**. Setze sie für Sonne.
+2. **Klicke Zombies direkt an** (ohne gewählte Pflanze) = Klick-Schaden — so farmst du am Anfang 🧬 FP.
+3. **Wellen startest du selbst** über den großen Button „🌊 Welle X starten". Dazwischen ist Vorbereitungszeit: platzieren, sammeln, forschen.
+4. Zombies droppen **🧬 FP**. Im **Forschungslabor** kaufst du:
+   - **⚛ Wissenschaft** — geleverte, **immer farmbare** Upgrades (Schaden, Feuerrate, Klick-Kraft, HP, Sonne, Münzen, FP). Erste Stufen billig (4–8 FP), Kosten steigen pro Stufe.
+   - **🌱 Pflanzen** freischalten (Erbsenschütze → Wand → Werfer → Stachel → Nebler → Bombe → Beam).
+   - **🛠 Ausrüstung** (Almanach, Schaufel, Zeitkontrolle, extra Reihen, Rasenmäher-Zündung/Reparatur, Klick-Gold …).
+5. **🪙 Münzen** (von Zombies) gibst du im **Laden** für Run-Items & Passive aus.
+6. **🧠 Gehirne** (von Bossen) → **Wiedergeburt**: dauerhafte Boni + einzigartige Chain-Upgrades.
 
-## 💰 Ressourcen
-- **☀ Sonne** — im Run, platziert Pflanzen.
-- **🧬 FP** — von Zombies, für den Fokusbaum (permanent).
-- **🪙 Münzen** — im Run, für den **Laden** (Items + Passive). Anklicken & Kills geben Münzen.
-- **🧠 Gehirne** — nur von **Bossen**, für Wiedergeburt + einzigartige Chains (permanent).
-
-## 🖱️ Klick-Kampf
-Ohne gewählte Pflanze **Zombies direkt anklicken** = Klick-Schaden (+ Münzen mit „Klick-Gold"). Im Baum aufrüstbar: *Starker Finger*, *Presslufthammer*, *Blitzfinger* (trifft 3 Zombies). Zusätzlich im Laden: *Eisenfaust*.
-
-## 🔬 Fokusbaum (pan/zoom, 67 Knoten)
-- **Chassis:** Sonne, Erbsenschütze, Wand, Werfer, Stachel, Nebler, Bombe, Beam — je eigener Mutations-Ast (Feuer, Eis, Gift, Krit, Durchschuss, Dreispur, Twin-Flower, Solar-Laser, Dornen …).
-- **🌊 Feld/Rasen:** 2./3. Reihe, Sonne schneller & mehr wert, **Rasenmäher per Klick** & **Respawn (5 Min)** + Turbo.
-- **🪙 Klick & Münzen:** Münz-Boni + Klick-Schaden.
-- **Meta:** +FP, +Schaden, +Sonne, Lockstoff. **Utility:** Almanach, Schaufel, Zeitkontrolle, Zombie-Buch, Labor.
-
-## 🪙 In-Run-Laden
-- **Items:** Sofort-Sonne, Schockfrost (alle einfrieren), Bomben-Regen (Flächenschaden), Mäher-Service.
-- **Passive (ganzer Run, steigende Kosten):** Kampfrausch, Adrenalin, Sonnenkraft, Eisenfaust, Münz-Magnet.
+> **Wichtig:** Skills (FP, Forschung, freigeschaltete Pflanzen) werden **nicht** gespeichert — jeder Neustart ist frisch. Dauerhaft bleiben nur **Gehirne, Prestige, Chains und die Enzyklopädie**.
 
 ## 🌍 Dynamische Welt
-- **Welle 1–9:** Tag · **Welle 9:** Mini-Boss 👺
-- **Welle 10–19:** 🌙 Nacht (weniger Himmels-Sonne!)
-- **Welle 20+:** Tag · **Welle 25+:** 🌊 Teich
-- **Bosse** alle 15 Wellen 👹 · **Welle 100:** Ober-Gargantuar 👿 (Finale). Wellen werden stetig härter.
+Tag (1–9) → 🌙 **Nacht** (10–19, weniger Himmels-Sonne) → Tag (20) → 🌊 **Teich** (25+). **Mini-Boss** bei Welle 9, **Bosse** alle 15 Wellen, **Ober-Gargantuar** bei Welle 100.
 
-## 🧠 Wiedergeburt
-Permanente Stufen (Reihen, Sonne, Schaden, HP, Gehirn-Multi, Auto-Gärtner) **und einzigartige Chains**: Erststart → Ersatz-Mäher → Sparschwein (Münz-Übertrag) → Overkill (+Krit) → Zweites Leben (überlebe 1 Niederlage/Run).
+## 🎨 Godot-Konzept
+[`godot-concept.svg`](godot-concept.svg) zeigt, wie eine spätere **Godot/C#-Version** mit gemalten Assets/PNGs aussehen könnte (die Formen/Emojis sind Platzhalter für deine eigenen Sprites).
+
+## 🔜 Später geplant
+Mutationen (Feuer/Eis/Gift …), aquatische Teich-Mechaniken, mehr Zombie-Arten — kommen in weiteren Schritten.
 
 ## 🛠️ Technik
-Reines HTML/CSS/JS, Canvas (Baum + Rasen), `localStorage`. Datengetrieben (`CHASSIS`, `MUT`, `ECON`, `SHOP_*`, `UNIQUE`, `PRESTIGE`, `computeChassisStats`). Prototyp für die spätere **Godot/C#-Version**.
+Reines HTML/CSS/JS, Canvas, `localStorage` (nur Meta). Datengetrieben (`CHASSIS`, `RESEARCH`, `EQUIP`, `SHOP_*`, `PRESTIGE`, `UNIQUE`). Prototyp für die spätere **Godot/C#-Version**.
 
 ---
 *Gebaut mit Kiro.*

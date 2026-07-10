@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" font-family="Trebuchet MS, Segoe UI, sans-serif">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#bfe9ff"/><stop offset="0.55" stop-color="#e9f6d8"/><stop offset="1" stop-color="#d6efb8"/>
+    </linearGradient>
+    <linearGradient id="hud" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b2f22"/><stop offset="1" stop-color="#0e1c14"/>
+    </linearGradient>
+    <linearGradient id="grassA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7cc35a"/><stop offset="1" stop-color="#6bb14c"/></linearGradient>
+    <linearGradient id="grassB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#84cf60"/><stop offset="1" stop-color="#74bd52"/></linearGradient>
+    <radialGradient id="sun" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#fff6c2"/><stop offset="0.6" stop-color="#ffd54f"/><stop offset="1" stop-color="#f6a723"/></radialGradient>
+    <linearGradient id="pod" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fe36a"/><stop offset="1" stop-color="#4fae3e"/></linearGradient>
+    <linearGradient id="btn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cf29a"/><stop offset="1" stop-color="#37bd66"/></linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f2226"/><stop offset="1" stop-color="#0b171a"/></linearGradient>
+    <filter id="ds" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000" flood-opacity="0.35"/></filter>
+  </defs>
+
+  <!-- BG -->
+  <rect width="1280" height="720" fill="url(#sky)"/>
+  <circle cx="1120" cy="120" r="70" fill="url(#sun)" opacity="0.9"/>
+  <circle cx="1120" cy="120" r="96" fill="#ffd54f" opacity="0.12"/>
+
+  <!-- ===== TOP HUD ===== -->
+  <rect x="0" y="0" width="1280" height="58" fill="url(#hud)"/>
+  <text x="24" y="37" fill="#5ee88a" font-size="22" letter-spacing="3" font-weight="bold">🧬 BOTANIK-LABOR</text>
+  <g font-size="18" font-weight="bold">
+    <rect x="330" y="14" width="112" height="30" rx="15" fill="#00000055" stroke="#ffd54f" stroke-width="2"/><text x="346" y="35" fill="#ffd54f">☀ 320</text>
+    <rect x="452" y="14" width="112" height="30" rx="15" fill="#00000055" stroke="#5ee8e8" stroke-width="2"/><text x="468" y="35" fill="#5ee8e8">🧬 47</text>
+    <rect x="574" y="14" width="112" height="30" rx="15" fill="#00000055" stroke="#ffcf4d" stroke-width="2"/><text x="590" y="35" fill="#ffcf4d">🪙 62</text>
+    <rect x="696" y="14" width="112" height="30" rx="15" fill="#00000055" stroke="#e0aaff" stroke-width="2"/><text x="712" y="35" fill="#e0aaff">🧠 9</text>
+  </g>
+  <g font-size="13" fill="#eaf2e6">
+    <rect x="946" y="15" width="96" height="28" rx="10" fill="#13241a" stroke="#5ee8e8" stroke-width="1.5"/><text x="958" y="33" fill="#5ee8e8">🔬 Forschung</text>
+    <rect x="1050" y="15" width="86" height="28" rx="10" fill="#13241a" stroke="#23402c" stroke-width="1.5"/><text x="1062" y="33">🪙 Laden</text>
+    <rect x="1144" y="15" width="118" height="28" rx="10" fill="#13241a" stroke="#e0aaff" stroke-width="1.5"/><text x="1156" y="33" fill="#e0aaff">🧠 Wiedergeburt</text>
+  </g>
+
+  <!-- ===== LEFT SEED BAR ===== -->
+  <rect x="0" y="58" width="128" height="662" fill="#0c1710"/>
+  <text x="64" y="82" fill="#7a8f7c" font-size="10" letter-spacing="2" text-anchor="middle">PFLANZEN</text>
+  <g>
+    <!-- seed cards -->
+    <g transform="translate(18,92)"><rect width="92" height="66" rx="12" fill="#16281c" stroke="#5ee88a" stroke-width="2"/>
+      <circle cx="30" cy="28" r="15" fill="url(#sun)"/><g fill="#f6a723"><circle cx="30" cy="10" r="4"/><circle cx="46" cy="20" r="4"/><circle cx="46" cy="38" r="4"/><circle cx="30" cy="47" r="4"/><circle cx="14" cy="38" r="4"/><circle cx="14" cy="20" r="4"/></g>
+      <text x="58" y="26" fill="#eaf2e6" font-size="11">Sonne</text><text x="58" y="46" fill="#ffd54f" font-size="12" font-weight="bold">☀50</text></g>
+    <g transform="translate(18,166)"><rect width="92" height="66" rx="12" fill="#13241a" stroke="#23402c" stroke-width="2"/>
+      <ellipse cx="30" cy="30" rx="17" ry="14" fill="url(#pod)"/><circle cx="42" cy="30" r="6" fill="#3d8f30"/><text x="56" y="26" fill="#eaf2e6" font-size="11">Erbse</text><text x="56" y="46" fill="#ffd54f" font-size="12" font-weight="bold">☀100</text></g>
+    <g transform="translate(18,240)"><rect width="92" height="66" rx="12" fill="#13241a" stroke="#23402c" stroke-width="2"/>
+      <ellipse cx="30" cy="32" rx="16" ry="18" fill="#8a5a34"/><ellipse cx="30" cy="26" rx="10" ry="7" fill="#a06c40"/><text x="56" y="26" fill="#eaf2e6" font-size="11">Wand</text><text x="56" y="46" fill="#ffd54f" font-size="12" font-weight="bold">☀50</text></g>
+    <g transform="translate(18,314)" opacity="0.4"><rect width="92" height="66" rx="12" fill="#13241a" stroke="#23402c" stroke-width="2"/>
+      <ellipse cx="30" cy="30" rx="16" ry="13" fill="#7bbf4a"/><text x="52" y="26" fill="#eaf2e6" font-size="11">Werfer</text><text x="52" y="46" fill="#7a8f7c" font-size="12">🔒 🧬40</text></g>
+  </g>
+  <text x="64" y="410" fill="#7a8f7c" font-size="10" letter-spacing="2" text-anchor="middle">WERKZEUG</text>
+  <g transform="translate(18,420)"><rect width="92" height="52" rx="12" fill="#13241a" stroke="#3a2c1c" stroke-width="2"/><text x="46" y="34" text-anchor="middle" font-size="22">🔧</text></g>
+
+  <!-- ===== LAWN ===== -->
+  <g>
+    <!-- 3 rows -->
+    <rect x="150" y="120" width="960" height="150" fill="url(#grassA)"/>
+    <rect x="150" y="270" width="960" height="150" fill="url(#grassB)"/>
+    <rect x="150" y="420" width="960" height="150" fill="url(#grassA)"/>
+    <!-- subtle column grid -->
+    <g stroke="#ffffff" stroke-opacity="0.06">
+      <line x1="257" y1="120" x2="257" y2="570"/><line x1="364" y1="120" x2="364" y2="570"/><line x1="471" y1="120" x2="471" y2="570"/><line x1="578" y1="120" x2="578" y2="570"/><line x1="685" y1="120" x2="685" y2="570"/><line x1="792" y1="120" x2="792" y2="570"/><line x1="899" y1="120" x2="899" y2="570"/><line x1="1006" y1="120" x2="1006" y2="570"/>
+    </g>
+    <rect x="150" y="120" width="960" height="450" fill="none" stroke="#3a2b18" stroke-width="4" rx="6"/>
+
+    <!-- lawnmowers -->
+    <g fill="#c0392b">
+      <g transform="translate(158,180)"><rect width="34" height="22" rx="5" fill="#d84a3a"/><circle cx="8" cy="26" r="7" fill="#333"/><circle cx="26" cy="26" r="7" fill="#333"/></g>
+      <g transform="translate(158,330)"><rect width="34" height="22" rx="5" fill="#d84a3a"/><circle cx="8" cy="26" r="7" fill="#333"/><circle cx="26" cy="26" r="7" fill="#333"/></g>
+      <g transform="translate(158,480)"><rect width="34" height="22" rx="5" fill="#d84a3a"/><circle cx="8" cy="26" r="7" fill="#333"/><circle cx="26" cy="26" r="7" fill="#333"/></g>
+    </g>
+
+    <!-- plants: sunflowers col0, peashooters col1-2, wallnut col3 -->
+    <g>
+      <!-- sunflower -->
+      <g transform="translate(203,195)"><rect x="-6" y="24" width="12" height="26" fill="#3d8f30"/><g fill="#f6a723"><circle cx="0" cy="0" r="8"/><g id="pet"><ellipse cx="0" cy="-22" rx="6" ry="12" fill="#ffd54f"/></g><use href="#pet" transform="rotate(45)"/><use href="#pet" transform="rotate(90)"/><use href="#pet" transform="rotate(135)"/><use href="#pet" transform="rotate(180)"/><use href="#pet" transform="rotate(225)"/><use href="#pet" transform="rotate(270)"/><use href="#pet" transform="rotate(315)"/></g><circle cx="0" cy="0" r="14" fill="url(#sun)"/><circle cx="0" cy="0" r="8" fill="#8a5a1a"/></g>
+      <g transform="translate(203,495)"><rect x="-6" y="24" width="12" height="26" fill="#3d8f30"/><circle cx="0" cy="0" r="14" fill="url(#sun)"/><circle cx="0" cy="0" r="8" fill="#8a5a1a"/></g>
+      <!-- peashooters -->
+      <g transform="translate(310,195)"><rect x="-8" y="10" width="16" height="40" rx="7" fill="#4fae3e"/><ellipse cx="6" cy="-2" rx="20" ry="16" fill="url(#pod)"/><circle cx="24" cy="-2" r="8" fill="#3d8f30"/><circle cx="30" cy="-2" r="4" fill="#2b6e22"/></g>
+      <g transform="translate(310,345)"><rect x="-8" y="10" width="16" height="40" rx="7" fill="#4fae3e"/><ellipse cx="6" cy="-2" rx="20" ry="16" fill="url(#pod)"/><circle cx="24" cy="-2" r="8" fill="#3d8f30"/></g>
+      <g transform="translate(417,345)"><rect x="-8" y="10" width="16" height="40" rx="7" fill="#4fae3e"/><ellipse cx="6" cy="-2" rx="20" ry="16" fill="url(#pod)"/><circle cx="24" cy="-2" r="8" fill="#3d8f30"/></g>
+      <!-- wallnut -->
+      <g transform="translate(524,495)"><ellipse cx="0" cy="0" rx="26" ry="32" fill="#8a5a34"/><ellipse cx="0" cy="-8" rx="16" ry="11" fill="#a06c40"/><circle cx="-8" cy="2" r="3" fill="#2a1a0e"/><circle cx="8" cy="2" r="3" fill="#2a1a0e"/><path d="M-9 14 Q0 20 9 14" stroke="#2a1a0e" stroke-width="3" fill="none"/></g>
+    </g>
+
+    <!-- peas flying -->
+    <g fill="#8fe36a" stroke="#3d8f30"><circle cx="470" cy="193" r="7"/><circle cx="560" cy="193" r="7"/><circle cx="500" cy="343" r="7"/><circle cx="640" cy="343" r="7"/></g>
+
+    <!-- zombies -->
+    <g>
+      <!-- basic -->
+      <g transform="translate(900,195)"><rect x="-14" y="-6" width="28" height="44" rx="8" fill="#7d8a7a"/><circle cx="0" cy="-22" r="15" fill="#93a08e"/><circle cx="-5" cy="-24" r="2.5" fill="#1a1a1a"/><circle cx="5" cy="-24" r="2.5" fill="#1a1a1a"/><rect x="-16" y="6" width="8" height="22" rx="4" fill="#6d7a6a"/></g>
+      <!-- cone zombie -->
+      <g transform="translate(1000,345)"><rect x="-14" y="-6" width="28" height="44" rx="8" fill="#7d8a7a"/><circle cx="0" cy="-22" r="15" fill="#93a08e"/><path d="M-13 -30 L0 -58 L13 -30 Z" fill="#e08b3a" stroke="#a5641f" stroke-width="2"/><circle cx="-5" cy="-24" r="2.5" fill="#1a1a1a"/><circle cx="5" cy="-24" r="2.5" fill="#1a1a1a"/></g>
+      <!-- basic 3rd -->
+      <g transform="translate(1030,495)"><rect x="-14" y="-6" width="28" height="44" rx="8" fill="#7d8a7a"/><circle cx="0" cy="-22" r="15" fill="#93a08e"/><circle cx="-5" cy="-24" r="2.5" fill="#1a1a1a"/><circle cx="5" cy="-24" r="2.5" fill="#1a1a1a"/></g>
+    </g>
+  </g>
+
+  <!-- Wave status pill -->
+  <g filter="url(#ds)"><rect x="540" y="78" width="200" height="34" rx="17" fill="#000000aa"/><text x="640" y="101" text-anchor="middle" fill="#eaf2e6" font-size="15" font-weight="bold">⚔ Welle 5 / 100 · Tag</text></g>
+
+  <!-- ===== RESEARCH / ATOM PANEL (bottom-right preview) ===== -->
+  <g transform="translate(1120,120)">
+    <rect x="0" y="0" width="150" height="430" rx="14" fill="url(#panel)" stroke="#2a5a5a" stroke-width="2"/>
+    <text x="75" y="26" text-anchor="middle" fill="#5ee8e8" font-size="12" letter-spacing="2">⚛ LABOR</text>
+    <!-- atom -->
+    <g transform="translate(75,74)">
+      <ellipse cx="0" cy="0" rx="34" ry="14" fill="none" stroke="#5ee8e855" stroke-width="2"/>
+      <ellipse cx="0" cy="0" rx="34" ry="14" fill="none" stroke="#5ee8e855" stroke-width="2" transform="rotate(60)"/>
+      <ellipse cx="0" cy="0" rx="34" ry="14" fill="none" stroke="#5ee8e855" stroke-width="2" transform="rotate(120)"/>
+      <circle cx="0" cy="0" r="8" fill="#5ee8e8"/><circle cx="0" cy="0" r="13" fill="#5ee8e8" opacity="0.25"/>
+      <circle cx="34" cy="0" r="4" fill="#cffcff"/><circle cx="-17" cy="29" r="4" fill="#cffcff"/><circle cx="-17" cy="-29" r="4" fill="#cffcff"/>
+    </g>
+    <!-- upgrade rows -->
+    <g font-size="11">
+      <g transform="translate(12,120)"><rect width="126" height="42" rx="9" fill="#0e2226" stroke="#2a5a5a"/><text x="10" y="18" fill="#bff">⚔ Schaden Lv3</text><rect x="80" y="24" width="40" height="14" rx="7" fill="#5ee8e8"/><text x="100" y="35" text-anchor="middle" fill="#052424" font-size="10" font-weight="bold">🧬9</text></g>
+      <g transform="translate(12,170)"><rect width="126" height="42" rx="9" fill="#0e2226" stroke="#2a5a5a"/><text x="10" y="18" fill="#bff">💨 Feuerrate L2</text><rect x="80" y="24" width="40" height="14" rx="7" fill="#5ee8e8"/><text x="100" y="35" text-anchor="middle" fill="#052424" font-size="10" font-weight="bold">🧬8</text></g>
+      <g transform="translate(12,220)"><rect width="126" height="42" rx="9" fill="#0e2226" stroke="#2a5a5a"/><text x="10" y="18" fill="#bff">👆 Klick Lv1</text><rect x="80" y="24" width="40" height="14" rx="7" fill="#5ee8e8"/><text x="100" y="35" text-anchor="middle" fill="#052424" font-size="10" font-weight="bold">🧬5</text></g>
+      <g transform="translate(12,270)"><rect width="126" height="42" rx="9" fill="#0e2226" stroke="#2a5a5a"/><text x="10" y="18" fill="#bff">☀ Sonne Lv0</text><rect x="80" y="24" width="40" height="14" rx="7" fill="#5ee8e8"/><text x="100" y="35" text-anchor="middle" fill="#052424" font-size="10" font-weight="bold">🧬8</text></g>
+    </g>
+    <text x="75" y="340" text-anchor="middle" fill="#7fb8b8" font-size="9">🌱 Chassis · 🛠 Ausrüstung</text>
+    <g transform="translate(28,354)"><rect width="42" height="42" rx="9" fill="#13241a" stroke="#5ee88a"/><text x="21" y="30" text-anchor="middle" font-size="20">🫛</text></g>
+    <g transform="translate(80,354)"><rect width="42" height="42" rx="9" fill="#13241a" stroke="#23402c"/><text x="21" y="30" text-anchor="middle" font-size="20">🥬</text></g>
+    <g transform="translate(28,400)" opacity="0.6"><rect width="94" height="20" rx="8" fill="#13241a" stroke="#23402c"/><text x="47" y="14" text-anchor="middle" font-size="9" fill="#6ab8ff">📖 🔧 ⏩ 🌱</text></g>
+  </g>
+
+  <!-- ===== START WAVE BUTTON ===== -->
+  <g filter="url(#ds)" transform="translate(470,600)">
+    <rect width="340" height="60" rx="30" fill="url(#btn)"/>
+    <rect width="340" height="60" rx="30" fill="none" stroke="#2a7d47" stroke-width="0"/>
+    <text x="170" y="39" text-anchor="middle" fill="#062012" font-size="22" font-weight="bold" letter-spacing="1">🌊 Welle 6 starten</text>
+  </g>
+
+  <!-- caption -->
+  <text x="150" y="700" fill="#3a5230" font-size="13">Godot-Konzept · Emojis/Formen sind Platzhalter — ersetze sie durch deine gemalten PNGs / Addon-Sprites</text>
+</svg>
