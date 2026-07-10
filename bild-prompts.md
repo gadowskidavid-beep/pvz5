@@ -1,6 +1,26 @@
 # 🎨 Bild-Prompts für ChatGPT / DALL·E — "Botanik-Labor"
 
-> Tipp: Kopiere zuerst den **Stil-Block** und häng ihn an JEDES Bild an, damit alle Bilder wie aus einem Spiel wirken. Dann jeweils "Bild X" dazu.
+> Tipp: Kopiere zuerst die **Spielbeschreibung** + den **Stil-Block** in den Chat, damit ChatGPT den Kontext versteht. Dann häng den Stil-Block an JEDES Bild an und ergänze "Bild X".
+
+---
+
+## 📖 WORUM GEHT ES IN DEM SPIEL? (ChatGPT vorab geben)
+
+> **Botanik-Labor** ist ein **Incremental-/Idle-Tower-Defense-Spiel** im Stil von *Plants vs Zombies* — komplett auf **einem Bildschirm**. Du bist ein Botaniker-Wissenschaftler und verteidigst deinen Rasen gegen anstürmende Zombies, indem du Pflanzen (Sonnenblumen, Erbsenschützen, Wände usw.) in einem Raster aus Reihen und Spalten platzierst.
+>
+> **Kern-Schleife:** Du startest nur mit einer **Sonnenblume** (sie produziert ☀ Sonne, die Währung zum Pflanzen-Setzen). Am Anfang bist du schwach und musst Zombies sogar per **Mausklick** direkt bekämpfen. Besiegte Zombies lassen **🧬 Forschungspunkte** und **🪙 Münzen** fallen. **Wellen startest du selbst** per Knopfdruck — dazwischen bereitest du dich vor. Rote **Rasenmäher** retten jede Reihe einmal, falls Zombies durchbrechen.
+>
+> **Fortschritt:** Im **Forschungslabor** (Wissenschafts-/Atom-Optik) gibst du Forschungspunkte für **immer stärkere, geleverte Upgrades** aus (mehr Schaden, schnelleres Schießen, mehr Sonne …) und schaltest neue Pflanzen frei. Alles wird schrittweise teurer — ein klassischer Incremental-Sog.
+>
+> **Ziel:** Überlebe bis **Welle 100**. Verlierst du, fängst du von vorn an — aber **🧠 Gehirne** (von Bossen) bleiben dauerhaft und werden im **Wiedergeburt-Menü (Prestige)** in permanente + einzigartige Upgrades investiert, sodass jeder Neustart stärker beginnt.
+>
+> **Dynamische Welt:** Die Umgebung verändert sich mit den Wellen: **Tag → Nacht** (weniger Sonne) **→ Teich** (Wasserreihe). Alle 15 Wellen kommt ein **Boss**, das große Finale ist ein Ober-Gargantuar bei Welle 100.
+>
+> **Später geplant:** ein **Mutations-Labor**, in dem man Pflanzen mit Elementen (Feuer, Eis, Gift) aufwertet — und ein riskantes **Zombie-Labor**, in dem man die Gegner freiwillig stärker macht, um dafür mehr Belohnung zu erhalten.
+>
+> **Stimmung:** freundlich, bunt, cartoonhaft, humorvoll — niedliche Pflanzen mit Gesichtern gegen tollpatschige Zombies.
+
+---
 
 ## 🎯 GEMEINSAMER STIL (an jeden Prompt anhängen)
 > Handgemalter Cartoon-Stil im Geiste von *Plants vs Zombies*: kräftige, gesättigte Farben, dicke dunkle Outlines, weiche Schlagschatten, freundliche runde Formen, sauberes lesbares Game-UI mit abgerundeten Ecken. Leicht schräge Draufsicht (Top-Down mit ~20° Neigung) auf einen in Spalten und Reihen unterteilten Rasen. Hochauflösendes Game-Concept-Art / UI-Mockup eines Tower-Defense-Incremental-Spiels namens **„Botanik-Labor"**. Ressourcen-Farbcodes: ☀ Sonne = warmes Gelb, 🧬 Forschung (FP) = Cyan/Neongrün, 🪙 Münzen = Gold, 🧠 Gehirne = Lila. 16:9.
