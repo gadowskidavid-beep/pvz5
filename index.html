@@ -225,6 +225,22 @@
   /* toast + run-ende */
   .toast{background:linear-gradient(#183226,#0e1c14);border:1px solid var(--grn);border-radius:14px;box-shadow:0 7px 22px #0009;color:#a8f5c2}
   .rovl .box{background:linear-gradient(#182c1e,#101e16);box-shadow:0 24px 70px #000d, inset 0 1px 0 #ffffff12}
+  /* Forschung: sauberes Raster statt Kreis */
+  .atomhead{display:flex;justify-content:center;align-items:center;height:74px;margin:2px 0 -2px}
+  .atomhead .atom{transform:scale(1.15)}
+  .scicard{background:linear-gradient(#12292e,#0c1c20);border:1.5px solid #37787a;border-radius:16px;padding:12px;
+    box-shadow:0 5px 16px #0007, 0 0 20px #5ff0ea18, inset 0 1px 0 #ffffff12;position:relative;overflow:hidden}
+  .scicard::before{content:"";position:absolute;inset:-40%;background:radial-gradient(circle,rgba(95,240,234,.12),transparent 60%);pointer-events:none}
+  .scicard .e{font-size:30px;position:relative;filter:drop-shadow(0 0 7px #5ff0ea77)}
+  .scicard .n{font-size:12.5px;color:#daffff;font-weight:bold;margin:3px 0}
+  .scicard .d{font-size:10px;color:#7fc6c6;min-height:28px;line-height:1.45}
+  .scicard .lv{font-size:11px;color:var(--sci);font-weight:bold;margin:3px 0}
+  .scicard button{background:linear-gradient(#83f2ec,#2fccc4);color:#04302e;font-family:inherit;font-weight:bold;
+    font-size:12px;padding:7px 14px;border-radius:11px;border:none;cursor:pointer;margin-top:2px;
+    box-shadow:0 3px 0 #16706c, inset 0 1px 0 #ffffff66}
+  .scicard button:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+  .scicard button:active:not(:disabled){transform:translateY(2px);box-shadow:0 1px 0 #16706c}
+  .scicard button:disabled{opacity:.34}
 </style>
 </head>
 <body>
@@ -268,11 +284,9 @@
 <div class="ov" id="ovResearch"><div class="sheet">
   <h2 class="px" style="margin-top:6px;color:var(--sci)">⚛ Forschungslabor</h2>
   <div style="font-size:12px;color:var(--dim)">🧬 <b id="resFP">0</b> Forschungspunkte · Upgrades unendlich levelbar (Kosten steigen)</div>
-  <div id="sciAtom">
-    <svg id="sciLines" viewBox="0 0 480 440" preserveAspectRatio="none"></svg>
-    <div class="atom bigatom"><div class="nuc"></div><div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div></div>
-    <div id="sciNodes"></div>
-  </div>
+  <div class="atomhead"><div class="atom"><div class="nuc"></div><div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div></div></div>
+  <h3 class="px" style="color:var(--sci)">⚛ Wissenschaft — Upgrades (unendlich levelbar)</h3>
+  <div class="grid" id="sciGrid"></div>
   <h3 class="px" style="color:var(--grn)">🌱 Pflanzen freischalten</h3>
   <div class="grid" id="chasGrid"></div>
   <h3 class="px" style="color:#6ab8ff">🛠 Ausrüstung</h3>
@@ -565,20 +579,15 @@ function refreshSeeds(){ renderSeeds(); }
 
 /* ---------- FORSCHUNG (Atom-Layout) ---------- */
 function renderScience(){
-  const nodes=$("sciNodes"), lines=$("sciLines"); if(!nodes||!lines) return;
-  nodes.innerHTML=""; lines.innerHTML="";
-  const keys=Object.keys(RESEARCH), cx=240, cy=220, R=178;
-  keys.forEach((k,i)=>{ const ang=-Math.PI/2 + i*(TAU/keys.length);
-    const x=cx+Math.cos(ang)*R, y=cy+Math.sin(ang)*R, on=resLvl(k)>0;
-    const ln=document.createElementNS("http://www.w3.org/2000/svg","line");
-    ln.setAttribute("x1",cx); ln.setAttribute("y1",cy); ln.setAttribute("x2",x); ln.setAttribute("y2",y);
-    ln.setAttribute("stroke", on?"#5ee8e8":"#2a5a5a"); ln.setAttribute("stroke-width", on?2.5:1.4); ln.setAttribute("opacity", on?0.85:0.5);
-    lines.appendChild(ln);
-    const r=RESEARCH[k], lv=resLvl(k), c=resCost(k), eff=r.kind==="pct"?("+"+Math.round(r.per*100*lv)+"%"):("+"+(r.per*lv));
-    const d=document.createElement("div"); d.className="anode"; d.style.left=(x/480*100)+"%"; d.style.top=(y/440*100)+"%";
-    d.innerHTML=`<div class="e">${r.e}</div><div class="n">${r.n}</div><div class="lv">St.${lv} ${eff}</div><button ${FP<c?"disabled":""}>🧬 ${c}</button>`;
+  const g=$("sciGrid"); if(!g) return; g.innerHTML="";
+  Object.keys(RESEARCH).forEach(k=>{ const r=RESEARCH[k], lv=resLvl(k), c=resCost(k);
+    const eff=r.kind==="pct"?("+"+Math.round(r.per*100*lv)+"%"):("+"+(r.per*lv));
+    const d=document.createElement("div"); d.className="scicard";
+    d.innerHTML=`<div class="e">${r.e}</div><div class="n">${r.n}</div><div class="d">${r.d}</div>
+      <div class="lv">Stufe ${lv} · <span style="color:#8fe6e6">${eff}</span></div>
+      <button ${FP<c?"disabled":""}>🧬 ${c}</button>`;
     d.querySelector("button").onclick=()=>{ if(FP>=c){ FP-=c; research[k]=lv+1; if(typeof Battle!=="undefined")Battle.rebuffPlants(); toast(r.e+" "+r.n+" → Stufe "+(lv+1)); renderResearch(); upd(); } };
-    nodes.appendChild(d);
+    g.appendChild(d);
   });
 }
 function renderMutations(){
