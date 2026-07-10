@@ -249,6 +249,8 @@ const META={
  x_sun:  {e:"🌞",n:"Photosynthese",  fp:6, d:"+0,6 Sonne/s passiv"},
  x_start:{e:"🌅",n:"Frühbeet",       fp:8, d:"+50 Start-Sonne"},
  x_haste:{e:"🎯",n:"Lockstoff",      fp:10,d:"Zombies kommen häufiger, droppen aber +50% FP"},
+ x_dmg2: {e:"💥",n:"Kampfserum II",  fp:16,d:"Nochmal +20% Schaden",req:"x_dmg"},
+ x_sun2: {e:"🌞",n:"Photosynthese II",fp:14,d:"Nochmal +1,2 Sonne/s passiv",req:"x_sun"},
 };
 /* ---------- UTILITY (Freischaltungen) ---------- */
 const UTIL={
@@ -257,6 +259,18 @@ const UTIL={
  u_time:     {e:"⏩",n:"Zeitkontrolle",  fp:6, d:"Zeit verlangsamen/beschleunigen"},
  u_zombiebook:{e:"🧟",n:"Zombie-Buch",   fp:5, d:"Öffnet die Zombie-Enzyklopädie"},
  u_lab:      {e:"🧪",n:"Mutations-Labor",fp:25,d:"Attribute frei kombinieren (Endgame)"},
+};
+/* ---------- FELD / RASEN-Upgrades ---------- */
+const FIELD={
+ f_lane2:   {e:"🌱",n:"2. Reihe",       fp:6, d:"Schaltet eine 2. Rasenreihe frei"},
+ f_sunval:  {e:"☀", n:"Reiche Sonne",   fp:5, d:"Jede Sonne ist +10 wert"},
+ f_sunrate: {e:"⏩",n:"Sonnen-Fluss",   fp:6, d:"Himmels-Sonne & Blumen 25% schneller"},
+ f_mowerclick:{e:"🖱",n:"Mäher-Zündung",fp:5, d:"Rasenmäher per Klick aktivieren"},
+ f_sunstart:{e:"🌅",n:"Voller Speicher",fp:5, d:"+75 Start-Sonne",req:"f_sunval"},
+ f_lane3:   {e:"🌱",n:"3. Reihe",       fp:15,d:"Schaltet eine 3. Rasenreihe frei",req:"f_lane2"},
+ f_sunval2: {e:"💎",n:"Sonnen-Kristall",fp:12,d:"Nochmal +15 pro Sonne",req:"f_sunstart"},
+ f_mowerspawn:{e:"🔁",n:"Mäher-Werkstatt",fp:12,d:"Benutzte Rasenmäher respawnen alle 5 Min",req:"f_mowerclick"},
+ f_mowerpow:{e:"🚜",n:"Turbo-Mäher",    fp:8, d:"Rasenmäher fahren schneller",req:"f_mowerspawn"},
 };
 
 /* ---------- Prestige (Gehirne) ---------- */
@@ -284,7 +298,7 @@ const ZTYPES={
 /* ---------- BAUM-LAYOUT (programmatisch, groß) ---------- */
 let nodes=[], sel=null, cam={x:0,y:0}, zoom=0.85;
 function mkNode(id,x,y,kind,ref,req,fp,e,n,d,c){ nodes.push({id,x,y,kind,ref,req,fp,e,n,d,c}); }
-const COL={chassis:"#5ee88a",mut:"#ff7a7a",meta:"#f0c14b",util:"#6ab8ff"};
+const COL={chassis:"#5ee88a",mut:"#ff7a7a",meta:"#f0c14b",util:"#6ab8ff",field:"#4fd0c0"};
 /* Chassis-Hubs mit Fächer-Richtung */
 const HUBS={
  sonne:  {x:-170,y:0,   req:["root"], dir:[-1,0]},
@@ -323,6 +337,11 @@ function buildTree(){
   const uk=Object.keys(UTIL);
   uk.forEach((k,i)=>{ const u=UTIL[k];
     mkNode("util_"+k,(i-(uk.length-1)/2)*135,-470-Math.abs(i-(uk.length-1)/2)*16,"util",k,["root"],u.fp,u.e,u.n,u.d,COL.util); });
+  // FELD / RASEN links (eigener Ast)
+  const fk=Object.keys(FIELD);
+  fk.forEach((k,i)=>{ const f=FIELD[k];
+    const req=f.req?["field_"+f.req]:(i===0?["root"]:["field_"+fk[i-1]]);
+    mkNode("field_"+k,-520-(i%2)*60,-190+i*62,"field",k,req,f.fp,f.e,f.n,f.d,COL.field); });
 }
 function chassisFP(ck){ return {pea:3,wall:5,werfer:8,stachel:8,nebler:12,bombe:15,beam:20}[ck]||0; }
 buildTree();
@@ -332,21 +351,28 @@ const avail=n=>!has(n.id)&&(n.req.length===0||n.req.some(has));
 const hasMut=mk=>has("m_"+mk);
 const hasMeta=k=>has("meta_"+k);
 const hasUtil=k=>has("util_"+k);
+const hasField=k=>has("field_"+k);
 const hasChassis=ck=>has("c_"+ck);
 
 /* Prestige-Helfer */
 const presLvl=k=>prestige[k]||0;
 const presMax=k=>presLvl(k)>=PRESTIGE[k].max;
 const presCost=k=>Math.ceil(PRESTIGE[k].base*Math.pow(PRESTIGE[k].g,presLvl(k)));
-const lanesCount=()=>1+presLvl("lane");
-const startSun=()=>50+25*presLvl("sun")+(hasMeta("x_start")?50:0);
-const sunPassive=()=>0.15*presLvl("srate")+(hasMeta("x_sun")?0.6:0);
+const fieldLanes=()=>(hasField("f_lane2")?1:0)+(hasField("f_lane3")?1:0);
+const lanesCount=()=>Math.min(5,1+presLvl("lane")+fieldLanes());
+const startSun=()=>50+25*presLvl("sun")+(hasMeta("x_start")?50:0)+(hasField("f_sunstart")?75:0);
+const sunPassive=()=>0.15*presLvl("srate")+(hasMeta("x_sun")?0.6:0)+(hasMeta("x_sun2")?1.2:0);
+const sunBonus=()=>(hasField("f_sunval")?10:0)+(hasField("f_sunval2")?15:0);
+const sunRateMul=()=>hasField("f_sunrate")?0.75:1;
+const mowerRespawn=()=>hasField("f_mowerspawn");
+const mowerClickable=()=>hasField("f_mowerclick");
+const mowerTurbo=()=>hasField("f_mowerpow")?1.6:1;
 const brainMul=()=>1+0.15*presLvl("brain");
 const presDmgMul=()=>1+0.08*presLvl("dmg");
 const presHpMul=()=>1+0.08*presLvl("hp");
 const fpMul=()=>{ let m=1; if(hasMeta("x_fp"))m+=0.5; if(hasMeta("x_fp2"))m+=1; if(hasMeta("x_haste"))m+=0.5; return m; };
 const spawnMul=()=>hasMeta("x_haste")?1.4:1;
-const metaDmgMul=()=>hasMeta("x_dmg")?1.15:1;
+const metaDmgMul=()=>(hasMeta("x_dmg")?1.15:1)*(hasMeta("x_dmg2")?1.2:1);
 
 /* Chunk B/C/D folgen */
 
@@ -484,7 +510,7 @@ function treeLoop(now){ tT+=(now-(tlast||now))/1000; tlast=now;
   if($("ovTree").classList.contains("open")) drawTree(); requestAnimationFrame(treeLoop); }
 requestAnimationFrame(treeLoop);
 function drawTree(){
-  tctx.clearRect(0,0,tcv.width,tcv.height);
+  tctx.fillStyle="#0a120c"; tctx.fillRect(0,0,tcv.width,tcv.height);
   // Sporen-Hintergrund
   for(let i=0;i<36;i++){ const sx=(i*173)%1400-700, sy=(i*97)%1000-500;
     tctx.fillStyle=`rgba(94,232,138,${.05+.04*Math.sin(tT+i)})`;
@@ -500,11 +526,11 @@ function drawTree(){
     if(u||a){ const g=tctx.createRadialGradient(x,y,2,x,y,r*2.2);
       g.addColorStop(0,hexA(n.c,u?.38:.12+.07*Math.sin(tT*4+n.x))); g.addColorStop(1,hexA(n.c,0));
       tctx.fillStyle=g; tctx.beginPath(); tctx.arc(x,y,r*2.2,0,TAU); tctx.fill(); }
-    tctx.fillStyle=u?"#14241a":"#0d1810"; tctx.strokeStyle=u?n.c:a?hexA(n.c,.8):"rgba(122,143,124,.4)";
-    tctx.lineWidth=u?3:2; tctx.beginPath(); tctx.arc(x,y,r,0,TAU); tctx.fill(); tctx.stroke();
+    tctx.fillStyle=u?"#16281c":"#12211b"; tctx.strokeStyle=u?n.c:a?hexA(n.c,.95):hexA(n.c,.6);
+    tctx.lineWidth=u?3:2.2; tctx.beginPath(); tctx.arc(x,y,r,0,TAU); tctx.fill(); tctx.stroke();
     tctx.font=`${19*zoom}px serif`; tctx.textAlign="center"; tctx.textBaseline="middle";
-    tctx.globalAlpha=u||a?1:.35; tctx.fillText(n.e,x,y+1); tctx.globalAlpha=1;
-    if(zoom>.55){ if(!u&&n.fp>0){ tctx.fillStyle=a?"#f0c14b":"#4a5c4c"; tctx.font=`${9.5*zoom}px 'Courier New'`;
+    tctx.globalAlpha=u||a?1:.85; tctx.fillText(n.e,x,y+1); tctx.globalAlpha=1;
+    if(zoom>.55){ if(!u&&n.fp>0){ tctx.fillStyle=a?"#f0c14b":"#a7bcac"; tctx.font=`${9.5*zoom}px 'Courier New'`;
         tctx.fillText(n.fp+" FP",x,y+r+11*zoom); }
       else { tctx.fillStyle=hexA(n.c,.9); tctx.font=`${9*zoom}px 'Courier New'`;
         tctx.fillText(n.n.split(" ")[0],x,y+r+11*zoom); } }
@@ -522,6 +548,7 @@ function unlockNode(){ const n=sel; if(!n||!avail(n)||FP<n.fp) return;
   FP-=n.fp; unlocked.add(n.id);
   toast(n.e+" "+n.n+" erforscht!");
   if(n.kind==="chassis") selectedSeed=n.ref;
+  if(n.kind==="field" && typeof Battle!=="undefined") Battle.resizeLawn();
   refreshTopButtons(); upd(); pickNode(n);
 }
 /* Baum pan/zoom + pick */
@@ -562,12 +589,14 @@ const Battle=(function(){
   let ROWS=1, W=COLS*cell, H=cell;
   let sun,plants,zombies,shots,suns,fx,mowers,cd,wave,toSpawn,spawnT,inWave,betweenT,skyT,autoT,gameOver,started=false;
 
-  function resizeLawn(){ ROWS=lanesCount(); W=COLS*cell; H=ROWS*cell; cv.width=W; cv.height=H; }
+  function resizeLawn(){ ROWS=lanesCount(); W=COLS*cell; H=ROWS*cell; cv.width=W; cv.height=H;
+    if(mowers){ while(mowers.length<ROWS) mowers.push({row:mowers.length,x:MOWER_X,active:false,used:false,respawnT:0});
+      if(mowers.length>ROWS) mowers.length=ROWS; } }
 
   function startRun(){
     resizeLawn();
     sun=startSun(); plants=[];zombies=[];shots=[];suns=[];fx=[];cd={};
-    mowers=[]; for(let r=0;r<ROWS;r++) mowers.push({row:r,x:MOWER_X,active:false,used:false});
+    mowers=[]; for(let r=0;r<ROWS;r++) mowers.push({row:r,x:MOWER_X,active:false,used:false,respawnT:0});
     wave=0; inWave=false; betweenT=6; skyT=6; autoT=3; gameOver=false; started=true;
     selectedSeed=hasChassis("pea")?selectedSeed:"sonne";
     renderSeeds();
@@ -581,6 +610,11 @@ const Battle=(function(){
     const r=cv.getBoundingClientRect();
     const mx=(e.clientX-r.left)*(W/r.width), my=(e.clientY-r.top)*(H/r.height);
     const col=Math.floor(mx/cell), row=Math.floor(my/cell);
+    // Rasenmäher per Klick zünden (Feld-Upgrade)
+    if(mowerClickable() && mx<44 && row>=0 && row<ROWS){
+      const m=mowers.find(mm=>mm.row===row && !mm.used && !mm.active);
+      if(m){ m.active=true; toast("🚜 Mäher gezündet!"); return; }
+    }
     // Schaufel
     if(selectedTool==="shovel"){
       const i=plants.findIndex(pl=>pl.col===col&&pl.row===row);
@@ -610,25 +644,27 @@ const Battle=(function(){
     .forEach(o=>{ o.hp-=dmg*0.5; fx.push({t:"bolt",x1:z.x,y1:z.y,x2:o.x,y2:o.y,life:0.2}); }); }
 
   function makeZ(row,kind){ const b=ZTYPES[kind]; seenZombies.add(kind);
-    const hpMul=1+wave*0.06;
+    const hpMul=1+wave*0.10+Math.pow(wave,1.5)*0.012;
+    const spd=b.speed*(1+wave*0.012);
     return {row,kind,x:W+22,y:kind==="balloon"?row*cell+cell*0.3:row*cell+cell/2,
-      hp:Math.round(b.hp*hpMul),maxHp:Math.round(b.hp*hpMul),speed:b.speed,dmg:b.dmg,e:b.e,
+      hp:Math.round(b.hp*hpMul),maxHp:Math.round(b.hp*hpMul),speed:spd,dmg:b.dmg,e:b.e,
       flying:!!b.flying,vault:!!b.vault,boss:!!b.boss,fp:b.fp,brain:b.brain||0,
       slow:0,burn:null,poison:null,dropped:false}; }
 
-  function startWave(){ inWave=true; toSpawn=3+wave*2+lanesCount();
+  function startWave(){ inWave=true; toSpawn=3+wave*2+lanesCount()+Math.floor(wave/4)*lanesCount();
     spawnT=0.6; zombies.push(makeZ(rrow(),"flag")); toSpawn--;
     if(wave%5===0 && wave>0){ zombies.push(makeZ(rrow(),"boss")); toast("👹 BOSS erscheint! (Welle "+wave+")"); } }
   function rrow(){ return Math.floor(Math.random()*ROWS); }
-  function spawnOne(){ const r=Math.random(); let k="basic";
-    if(wave>=1&&r>0.6)k="cone"; if(wave>=2&&r>0.8)k="vaulter";
-    if(wave>=3&&r>0.88)k="balloon"; if(wave>=4&&r>0.93)k="bucket";
+  function spawnOne(){ const r=Math.random(), w=wave; let k="basic";
+    if(w>=1&&r>0.6)k="cone"; if(w>=2&&r>0.8)k="vaulter";
+    if(w>=3&&r>0.88)k="balloon"; if(w>=4&&r>0.92)k="bucket";
+    if(w>=9&&r>0.5)k=(r>0.82?"bucket":"cone"); // späte Wellen: deutlich zäher
     zombies.push(makeZ(rrow(),k)); }
 
   function update(dt){
     for(const k in cd) if(cd[k]>0) cd[k]=Math.max(0,cd[k]-dt);
     sun += sunPassive()*dt;
-    skyT-=dt; if(skyT<=0){ skyT=(9+Math.random()*4); suns.push({x:60+Math.random()*(W-120),y:-16,ty:50+Math.random()*(H-100),value:25,vy:60,life:12,fall:true}); }
+    skyT-=dt; if(skyT<=0){ skyT=(9+Math.random()*4)*sunRateMul(); suns.push({x:60+Math.random()*(W-120),y:-16,ty:50+Math.random()*(H-100),value:25+sunBonus(),vy:60,life:12,fall:true}); }
 
     // Wellen (endlos) — spawnMul macht Pausen kürzer
     if(!inWave){ betweenT-=dt*spawnMul(); if(betweenT<=0){ wave++; startWave(); } }
@@ -643,7 +679,7 @@ const Battle=(function(){
       if(pl.regen&&pl.hp<pl.maxHp) pl.hp=Math.min(pl.maxHp,pl.hp+(s.regen||0)*dt);
       pl.t+=dt;
       if(pl.arch==="sun"){
-        const iv=s.interval; if(pl.t>=iv){ pl.t=0; suns.push({x:pl.x+(Math.random()*14-7),y:pl.y,ty:pl.y,value:s.amount,vy:0,life:12,fall:false}); }
+        const iv=s.interval*sunRateMul(); if(pl.t>=iv){ pl.t=0; suns.push({x:pl.x+(Math.random()*14-7),y:pl.y,ty:pl.y,value:s.amount+sunBonus(),vy:0,life:12,fall:false}); }
         if(s.laser){ pl.lt+=dt; if(pl.lt>=s.laserInt&&laneHas(pl,s)){ pl.lt=0; laserShot(pl,s); } }
       }
       else if(pl.arch==="shooter"){ if(pl.t>=s.shotInt&&laneHas(pl,s)){ pl.t=0; shoot(pl,s); } }
@@ -681,10 +717,12 @@ const Battle=(function(){
       if(z.x<TRIGGER_X){ if(!mow(z.row)) return lose(); }
     }
 
-    // Rasenmäher
-    mowers.forEach(m=>{ if(!m.active)return; m.x+=560*dt;
+    // Rasenmäher (+ Respawn nach 5 Min & Turbo per Feld-Upgrade)
+    mowers.forEach(m=>{
+      if(m.used){ if(mowerRespawn()){ m.respawnT-=dt; if(m.respawnT<=0){ m.used=false; m.active=false; m.x=MOWER_X; toast("🚜 Rasenmäher repariert!"); } } return; }
+      if(!m.active)return; m.x+=560*mowerTurbo()*dt;
       zombies.forEach(z=>{ if(!z.flying&&z.row===m.row&&z.x<m.x+cell*0.4&&z.x>m.x-cell){ killZombie(z); z.hp=0; } });
-      if(m.x>W+30){ m.active=false; m.used=true; } });
+      if(m.x>W+30){ m.active=false; m.used=true; m.respawnT=300; } });
     zombies=zombies.filter(z=>z.hp>0);
 
     for(let i=suns.length-1;i>=0;i--){ const s=suns[i]; if(s.fall&&s.y<s.ty)s.y+=s.vy*dt; else s.fall=false; s.life-=dt; if(s.life<=0)suns.splice(i,1); }
@@ -778,7 +816,8 @@ const Battle=(function(){
 
   return { startRun, info, resizeLawn,
     restart:()=>{ $("runEnd").classList.remove("open"); startRun(); },
-    _dbg:()=>({sun,plants,zombies,shots,fx,wave,inWave,gameOver,ROWS,brains,FP}),
+    _dbg:()=>({sun,plants,zombies,shots,fx,wave,inWave,gameOver,ROWS,brains,FP,mowers}),
+    _mowers:()=>mowers,
     _addSun:n=>{sun+=n;}, _tickWaveNow:()=>{betweenT=0.01;},
     _place:(ck,row,col)=>{ if(!hasChassis(ck))return false; const s=computeChassisStats(ck); if(sun<s.cost)return false; sun-=s.cost; place(ck,s,row,col); return true; } };
 })();
