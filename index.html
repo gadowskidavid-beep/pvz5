@@ -117,6 +117,36 @@
   .rovl .rb{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px}
   .rovl .rb button{font-family:inherit;font-size:13px;font-weight:bold;padding:11px 18px;border-radius:18px;border:none;cursor:pointer}
   .rovl .rb .prim{background:var(--grn);color:#062012} .rovl .rb .alt{background:#24402c;color:var(--paper)}
+  /* ---- Atom-Layout Forschung (Bild 2) ---- */
+  #sciAtom{position:relative;width:480px;height:440px;max-width:96vw;margin:2px auto}
+  #sciLines{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+  .bigatom{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(1.9);z-index:1}
+  #sciNodes{position:absolute;inset:0;z-index:2}
+  .anode{position:absolute;transform:translate(-50%,-50%);width:120px;
+    background:linear-gradient(#0e2226,#0c1a1c);border:1.5px solid #2a5a5a;border-radius:12px;padding:7px 4px;text-align:center;box-shadow:0 0 14px #5ee8e822}
+  .anode .e{font-size:22px} .anode .n{font-size:10px;color:#bff;font-weight:bold}
+  .anode .lv{font-size:10px;color:var(--sci)}
+  .anode button{background:var(--sci);color:#052424;font-family:inherit;font-size:11px;font-weight:bold;padding:5px 10px;border-radius:9px;border:none;cursor:pointer;margin-top:3px}
+  .anode button:disabled{opacity:.35}
+  /* ---- Mutations-Labor (Bild 3) ---- */
+  .mutwrap{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;width:min(920px,97vw)}
+  .mutcol{flex:1;min-width:300px;border-radius:16px;padding:14px;border:2px solid}
+  .mutcol.plants{background:linear-gradient(#0f2415,#0b1a10);border-color:#2e6a3a}
+  .mutcol.zomb{background:linear-gradient(#2a1220,#1a0c14);border-color:#7a2f3f}
+  .mutcol h3{text-align:center;margin-bottom:10px}
+  .elrow{display:flex;gap:12px;justify-content:center;margin-bottom:10px}
+  .elem{width:62px;text-align:center;font-size:11px;color:#9fe0a0;opacity:.6;position:relative}
+  .elem .ic{font-size:32px;display:block;filter:grayscale(.35)}
+  .elem .lk{position:absolute;top:2px;right:8px;font-size:12px}
+  .zstat{display:flex;align-items:center;gap:8px;margin:9px 0;background:#00000033;border-radius:10px;padding:8px 10px}
+  .zstat .zi{font-size:22px} .zstat .zn{flex:1;font-size:12px;font-weight:bold;color:#ffb0b0}
+  .zbar{height:9px;background:#3a1520;border-radius:6px;overflow:hidden;margin-top:5px}
+  .zbar div{height:100%;background:linear-gradient(90deg,#ff7a7a,#e53950)}
+  .zbtn{width:28px;height:28px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-weight:bold;font-size:16px;background:#7a2f3f;color:#fff}
+  .zbtn:disabled{opacity:.3;cursor:not-allowed}
+  .riskbox{margin-top:12px;padding:12px;border-radius:12px;background:#00000038;text-align:center}
+  .riskbox .rl{font-size:18px;font-weight:bold;color:#ff9a5a}
+  .rewrow{display:flex;gap:16px;justify-content:center;margin-top:8px;font-size:15px;font-weight:bold;color:#ffcf4d}
 </style>
 </head>
 <body>
@@ -134,6 +164,7 @@
     <button class="tbtn" id="tFast" title="Schnell (Ausrüstung)">⏩</button>
   </div>
   <button class="tbtn" id="btnResearch">🔬 Forschung</button>
+  <button class="tbtn" id="btnMut">🧬 Mutationen</button>
   <button class="tbtn locked" id="btnAlmanac">📖 Almanach</button>
   <button class="tbtn locked" id="btnZombies">🧟 Zombie-Buch</button>
   <button class="tbtn" id="btnShop">🪙 Laden</button>
@@ -157,15 +188,44 @@
 
 <!-- FORSCHUNG (Atom-Science) -->
 <div class="ov" id="ovResearch"><div class="sheet">
-  <div class="scihead"><div class="atom"><div class="nuc"></div><div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div></div>
-    <h2 class="px">Forschungslabor</h2>
-    <div style="font-size:12px;color:var(--dim)">🧬 <b id="resFP">0</b> Forschungspunkte · Upgrades bleveln unendlich (Kosten steigen)</div></div>
-  <h3 class="px" style="color:var(--sci)">⚛ Wissenschaft — geleverte Upgrades</h3>
-  <div class="grid" id="sciGrid"></div>
+  <h2 class="px" style="margin-top:6px;color:var(--sci)">⚛ Forschungslabor</h2>
+  <div style="font-size:12px;color:var(--dim)">🧬 <b id="resFP">0</b> Forschungspunkte · Upgrades unendlich levelbar (Kosten steigen)</div>
+  <div id="sciAtom">
+    <svg id="sciLines" viewBox="0 0 480 440" preserveAspectRatio="none"></svg>
+    <div class="atom bigatom"><div class="nuc"></div><div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div></div>
+    <div id="sciNodes"></div>
+  </div>
   <h3 class="px" style="color:var(--grn)">🌱 Pflanzen freischalten</h3>
   <div class="grid" id="chasGrid"></div>
   <h3 class="px" style="color:#6ab8ff">🛠 Ausrüstung</h3>
   <div class="grid" id="equipGrid"></div>
+</div><button class="ovclose" onclick="closeOv()">✕ Schließen</button></div>
+
+<!-- MUTATIONS-LABOR (Bild 3) -->
+<div class="ov" id="ovMutations"><div class="sheet">
+  <h2 class="px">🧬 Mutations-Labor</h2>
+  <div class="mutwrap">
+    <div class="mutcol plants">
+      <h3 class="px" style="color:#7cf29a">🌿 Pflanzen verbessern</h3>
+      <div class="elrow">
+        <div class="elem"><span class="ic">🔥</span>Feuer<span class="lk">🔒</span></div>
+        <div class="elem"><span class="ic">❄️</span>Eis<span class="lk">🔒</span></div>
+        <div class="elem"><span class="ic">☠️</span>Gift<span class="lk">🔒</span></div>
+        <div class="elem"><span class="ic">⚡</span>Elektro<span class="lk">🔒</span></div>
+      </div>
+      <p style="font-size:11px;color:#7a8f7c;text-align:center;line-height:1.7">Bald verfügbar: Rüste deine Pflanzen mit Elementen auf — Feuer-Erbse, Eis, Gift, Elektro und mehr. 🔒</p>
+    </div>
+    <div class="mutcol zomb">
+      <h3 class="px" style="color:#ff9a9a">🧟 Zombies stärker machen</h3>
+      <div id="zlStats"></div>
+      <div class="riskbox">
+        <div class="rl" id="zlRisk">Risiko-Stufe 0 / 30</div>
+        <div style="font-size:11px;color:#ffb0a0;margin-top:4px">⚠ Höheres Risiko = bessere Belohnung!</div>
+        <div style="font-size:11px;color:#c9a;margin-top:8px">Bonus auf ALLE Drops:</div>
+        <div class="rewrow" id="zlRew"></div>
+      </div>
+    </div>
+  </div>
 </div><button class="ovclose" onclick="closeOv()">✕ Schließen</button></div>
 
 <!-- ALMANACH -->
@@ -214,6 +274,7 @@ const seenZombies=new Set();      // Enzyklopädie (bleibt)
 let FP=0, coins=0, research={};
 const unlocked=new Set(["sonne"]); // Chassis + Ausrüstung (Skills)
 let runShop={}, won=false;
+let zlab={str:0,arm:0,spd:0};       // Zombie-Labor (Risk-Reward, bleibt gespeichert)
 
 /* ---------- CHASSIS (Pflanzen) ---------- */
 const CHASSIS={
@@ -327,6 +388,8 @@ const runSunMul=()=>1+0.15*(runShop.s_sun||0);
 function clickDmg(){ return Math.round((10+6*resLvl("r_click")+25*(runShop.s_click||0))*presDmgMul()); }
 function coinMul(){ return resMul("r_coin")*(1+0.5*(runShop.s_coin||0)); }
 function fpMul(){ return resMul("r_fp"); }
+const riskLevel=()=>(zlab.str||0)+(zlab.arm||0)+(zlab.spd||0);
+const rewardMul=()=>1+0.10*riskLevel();   // Zombie-Labor: +10% Belohnung pro Risiko-Stufe
 function worldOf(w){ if(w>=25)return{name:"Teich",night:false,pond:true,g1:"#20404c",g2:"#274c58"};
   if(w>=20)return{name:"Tag",night:false,pond:false,g1:"#26402c",g2:"#2e4a33"};
   if(w>=10)return{name:"Nacht",night:true,pond:false,g1:"#161f2c",g2:"#1c2836"};
@@ -368,9 +431,10 @@ function upd(){
 function setSunLbl(v){ $("rSun").textContent=Math.floor(v); }
 
 /* ---------- Overlays ---------- */
-const OVS=["ovResearch","ovAlmanac","ovZombies","ovShop","ovPrestige"];
+const OVS=["ovResearch","ovMutations","ovAlmanac","ovZombies","ovShop","ovPrestige"];
 function openOv(id){ overlayOpen=true; OVS.forEach(o=>$(o).classList.toggle("open",o===id));
   if(id==="ovResearch") renderResearch();
+  if(id==="ovMutations") renderMutations();
   if(id==="ovAlmanac") renderAlmanac();
   if(id==="ovZombies") renderZombies();
   if(id==="ovShop") renderShop();
@@ -378,6 +442,7 @@ function openOv(id){ overlayOpen=true; OVS.forEach(o=>$(o).classList.toggle("ope
 }
 function closeOv(){ overlayOpen=false; OVS.forEach(o=>$(o).classList.remove("open")); }
 $("btnResearch").onclick=()=>openOv("ovResearch");
+$("btnMut").onclick=()=>openOv("ovMutations");
 $("btnShop").onclick=()=>openOv("ovShop");
 $("btnPrestige").onclick=()=>openOv("ovPrestige");
 $("btnAlmanac").onclick=()=>{ hasEquip("u_almanac")?openOv("ovAlmanac"):toast("📖 Erst in der Forschung freischalten!"); };
@@ -416,20 +481,43 @@ function renderTools(){
 function selectSeed(ck){ selectedSeed=selectedSeed===ck?null:ck; selectedTool=null; renderSeeds(); }
 function refreshSeeds(){ renderSeeds(); }
 
-/* ---------- FORSCHUNG (Atom-Science) ---------- */
+/* ---------- FORSCHUNG (Atom-Layout) ---------- */
+function renderScience(){
+  const nodes=$("sciNodes"), lines=$("sciLines"); if(!nodes||!lines) return;
+  nodes.innerHTML=""; lines.innerHTML="";
+  const keys=Object.keys(RESEARCH), cx=240, cy=220, R=178;
+  keys.forEach((k,i)=>{ const ang=-Math.PI/2 + i*(TAU/keys.length);
+    const x=cx+Math.cos(ang)*R, y=cy+Math.sin(ang)*R, on=resLvl(k)>0;
+    const ln=document.createElementNS("http://www.w3.org/2000/svg","line");
+    ln.setAttribute("x1",cx); ln.setAttribute("y1",cy); ln.setAttribute("x2",x); ln.setAttribute("y2",y);
+    ln.setAttribute("stroke", on?"#5ee8e8":"#2a5a5a"); ln.setAttribute("stroke-width", on?2.5:1.4); ln.setAttribute("opacity", on?0.85:0.5);
+    lines.appendChild(ln);
+    const r=RESEARCH[k], lv=resLvl(k), c=resCost(k), eff=r.kind==="pct"?("+"+Math.round(r.per*100*lv)+"%"):("+"+(r.per*lv));
+    const d=document.createElement("div"); d.className="anode"; d.style.left=(x/480*100)+"%"; d.style.top=(y/440*100)+"%";
+    d.innerHTML=`<div class="e">${r.e}</div><div class="n">${r.n}</div><div class="lv">St.${lv} ${eff}</div><button ${FP<c?"disabled":""}>🧬 ${c}</button>`;
+    d.querySelector("button").onclick=()=>{ if(FP>=c){ FP-=c; research[k]=lv+1; if(typeof Battle!=="undefined")Battle.rebuffPlants(); toast(r.e+" "+r.n+" → Stufe "+(lv+1)); renderResearch(); upd(); } };
+    nodes.appendChild(d);
+  });
+}
+function renderMutations(){
+  const zg=$("zlStats"); zg.innerHTML="";
+  const stats=[["str","💪","Stärke"],["arm","🛡️","Rüstung"],["spd","⚡","Geschwindigkeit"]];
+  stats.forEach(([key,ic,nm])=>{ const lv=zlab[key]||0;
+    const d=document.createElement("div"); d.className="zstat";
+    d.innerHTML=`<span class="zi">${ic}</span><span class="zn">${nm} <span style="color:#ffd0b0">St.${lv}/10</span><div class="zbar"><div style="width:${lv*10}%"></div></div></span>
+      <button class="zbtn" ${lv<=0?"disabled":""}>−</button><button class="zbtn" ${lv>=10?"disabled":""}>+</button>`;
+    const bs=d.querySelectorAll("button");
+    bs[0].onclick=()=>{ if((zlab[key]||0)>0){ zlab[key]--; renderMutations(); save(); } };
+    bs[1].onclick=()=>{ if((zlab[key]||0)<10){ zlab[key]=(zlab[key]||0)+1; renderMutations(); save(); } };
+    zg.appendChild(d);
+  });
+  const risk=riskLevel(), rew=Math.round((rewardMul()-1)*100);
+  $("zlRisk").textContent="Risiko-Stufe "+risk+" / 30";
+  $("zlRew").innerHTML=`🪙 +${rew}% &nbsp; 🧬 +${rew}% &nbsp; 🧠 +${rew}%`;
+}
 function renderResearch(){
   $("resFP").textContent=Math.floor(FP);
-  // geleverte Upgrades
-  const sg=$("sciGrid"); sg.innerHTML="";
-  Object.keys(RESEARCH).forEach(k=>{ const r=RESEARCH[k], lv=resLvl(k), c=resCost(k);
-    const eff=r.kind==="pct"?("+"+Math.round(r.per*100*lv)+"%"):("+"+(r.per*lv));
-    const d=document.createElement("div"); d.className="scicard";
-    d.innerHTML=`<div class="e">${r.e}</div><div class="n">${r.n}</div><div class="d">${r.d}</div>
-      <div class="lv">Stufe ${lv} <span style="color:#7fb8b8">(${eff})</span></div>
-      <button ${FP<c?"disabled":""}>🧬 ${c}</button>`;
-    d.querySelector("button").onclick=()=>{ if(FP>=c){ FP-=c; research[k]=lv+1; if(typeof Battle!=="undefined")Battle.rebuffPlants(); toast(r.e+" "+r.n+" → Stufe "+(lv+1)); renderResearch(); upd(); } };
-    sg.appendChild(d);
-  });
+  renderScience();
   // Chassis
   const cg=$("chasGrid"); cg.innerHTML="";
   CH_ORDER.forEach(ck=>{ if(ck==="sonne")return; const c=CHASSIS[ck], owned=hasChassis(ck), ok=chassisReqOk(ck);
@@ -578,9 +666,10 @@ const Battle=(function(){
   function place(ck,s,row,col){ plants.push({ck,s,arch:s.arch,row,col,x:col*cell+cell/2,y:row*cell+cell/2,hp:s.hp,maxHp:s.hp,e:CHASSIS[ck].e,t:0,fuse:s.arch==="bomb"?0.7:0,done:false}); }
 
   function makeZ(row,kind){ const b=ZTYPES[kind]; seenZombies.add(kind);
-    const hpMul=1+wave*0.09+Math.pow(wave,1.5)*0.011, spd=b.speed*(1+wave*0.012);
+    const zHp=1+0.15*(zlab.str||0)+0.13*(zlab.arm||0), zSpd=1+0.08*(zlab.spd||0), zDmg=1+0.06*(zlab.str||0);
+    const hpMul=(1+wave*0.09+Math.pow(wave,1.5)*0.011)*zHp, spd=b.speed*(1+wave*0.012)*zSpd;
     return {row,kind,x:W+22,y:kind==="balloon"?row*cell+cell*0.3:row*cell+cell/2,
-      hp:Math.round(b.hp*hpMul),maxHp:Math.round(b.hp*hpMul),speed:spd,dmg:b.dmg,e:b.e,
+      hp:Math.round(b.hp*hpMul),maxHp:Math.round(b.hp*hpMul),speed:spd,dmg:Math.round(b.dmg*zDmg),e:b.e,
       flying:!!b.flying,vault:!!b.vault,boss:!!b.boss,final:!!b.final,fp:b.fp,brain:b.brain||0,slow:0,dropped:false}; }
   function spawnOne(){ const r=Math.random(),w=wave; let k="basic";
     if(w>=2&&r>0.62)k="cone"; if(w>=4&&r>0.82)k="vaulter"; if(w>=6&&r>0.9)k="bucket";
@@ -644,10 +733,10 @@ const Battle=(function(){
     for(let i=fx.length-1;i>=0;i--){ fx[i].life-=dt; if(fx[i].life<=0)fx.splice(i,1); }
   }
   function mow(row){ const m=mowers.find(mm=>mm.row===row&&!mm.used); if(!m)return false; if(!m.active){m.active=true; toast("🚜 Rasenmäher!");} return true; }
-  function killZombie(z){ if(z.dropped)return; z.dropped=true;
-    if(z.boss){ const b=Math.max(1,Math.round((z.brain+Math.floor(wave/5))*brainMul())); brains+=b; fx.push({t:"brain",x:z.x,y:z.y,life:1.1,v:b}); toast((z.final?"👿 OBER-BOSS":"👹 Boss")+" besiegt! +🧠 "+b); shakeT=0.45; }
-    const f=Math.max(1,Math.round(z.fp*fpMul())); FP+=f;
-    const cn=Math.max(1,Math.round((1+wave*0.08+(z.boss?8:0))*coinMul())); coins+=cn;
+  function killZombie(z){ if(z.dropped)return; z.dropped=true; const rew=rewardMul();
+    if(z.boss){ const b=Math.max(1,Math.round((z.brain+Math.floor(wave/5))*brainMul()*rew)); brains+=b; fx.push({t:"brain",x:z.x,y:z.y,life:1.1,v:b}); toast((z.final?"👿 OBER-BOSS":"👹 Boss")+" besiegt! +🧠 "+b); shakeT=0.45; }
+    const f=Math.max(1,Math.round(z.fp*fpMul()*rew)); FP+=f;
+    const cn=Math.max(1,Math.round((1+wave*0.08+(z.boss?8:0))*coinMul()*rew)); coins+=cn;
     fx.push({t:"fp",x:z.x,y:z.y,life:0.9,v:f}); fx.push({t:"coin",x:z.x+8,y:z.y+8,life:0.9,v:cn}); refreshTop(); }
 
   function laneHas(pl,s){ const rows=s.lanes>1?[pl.row-1,pl.row,pl.row+1]:[pl.row];
@@ -731,13 +820,14 @@ const SAVE_KEY="botanik_labor_v6";
 /* WICHTIG: Skills (FP, research, unlocked, coins) werden NICHT gespeichert.
    Nur dauerhafte Meta: Gehirne, Prestige, einzigartige Chains, Enzyklopädie. */
 function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify({
-  brains,prestige,uniques:[...uniques],seen:[...seenZombies],carryCoins })); }catch(e){} }
+  brains,prestige,uniques:[...uniques],seen:[...seenZombies],carryCoins,zlab })); }catch(e){} }
 function load(){ try{ const raw=localStorage.getItem(SAVE_KEY); if(!raw)return; const d=JSON.parse(raw);
   if(typeof d.brains==="number")brains=d.brains;
   if(d.prestige)prestige=d.prestige;
   if(Array.isArray(d.uniques))d.uniques.forEach(x=>uniques.add(x));
   if(Array.isArray(d.seen))d.seen.forEach(x=>seenZombies.add(x));
   if(typeof d.carryCoins==="number")carryCoins=d.carryCoins;
+  if(d.zlab)zlab=Object.assign({str:0,arm:0,spd:0},d.zlab);
 }catch(e){ console.warn("Laden fehlgeschlagen",e); } }
 
 $("rePres").onclick=()=>{ $("runEnd").classList.remove("open"); openOv("ovPrestige"); };

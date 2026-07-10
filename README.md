@@ -25,8 +25,12 @@ Tag (1–9) → 🌙 **Nacht** (10–19, weniger Himmels-Sonne) → Tag (20) →
 ## 🎨 Godot-Konzept
 [`godot-concept.svg`](godot-concept.svg) zeigt, wie eine spätere **Godot/C#-Version** mit gemalten Assets/PNGs aussehen könnte (die Formen/Emojis sind Platzhalter für deine eigenen Sprites).
 
+## ⚛️ Forschung & 🧬 Mutations-Labor
+- **Forschungslabor** im **Atom-Layout**: die geleverten Upgrades kreisen als Knoten um einen leuchtenden Atomkern.
+- **Mutations-Labor** mit **Zombie-Risk-Reward**: Rechts machst du die Zombies per Reglern (Stärke/Rüstung/Geschwindigkeit) freiwillig stärker → höhere **Risiko-Stufe** → **mehr 🪙 Münzen, 🧬 FP & 🧠 Gehirne** auf alle Drops. Links steht bereits die Vorschau der Pflanzen-Elemente (Feuer/Eis/Gift/Elektro) — kommt als Nächstes.
+
 ## 🔜 Später geplant
-Mutationen (Feuer/Eis/Gift …), aquatische Teich-Mechaniken, mehr Zombie-Arten — kommen in weiteren Schritten.
+Pflanzen-Element-Mutationen (Feuer/Eis/Gift …), aquatische Teich-Mechaniken, mehr Zombie-Arten.
 
 ## 🛠️ Technik
 Reines HTML/CSS/JS, Canvas, `localStorage` (nur Meta). Datengetrieben (`CHASSIS`, `RESEARCH`, `EQUIP`, `SHOP_*`, `PRESTIGE`, `UNIQUE`). Prototyp für die spätere **Godot/C#-Version**.
