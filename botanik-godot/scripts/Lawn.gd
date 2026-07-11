@@ -142,6 +142,11 @@ func _spawn_one() -> void:
 	# Gehirn-Traeger tauchen selten zusaetzlich auf (nur sie + Bosse droppen Gehirne)
 	if Game.wave >= BAL.BRAIN_MIN_WAVE and k != "brainz" and rng.randf() < BAL.BRAIN_CHANCE:
 		k = "brainz"
+	# Progressive Ruestung: je hoeher die Welle, desto oefter werden schwache Zombies aufgepanzert
+	var armor_chance: float = min(0.55, Game.wave * 0.012)
+	if (k == "basic" or k == "flag") and rng.randf() < armor_chance:
+		var armored := ["cone", "bucket", "shield", "brute"]
+		k = armored[rng.randi() % armored.size()]
 	_spawn(k)
 
 func _weighted(table) -> String:
@@ -186,7 +191,7 @@ func _update(dt: float) -> void:
 	if Game.phase == "fight":
 		spawn_timer -= dt
 		if to_spawn > 0 and spawn_timer <= 0:
-			spawn_timer = 0.9 + rng.randf() * 1.2
+			spawn_timer = 1.6 + rng.randf() * 1.9   # groessere Abstaende -> Wellen laufen laenger, nicht alles auf einmal
 			_spawn_one(); to_spawn -= 1
 		if to_spawn <= 0 and zombies.is_empty():
 			_end_wave()
@@ -618,8 +623,9 @@ func lawn_click(pos: Vector2) -> void:
 		for p in plants:
 			if p.col == col and p.row == row: plants.erase(p); return
 		return
-	# Hammer/Faust (kein Samen gewählt)
+	# Hammer/Faust (kein Samen gewählt) — nur wenn freigeschaltet
 	if Game.place_slot < 0:
+		if not Game.has("u_hammer"): return
 		var best = null; var bd := 1.0e9
 		for z in zombies:
 			if z.hp > 0:

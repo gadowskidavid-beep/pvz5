@@ -106,9 +106,15 @@ func _process(_delta: float) -> void:
 		wave_btn.visible = true; wave_btn.disabled = false; wave_btn.text = "START"
 	# Werkzeug-Highlight
 	if tool_ham != null:
-		tool_ham.modulate = Color(1, 1, 0.6) if (Game.place_slot < 0 and not Game.shovel) else Color(1, 1, 1)
+		var ham_ok := Game.has("u_hammer")
+		tool_ham.disabled = not ham_ok
+		tool_ham.text = "Hammer" if ham_ok else "Hammer (gesperrt)"
+		tool_ham.modulate = Color(1, 1, 0.6) if (ham_ok and Game.place_slot < 0 and not Game.shovel) else Color(1, 1, 1)
 	if tool_sho != null:
-		tool_sho.modulate = Color(1, 1, 0.6) if Game.shovel else Color(1, 1, 1)
+		var sho_ok := Game.has("u_shovel")
+		tool_sho.disabled = not sho_ok
+		tool_sho.text = "Schaufel" if sho_ok else "Schaufel (gesperrt)"
+		tool_sho.modulate = Color(1, 1, 0.6) if (sho_ok and Game.shovel) else Color(1, 1, 1)
 	if Game.phase == "dead":
 		if not _death_open:
 			_death_open = true
@@ -298,6 +304,7 @@ func _pick_slot(i: int) -> void:
 	refresh_seeds()
 
 func _pick_hammer() -> void:
+	if not Game.has("u_hammer"): return   # erst im Labor freischalten
 	Game.place_slot = -1
 	Game.shovel = false
 	refresh_seeds()
@@ -309,6 +316,7 @@ func _edit_slot_open(i: int) -> void:
 	else: _rebuild_drawer()
 
 func _toggle_shovel() -> void:
+	if not Game.has("u_shovel"): return   # erst im Labor freischalten
 	Game.shovel = not Game.shovel
 	if Game.shovel: Game.place_slot = -1
 	refresh_seeds()

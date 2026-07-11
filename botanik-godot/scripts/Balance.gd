@@ -12,8 +12,8 @@ const MINIBOSS_WAVE := 9      # kleiner Extra-Boss zum Kennenlernen
 const MAX_CHAINS := 3         # (nicht mehr genutzt)
 
 # ---- Wellen-Menge (Anzahl Zombies) ----
-const WAVE_BASE := 3
-const WAVE_PER := 1.6
+const WAVE_BASE := 4
+const WAVE_PER := 2.0
 
 # ---- Zombie-Skalierung pro Welle ----
 const Z_HP_PER_WAVE := 0.09

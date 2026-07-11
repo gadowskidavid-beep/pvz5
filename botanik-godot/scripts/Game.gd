@@ -14,7 +14,7 @@ const LAWN_Y := 96
 # ---- CHASSIS = die 8 CHAINS (env: day/night/water/any) ----
 var CHASSIS := {
 	"sonne":       {"n":"Sonnenblume","arch":"sun","env":"day","fp":0,"req":"","col":Color(1,0.83,0.2),"cost":50,"hp":60,"cd":5,"amount":25,"interval":8.0,"d":"Tag · Oekonomie: produziert Sonne."},
-	"pea":         {"n":"Schütze","arch":"shooter","env":"day","fp":10,"req":"","col":Color(0.35,0.85,0.4),"cost":100,"hp":60,"cd":5,"dmg":22,"rate":1.4,"speed":340.0,"d":"Tag · Schaden/DPS: schießt Erbsen."},
+	"pea":         {"n":"Schütze","arch":"shooter","env":"day","fp":10,"req":"","col":Color(0.35,0.85,0.4),"cost":100,"hp":60,"cd":5,"dmg":22,"rate":0.9,"speed":340.0,"d":"Tag · Schaden/DPS: schießt Erbsen (langsam - skille die Feuerrate!)."},
 	"wall":        {"n":"Panzer-Nuss","arch":"wall","env":"any","fp":18,"req":"pea","col":Color(0.62,0.44,0.26),"cost":50,"hp":340,"cd":14,"d":"Ueberall · Verteidigung: zaeher Blocker."},
 	"pilz":        {"n":"Pilz","arch":"fume","env":"night","fp":36,"req":"","col":Color(0.72,0.55,0.85),"cost":100,"hp":60,"cd":5,"dmg":16,"rate":1.6,"range":2.6,"d":"Nacht · Gift & Sporen-Flaeche. Stark bei Nacht, schwach am Tag."},
 	"sonnenpilz":  {"n":"Sonnenpilz","arch":"sun","env":"night","fp":20,"req":"sonne","col":Color(0.8,0.72,0.5),"cost":25,"hp":60,"cd":5,"amount":15,"interval":7.0,"d":"Nacht · Billige Sonne, produziert auch nachts."},
@@ -35,6 +35,7 @@ var RES_ORDER := ["r_click","r_coin","r_fp","r_loot"]
 
 # ---- EQUIP (einmalig, FP) ----
 var EQUIP := {
+	"u_hammer":     {"n":"Hammer","fp":4,"req":"","d":"Zombies per Klick zerschlagen (Faust)"},
 	"u_almanac":    {"n":"Almanach","fp":5,"req":"","d":"Pflanzen-Almanach"},
 	"u_shovel":     {"n":"Schaufel","fp":6,"req":"","d":"Pflanzen entfernen"},
 	"u_zombiebook": {"n":"Zombie-Buch","fp":9,"req":"u_almanac","d":"Zombie-Enzyklopädie"},
@@ -43,7 +44,7 @@ var EQUIP := {
 	"f_mowerfix":   {"n":"Mäher-Werkstatt","fp":26,"req":"","d":"Mäher werden zwischen Wellen repariert"},
 	"e_clickcoin":  {"n":"Klick-Gold","fp":10,"req":"u_almanac","d":"Zombies anklicken gibt Münzen"},
 }
-var EQ_ORDER := ["u_almanac","u_shovel","u_zombiebook","f_mowerfix","e_clickcoin"]   # f_lane2/f_lane3 entfernt: Rasen ist fest 5 Reihen
+var EQ_ORDER := ["u_hammer","u_shovel","u_almanac","u_zombiebook","f_mowerfix","e_clickcoin"]
 
 # ---- IN-RUN LADEN (Münzen) ----
 var SHOP_ITEMS := {
