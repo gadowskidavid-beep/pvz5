@@ -368,9 +368,9 @@ func _update(dt: float) -> void:
 				z.slow = max(z.slow, 1.5)
 			if tgt.hp <= 0: _plant_dies(tgt)
 		else:
-			var spd := z.speed
+			var spd: float = z.speed
 			# Renn-Zombie: je weniger HP, desto schneller (bis +130%)
-			if z.get("rage", false): spd = z.speed * (1.0 + (1.0 - z.hp / z.maxhp) * 1.3)
+			if z.get("rage", false): spd = float(z.speed) * (1.0 + (1.0 - z.hp / z.maxhp) * 1.3)
 			z.x -= spd * sl * dt
 		if z.x < Game.LAWN_X + 10:
 			if not _mow(z.row):
