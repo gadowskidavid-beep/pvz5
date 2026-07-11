@@ -192,11 +192,11 @@ func _update(dt: float) -> void:
 		if zombies[i].hp <= 0: zombies.remove_at(i)
 	# Sonne
 	for i in range(suns.size() - 1, -1, -1):
-		var s = suns[i]
-		if s.falling and s.y < s.ty: s.y += s.vy * dt
-		else: s.falling = false
-		s.life -= dt
-		if s.life <= 0: suns.remove_at(i)
+		var su = suns[i]
+		if su.falling and su.y < su.ty: su.y += su.vy * dt
+		else: su.falling = false
+		su.life -= dt
+		if su.life <= 0: suns.remove_at(i)
 	# Effekte
 	for i in range(fx.size() - 1, -1, -1):
 		fx[i].life -= dt

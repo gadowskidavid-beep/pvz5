@@ -268,13 +268,13 @@ func _build_lab(vb) -> void:
 	var g2 := _grid(vb, 3)
 	for k in Game.CH_ORDER:
 		if k == "sonne": continue
-		var c = Game.CHASSIS[k]
+		var ch = Game.CHASSIS[k]
 		if Game.has(k):
-			_card(g2, "* " + c.n, c.d, "", false, Callable())
+			_card(g2, "* " + ch.n, ch.d, "", false, Callable())
 		else:
-			var ok := Game.chassis_req_ok(k)
-			var sub: String = c.d if ok else ("Braucht: " + Game.CHASSIS[c.req].n)
-			_card(g2, c.n, sub, "FP %d" % int(c.fp), ok and Game.fp >= int(c.fp), _buy_chassis.bind(k))
+			var ok_c := Game.chassis_req_ok(k)
+			var sub_c: String = ch.d if ok_c else ("Braucht: " + str(Game.CHASSIS[ch.req].n))
+			_card(g2, ch.n, sub_c, "FP %d" % int(ch.fp), ok_c and Game.fp >= int(ch.fp), _buy_chassis.bind(k))
 	_header(vb, "AUSRUESTUNG", Color(0.55, 0.7, 1))
 	var g3 := _grid(vb, 3)
 	for k in Game.EQ_ORDER:
@@ -282,9 +282,9 @@ func _build_lab(vb) -> void:
 		if Game.has(k):
 			_card(g3, "* " + e.n, e.d, "", false, Callable())
 		else:
-			var ok := Game.equip_req_ok(k)
-			var sub: String = e.d if ok else ("Braucht: " + Game.EQUIP[e.req].n)
-			_card(g3, e.n, sub, "FP %d" % int(e.fp), ok and Game.fp >= int(e.fp), _buy_equip.bind(k))
+			var ok_e := Game.equip_req_ok(k)
+			var sub_e: String = e.d if ok_e else ("Braucht: " + str(Game.EQUIP[e.req].n))
+			_card(g3, e.n, sub_e, "FP %d" % int(e.fp), ok_e and Game.fp >= int(e.fp), _buy_equip.bind(k))
 	_header(vb, "MUTATIONEN  (Feuer/Eis/Gift/Elektro fuer alle Angreifer)", Color(1, 0.6, 0.6))
 	var g4 := _grid(vb, 4)
 	for k in Game.MUT_ORDER:
