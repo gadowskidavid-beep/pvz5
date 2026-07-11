@@ -23,6 +23,8 @@ var wave_bar: Control
 var msg_lbl: Label
 var wave_btn: Button
 var seed_box: HBoxContainer
+var tool_ham: Button
+var tool_sho: Button
 
 # Drawer (Skill-Trees)
 var drawer: Control
@@ -96,6 +98,11 @@ func _process(_delta: float) -> void:
 		wave_btn.visible = false
 	else:
 		wave_btn.visible = true; wave_btn.disabled = false; wave_btn.text = "START"
+	# Werkzeug-Highlight
+	if tool_ham != null:
+		tool_ham.modulate = Color(1, 1, 0.6) if (Game.selected == "" and not Game.shovel) else Color(1, 1, 1)
+	if tool_sho != null:
+		tool_sho.modulate = Color(1, 1, 0.6) if Game.shovel else Color(1, 1, 1)
 	if Game.phase == "dead":
 		if not _death_open:
 			_death_open = true
@@ -235,10 +242,10 @@ func _build_bottom() -> void:
 	root.add_child(tools)
 	var st := Button.new(); st.text = "Skill Trees"; st.custom_minimum_size = Vector2(130, 46)
 	st.pressed.connect(_toggle_drawer); tools.add_child(st)
-	var ham := Button.new(); ham.text = "Hammer"; ham.custom_minimum_size = Vector2(96, 46)
-	ham.pressed.connect(_select.bind("")); tools.add_child(ham)
-	var sho := Button.new(); sho.text = "Schaufel"; sho.custom_minimum_size = Vector2(96, 46)
-	sho.pressed.connect(_toggle_shovel); tools.add_child(sho)
+	tool_ham = Button.new(); tool_ham.text = "Hammer"; tool_ham.custom_minimum_size = Vector2(96, 46)
+	tool_ham.pressed.connect(_select.bind("")); tools.add_child(tool_ham)
+	tool_sho = Button.new(); tool_sho.text = "Schaufel"; tool_sho.custom_minimum_size = Vector2(96, 46)
+	tool_sho.pressed.connect(_toggle_shovel); tools.add_child(tool_sho)
 	# Pfeil zum Aufziehen (mittig unten)
 	var arrow := Button.new(); arrow.text = "^  Skill Trees  ^"; arrow.custom_minimum_size = Vector2(190, 26)
 	arrow.position = Vector2(SCREEN_W / 2.0 - 95, SCREEN_H - 90)
@@ -249,18 +256,27 @@ func _build_bottom() -> void:
 func refresh_seeds() -> void:
 	for c in seed_box.get_children():
 		c.queue_free()
-	for ck in Game.CH_ORDER:
+	# Nur die aktiven Chains (Deck) sind spielbar
+	for ck in Game.active:
 		var card := Button.new()
-		card.custom_minimum_size = Vector2(104, 52)
+		card.custom_minimum_size = Vector2(108, 52)
 		card.add_theme_font_size_override("font_size", 12)
-		if Game.has(ck):
-			var s = Game.compute_chassis_stats(ck)
-			card.text = "%s\nSonne %d · Lv%d" % [Game.CHASSIS[ck].n, int(s.cost), _plant_level(ck)]
-			card.pressed.connect(_select.bind(ck))
-		else:
-			card.text = "%s\n(gesperrt)" % Game.CHASSIS[ck].n
-			card.disabled = true
+		var s = Game.compute_chassis_stats(ck)
+		card.text = "%s\nSonne %d · Lv%d" % [Game.CHASSIS[ck].n, int(s.cost), _plant_level(ck)]
+		# Highlight der aktuell gewaehlten Pflanze
+		if Game.selected == ck and not Game.shovel:
+			card.add_theme_stylebox_override("normal", _sb(Color(0.2, 0.45, 0.28), Color(0.6, 1, 0.7), 3, 8))
+			card.add_theme_color_override("font_color", Color(1, 1, 0.85))
+		card.pressed.connect(_select.bind(ck))
 		seed_box.add_child(card)
+	# freie Deck-Slots anzeigen
+	for i in range(Game.active.size(), BAL.MAX_CHAINS):
+		var slot := Button.new()
+		slot.custom_minimum_size = Vector2(108, 52)
+		slot.add_theme_font_size_override("font_size", 12)
+		slot.text = "+ Chain\n(im Baum)"
+		slot.pressed.connect(_toggle_drawer)
+		seed_box.add_child(slot)
 
 func _plant_level(ck: String) -> int:
 	var n := 0
@@ -271,10 +287,12 @@ func _plant_level(ck: String) -> int:
 func _select(key: String) -> void:
 	Game.selected = key
 	Game.shovel = false
+	refresh_seeds()
 
 func _toggle_shovel() -> void:
 	Game.shovel = not Game.shovel
 	Game.selected = ""
+	refresh_seeds()
 
 func _on_wave() -> void:
 	if Game.phase == "won": lawn.reset_run()
@@ -362,10 +380,11 @@ func _animate_drawer() -> void:
 	_dtween.tween_property(drawer, "position:y", ty, 0.3).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 func _rebuild_drawer() -> void:
-	# Tabs
+	# Tabs: ALLE Chains (aktive markiert mit Punkt) + Spiel + Zombies
 	for c in d_tabs.get_children(): c.queue_free()
 	for ck in Game.CH_ORDER:
-		if Game.has(ck): _tab(d_tabs, Game.CHASSIS[ck].n, ck)
+		var lbl: String = ("* " + Game.CHASSIS[ck].n) if Game.is_active(ck) else Game.CHASSIS[ck].n
+		_tab(d_tabs, lbl, ck)
 	_tab(d_tabs, "Spiel", "spiel")
 	_tab(d_tabs, "Zombies", "zombies")
 	# Baum-Bereich
@@ -378,23 +397,68 @@ func _rebuild_drawer() -> void:
 	elif _tree_sel == "zombies":
 		_build_ztab(holder)
 	else:
-		if not Game.has(_tree_sel): _tree_sel = "sonne"
+		if not Game.CHASSIS.has(_tree_sel): _tree_sel = "sonne"
+		var ck: String = _tree_sel
 		var owned := 0
 		var total := 0
-		for id in Game.tree_nodes(_tree_sel):
+		for id in Game.tree_nodes(ck):
 			if id == "root": continue
 			total += 1
-			if Game.pt_owned(_tree_sel, id): owned += 1
+			if Game.pt_owned(ck, id): owned += 1
+		# Kopfzeile des Baums: Name/Skills + Deck-Zaehler + Aktion
+		var arow := HBoxContainer.new(); arow.add_theme_constant_override("separation", 12)
 		var sl := Label.new()
-		sl.text = "%s   ·   Stufe %d   ·   %d/%d Skills" % [Game.CHASSIS[_tree_sel].n, owned, owned, total]
+		sl.text = "%s   ·   %d/%d Skills" % [Game.CHASSIS[ck].n, owned, total]
 		sl.add_theme_font_size_override("font_size", 15); sl.modulate = Color(0.88, 0.97, 0.88)
-		holder.add_child(sl)
-		_build_tree_canvas(holder, _tree_sel)
+		arow.add_child(sl)
+		var dk := Label.new(); dk.text = "Deck: %d/%d" % [Game.active_count(), BAL.MAX_CHAINS]
+		dk.modulate = COL_ACCENT; dk.add_theme_font_size_override("font_size", 15)
+		arow.add_child(dk)
+		var asp := Control.new(); asp.size_flags_horizontal = Control.SIZE_EXPAND_FILL; arow.add_child(asp)
+		_chain_action_button(arow, ck)
+		holder.add_child(arow)
+		_build_tree_canvas(holder, ck)
 	_rebuild_info()
 
+func _chain_action_button(parent, ck: String) -> void:
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(210, 36)
+	if not Game.has(ck):
+		var cost := int(Game.CHASSIS[ck].fp)
+		var ok := Game.chassis_req_ok(ck)
+		if ok:
+			b.text = "Chain freischalten  (%d FP)" % cost
+			b.disabled = Game.fp < cost
+			b.pressed.connect(_unlock_chain.bind(ck))
+		else:
+			b.text = "Braucht: %s" % str(Game.CHASSIS[Game.CHASSIS[ck].req].n)
+			b.disabled = true
+	elif Game.is_active(ck):
+		b.text = "Aus Deck entfernen"
+		b.add_theme_stylebox_override("normal", _sb(Color(0.4, 0.2, 0.2), Color(0.9, 0.5, 0.5), 2, 8))
+		b.pressed.connect(_deactivate_chain.bind(ck))
+	elif Game.deck_full():
+		b.text = "Deck voll (%d/%d)" % [Game.active_count(), BAL.MAX_CHAINS]
+		b.disabled = true
+	else:
+		b.text = "Ins Deck aktivieren"
+		b.add_theme_stylebox_override("normal", _sb(Color(0.18, 0.42, 0.26), COL_ACCENT, 2, 8))
+		b.pressed.connect(_activate_chain.bind(ck))
+	parent.add_child(b)
+
+func _unlock_chain(ck: String) -> void:
+	if Game.buy_chassis(ck): _rebuild_drawer(); refresh_seeds()
+
+func _activate_chain(ck: String) -> void:
+	if Game.activate_chain(ck): _rebuild_drawer(); refresh_seeds()
+
+func _deactivate_chain(ck: String) -> void:
+	Game.deactivate_chain(ck); _rebuild_drawer(); refresh_seeds()
+
 func _tab(parent, label: String, key: String) -> void:
-	var b := Button.new(); b.text = label; b.custom_minimum_size = Vector2(118, 34)
-	b.add_theme_font_size_override("font_size", 14)
+	var b := Button.new(); b.text = label; b.custom_minimum_size = Vector2(94, 32)
+	b.add_theme_font_size_override("font_size", 12)
+	b.clip_text = true
 	if _tree_sel == key:
 		b.add_theme_stylebox_override("normal", _sb(Color(0.17, 0.4, 0.24), COL_ACCENT, 2, 8, 8))
 		b.add_theme_color_override("font_color", Color(0.82, 1, 0.86))

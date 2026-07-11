@@ -103,6 +103,7 @@ var fp := 0
 var research := {}
 var ptree := {}                   # Pflanzen-Skill-Trees: {plant_key: {node: level}}
 var unlocked := {"sonne": true}   # chassis + equip ids
+var active := ["sonne"]           # Deck: max 3 aktive Chains (nur die sind spielbar)
 var run_shop := {}
 var lure := 0                     # Lockstoff-Stufe: Idle-Zombies zwischen Wellen
 var god := false                  # Dev: Rasen kann nicht verloren gehen
@@ -210,6 +211,20 @@ func equip_req_ok(k: String) -> bool:
 func pass_cost(k: String) -> int:
 	return int(SHOP_PASS[k].base) * (int(run_shop.get(k, 0)) + 1)
 
+# ---- Deck: max 3 aktive Chains ----
+func is_active(ck: String) -> bool: return active.has(ck)
+func active_count() -> int: return active.size()
+func deck_full() -> bool: return active.size() >= BAL.MAX_CHAINS
+func can_activate(ck: String) -> bool:
+	return has(ck) and not is_active(ck) and not deck_full()
+func activate_chain(ck: String) -> bool:
+	if not can_activate(ck): return false
+	active.append(ck)
+	return true
+func deactivate_chain(ck: String) -> void:
+	active.erase(ck)
+	if selected == ck: selected = ""
+
 # Umgebungs-Multiplikator: Nacht-Pflanzen stark bei Nacht, Tag-Pflanzen schwaecher nachts
 func env_mul(ck: String) -> float:
 	var env: String = str(CHASSIS[ck].get("env", "any"))
@@ -271,7 +286,10 @@ func buy_chassis(ck: String) -> bool:
 	if has(ck) or not chassis_req_ok(ck): return false
 	var c := int(CHASSIS[ck].fp)
 	if fp < c: return false
-	fp -= c; unlocked[ck] = true; selected = ck
+	fp -= c; unlocked[ck] = true
+	# Frisch freigeschaltete Chain automatisch ins Deck (falls Platz)
+	if not is_active(ck) and not deck_full(): active.append(ck)
+	if is_active(ck): selected = ck
 	return true
 func buy_equip(k: String) -> bool:
 	if has(k) or not equip_req_ok(k): return false
@@ -314,13 +332,16 @@ func rebirth() -> void:
 	run_shop = {}
 	lure = 0
 	unlocked = {"sonne": true}
+	active = ["sonne"]
 	selected = "sonne"
 	shovel = false
 	_apply_prestige_unlocks()
 	new_run()
 
 func _apply_prestige_unlocks() -> void:
-	if pres_lvl("startpea") > 0: unlocked["pea"] = true
+	if pres_lvl("startpea") > 0:
+		unlocked["pea"] = true
+		if not is_active("pea") and not deck_full(): active.append("pea")
 
 # ================================================================
 # SPEICHERN / LADEN (nur Meta!)
