@@ -132,7 +132,7 @@ func refresh_top() -> void:
 	var sel := "Faust"
 	if Game.shovel: sel = "Schaufel"
 	elif Game.selected != "" and Game.has(Game.selected): sel = Game.CHASSIS[Game.selected].n
-	var m := lawn.msg if lawn.msg_t > 0 else ""
+	var m: String = lawn.msg if lawn.msg_t > 0 else ""
 	status_lbl.text = "Welle %d/100  [%s]   |   Gewaehlt: %s   |   %s" % [Game.wave, wname, sel, m]
 	if Game.phase == "won":
 		wave_btn.text = "GEWONNEN! Neuer Run"; wave_btn.disabled = false
