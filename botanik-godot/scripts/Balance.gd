@@ -49,25 +49,25 @@ const ACTS := [
 		"name": "Vorgarten",
 		"night": false, "pond": false, "roof": false, "hazard": false,
 		"g1": Color(0.23, 0.42, 0.25), "g2": Color(0.27, 0.49, 0.29),
-		"spawn": [["basic", 5], ["flag", 1], ["cone", 3], ["vaulter", 1]],
+		"spawn": [["basic", 5], ["flag", 1], ["cone", 3], ["vaulter", 1], ["sprinter", 1]],
 	},
 	{
 		"name": "Nacht-Teich",
 		"night": true, "pond": true, "roof": false, "hazard": false,
 		"g1": Color(0.10, 0.14, 0.22), "g2": Color(0.12, 0.18, 0.26),
-		"spawn": [["basic", 3], ["vaulter", 4], ["cone", 2], ["brainz", 1]],
+		"spawn": [["basic", 3], ["vaulter", 4], ["cone", 2], ["brainz", 1], ["balloon", 2]],
 	},
 	{
 		"name": "Dachterrasse",
 		"night": false, "pond": false, "roof": true, "hazard": true,
 		"g1": Color(0.34, 0.28, 0.24), "g2": Color(0.39, 0.32, 0.27),
-		"spawn": [["cone", 3], ["bucket", 4], ["brute", 2], ["basic", 2]],
+		"spawn": [["cone", 3], ["bucket", 4], ["brute", 2], ["basic", 2], ["shield", 3], ["balloon", 1]],
 	},
 	{
 		"name": "Finstere Zone",
 		"night": true, "pond": false, "roof": false, "hazard": true,
 		"g1": Color(0.16, 0.08, 0.20), "g2": Color(0.21, 0.10, 0.26),
-		"spawn": [["bucket", 3], ["brute", 3], ["vaulter", 3], ["brainz", 2], ["cone", 2]],
+		"spawn": [["bucket", 3], ["brute", 3], ["vaulter", 3], ["brainz", 2], ["cone", 2], ["shield", 2], ["balloon", 2], ["sprinter", 2]],
 	},
 ]
 

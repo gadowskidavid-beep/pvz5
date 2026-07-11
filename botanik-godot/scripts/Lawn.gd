@@ -92,7 +92,9 @@ func _spawn(kind: String) -> void:
 		"smash": b.get("smash", false), "carrier": b.get("carrier", false),
 		"jumped": false, "fp": int(b.fp), "brain": int(b.get("brain", 0)),
 		"slow": 0.0, "burn": 0.0, "poison": 0.0, "dropped": false, "switched": false,
-		"element": str(b.get("element", "")), "ability_t": 0.0
+		"element": str(b.get("element", "")), "ability_t": 0.0,
+		"fly": b.get("fly", false), "rage": b.get("rage", false),
+		"shield": float(b.get("shield", 0.0)), "maxshield": float(b.get("shield", 0.0))
 	})
 
 func _spawn_one() -> void:
@@ -238,7 +240,10 @@ func _update(dt: float) -> void:
 		var gone := false
 		for z in zombies:
 			if z.row == pe.row and z.hp > 0 and abs(z.x - pe.x) < 26 and not pe.hit.has(z):
-				z.hp -= pe.dmg; _apply_fx(z, pe.effects, pe.dmg)
+				if float(z.get("shield", 0.0)) > 0.0:
+					z["shield"] = float(z.shield) - pe.dmg   # Schild absorbiert frontale Erbsen
+				else:
+					z.hp -= pe.dmg; _apply_fx(z, pe.effects, pe.dmg)
 				pe.hit.append(z)
 				if int(pe.pierce) > 0:
 					pe.pierce = int(pe.pierce) - 1
@@ -263,8 +268,14 @@ func _update(dt: float) -> void:
 		var tgt = null
 		for p in plants:
 			if p.arch == "spike" or p.arch == "bomb": continue
+			# Ballon-Zombie fliegt ueber alles ausser hohen Pflanzen (Eisnuss)
+			if z.get("fly", false) and float(p.s.get("tall", 0.0)) <= 0.0: continue
 			if p.row == z.row and abs(z.x - p.x) < Game.CELL * 0.42 and z.x >= p.x - Game.CELL * 0.2:
 				tgt = p; break
+		# Von einer hohen Pflanze heruntergeholt -> landet und frisst normal weiter
+		if z.get("fly", false) and tgt != null:
+			z.fly = false
+			fx.append({"t": "boom", "x": z.x, "y": z.y, "life": 0.2})
 		# Stachel-Schaden
 		for p in plants:
 			if p.arch == "spike" and p.row == z.row and abs(z.x - p.x) < Game.CELL * 0.5:
@@ -310,7 +321,10 @@ func _update(dt: float) -> void:
 				z.slow = max(z.slow, 1.5)
 			if tgt.hp <= 0: _plant_dies(tgt)
 		else:
-			z.x -= z.speed * sl * dt
+			var spd := z.speed
+			# Renn-Zombie: je weniger HP, desto schneller (bis +130%)
+			if z.get("rage", false): spd = z.speed * (1.0 + (1.0 - z.hp / z.maxhp) * 1.3)
+			z.x -= spd * sl * dt
 		if z.x < Game.LAWN_X + 10:
 			if not _mow(z.row):
 				if Game.god: z.hp = 0
@@ -618,11 +632,30 @@ func _draw() -> void:
 		var zc: Color = z.col
 		if z.slow > 0: zc = zc.lerp(Color(0.6,0.8,1), 0.4)
 		var sz = 60 if z.boss else 40
-		draw_rect(Rect2(z.x - sz/2.0, z.y - sz*0.55, sz, sz*1.1), zc)
-		_hp_bar(z.x, z.y - sz*0.62, z.hp / z.maxhp, Color(0.9,0.3,0.3))
+		var zy: float = z.y
+		if z.get("fly", false): zy = z.y - Game.CELL * 0.32   # Ballon schwebt hoeher
+		draw_rect(Rect2(z.x - sz/2.0, zy - sz*0.55, sz, sz*1.1), zc)
+		if z.get("fly", false):
+			draw_line(Vector2(z.x, zy - sz*0.55), Vector2(z.x, zy - sz*0.95), Color(0.25,0.25,0.25), 1.5)
+			draw_circle(Vector2(z.x, zy - sz*1.05), 13, Color(0.92,0.5,0.55))
+		if float(z.get("shield", 0.0)) > 0.0:
+			# Schild vorne (links, Richtung Pflanzen)
+			draw_rect(Rect2(z.x - sz*0.62, zy - sz*0.5, 7, sz*1.0), Color(0.62,0.78,0.96,0.9))
+		_hp_bar(z.x, zy - sz*0.62, z.hp / z.maxhp, Color(0.9,0.3,0.3))
 		var ix = z.x + sz*0.4
-		if z.burn > 0: draw_circle(Vector2(ix, z.y - sz*0.5), 4, Color(1,0.5,0.1))
-		if z.poison > 0: draw_circle(Vector2(ix, z.y - sz*0.5 + 10), 4, Color(0.6,0.9,0.3))
+		if z.burn > 0: draw_circle(Vector2(ix, zy - sz*0.5), 4, Color(1,0.5,0.1))
+		if z.poison > 0: draw_circle(Vector2(ix, zy - sz*0.5 + 10), 4, Color(0.6,0.9,0.3))
+	# Boss-Lebensbalken oben am Bildschirm
+	for bz in zombies:
+		if bz.boss and bz.hp > 0:
+			var bfrac: float = clamp(bz.hp / bz.maxhp, 0.0, 1.0)
+			var bw := 520.0
+			var bx := Game.LAWN_X + (Game.COLS * Game.CELL - bw) / 2.0
+			var by := 70.0
+			draw_rect(Rect2(bx - 3, by - 3, bw + 6, 22), Color(0, 0, 0, 0.55))
+			draw_rect(Rect2(bx, by, bw, 16), Color(0.18, 0.05, 0.08))
+			draw_rect(Rect2(bx, by, bw * bfrac, 16), bz.col)
+			break
 	# Sonne
 	for s in suns:
 		draw_circle(Vector2(s.x, s.y), 15, Color(1,0.85,0.25))
