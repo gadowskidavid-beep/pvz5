@@ -112,6 +112,7 @@ var research := {}
 var unlocked := {"sonne": true}   # chassis + equip + mutation ids
 var run_shop := {}
 var lure := 0                     # Lockstoff-Stufe: Idle-Zombies zwischen Wellen
+var god := false                  # Dev: Rasen kann nicht verloren gehen
 # --- Kampf-Laufzeit ---
 var sun := 75
 var coins := 0

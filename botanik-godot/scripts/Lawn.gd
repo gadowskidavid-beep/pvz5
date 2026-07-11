@@ -187,7 +187,9 @@ func _update(dt: float) -> void:
 		else:
 			z.x -= z.speed * sl * dt
 		if z.x < Game.LAWN_X + 10:
-			if not _mow(z.row): _lose(); return
+			if not _mow(z.row):
+				if Game.god: z.hp = 0
+				else: _lose(); return
 	# Rasenmäher
 	for m in mowers:
 		if m.used or not m.active: continue
