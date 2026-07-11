@@ -8,9 +8,15 @@ var fp_lbl: Label
 var coin_lbl: Label
 var brain_lbl: Label
 var status_lbl: Label
+var wave_lbl: Label
 var seed_box: VBoxContainer
 var wave_btn: Button
-var overlays := {}     # name -> {"panel":Panel, "content":VBoxContainer}
+var overlays := {}       # name -> {"panel":Panel, "content":VBoxContainer, "close":Button}
+var _nav_return := ""     # Overlay, zu dem "Zurueck" springt (sonst Spiel)
+var _death_open := false  # ist der Todes-Screen bereits offen?
+
+const SCREEN_W := 1152
+const SCREEN_H := 648
 
 func _ready() -> void:
 	lawn = Node2D.new()
@@ -21,12 +27,20 @@ func _ready() -> void:
 	_build_topbar()
 	_build_left()
 	_build_wave_btn()
-	for n in ["lab", "prestige", "almanac", "zombiebook", "shop"]:
+	for n in ["lab", "prestige", "almanac", "zombiebook", "shop", "menu", "death", "options"]:
 		_make_overlay(n)
 	refresh_seeds()
+	open_overlay("menu")   # Spiel startet im Startmenue
 
 func _process(_delta: float) -> void:
 	refresh_top()
+	# Todes-Screen automatisch oeffnen
+	if Game.phase == "dead":
+		if not _death_open:
+			_death_open = true
+			open_overlay("death")
+	else:
+		_death_open = false
 
 # ================= TOPBAR =================
 func _build_topbar() -> void:
@@ -39,14 +53,22 @@ func _build_topbar() -> void:
 	coin_lbl = _mk_lbl(hb, "Muenzen: 0", Color(1, 0.82, 0.35))
 	brain_lbl = _mk_lbl(hb, "Gehirne: 0", Color(0.88, 0.68, 1))
 	_nav(hb, "Labor", _open_lab)
-	_nav(hb, "Wiedergeburt", _open_pres)
 	_nav(hb, "Almanach", _open_alm)
 	_nav(hb, "Zombie-Buch", _open_zom)
 	_nav(hb, "Laden", _open_shop)
+	_nav(hb, "Menue", _open_menu)
+	# Wellenzaehler oben rechts
+	wave_lbl = Label.new()
+	wave_lbl.text = "WELLE 0 / 100"
+	wave_lbl.modulate = Color(0.95, 0.95, 0.7)
+	wave_lbl.add_theme_font_size_override("font_size", 22)
+	wave_lbl.position = Vector2(SCREEN_W - 210, 10)
+	ui.add_child(wave_lbl)
+	# Statuszeile (Auswahl + Meldung)
 	var st := HBoxContainer.new()
 	st.position = Vector2(12, 40)
 	ui.add_child(st)
-	status_lbl = _mk_lbl(st, "Welle 0", Color(0.8, 0.95, 0.8))
+	status_lbl = _mk_lbl(st, "", Color(0.8, 0.95, 0.8))
 
 func _mk_lbl(parent, text: String, col := Color(1, 1, 1)) -> Label:
 	var l := Label.new()
@@ -64,12 +86,10 @@ func _nav(parent, text: String, cb: Callable) -> void:
 
 # Nav-Handler
 func _open_lab() -> void: open_overlay("lab")
-func _open_pres() -> void: open_overlay("prestige")
-func _open_alm() -> void:
-	if Game.has("u_almanac"): open_overlay("almanac")
-func _open_zom() -> void:
-	if Game.has("u_zombiebook"): open_overlay("zombiebook")
+func _open_alm() -> void: open_overlay("almanac")
+func _open_zom() -> void: open_overlay("zombiebook")
 func _open_shop() -> void: open_overlay("shop")
+func _open_menu() -> void: open_overlay("menu")
 
 # ================= LINKE PFLANZEN-LEISTE =================
 func _build_left() -> void:
@@ -109,12 +129,12 @@ func _toggle_shovel() -> void:
 	Game.shovel = not Game.shovel
 	Game.selected = ""
 
-# ================= WELLEN-BUTTON =================
+# ================= WELLEN-BUTTON (unten rechts) =================
 func _build_wave_btn() -> void:
 	wave_btn = Button.new()
-	wave_btn.position = Vector2(Game.LAWN_X + 250, 40)
-	wave_btn.custom_minimum_size = Vector2(230, 40)
-	wave_btn.add_theme_font_size_override("font_size", 18)
+	wave_btn.custom_minimum_size = Vector2(160, 52)
+	wave_btn.position = Vector2(SCREEN_W - 180, SCREEN_H - 72)
+	wave_btn.add_theme_font_size_override("font_size", 22)
 	wave_btn.pressed.connect(_on_wave)
 	ui.add_child(wave_btn)
 
@@ -128,7 +148,7 @@ func refresh_top() -> void:
 	fp_lbl.text = "FP: %d" % Game.fp
 	coin_lbl.text = "Muenzen: %d" % Game.coins
 	brain_lbl.text = "Gehirne: %d" % Game.brains
-	var wname: String = str(lawn.world_of(Game.wave).name)
+	wave_lbl.text = "WELLE %d / 100" % Game.wave
 	var sel_name: String = "Faust"
 	if Game.shovel:
 		sel_name = "Schaufel"
@@ -137,13 +157,16 @@ func refresh_top() -> void:
 	var m: String = ""
 	if lawn.msg_t > 0:
 		m = str(lawn.msg)
-	status_lbl.text = "Welle %d/100  [%s]   |   Gewaehlt: %s   |   %s" % [Game.wave, wname, sel_name, m]
+	status_lbl.text = "Gewaehlt: %s     %s" % [sel_name, m]
+	# Wellen-Button je nach Phase
 	if Game.phase == "won":
-		wave_btn.text = "GEWONNEN! Neuer Run"; wave_btn.disabled = false
+		wave_btn.visible = true; wave_btn.disabled = false; wave_btn.text = "Neuer Run"
 	elif Game.phase == "fight":
-		wave_btn.text = "Welle %d laeuft..." % Game.wave; wave_btn.disabled = true
+		wave_btn.visible = true; wave_btn.disabled = true; wave_btn.text = "..."
+	elif Game.phase == "dead":
+		wave_btn.visible = false
 	else:
-		wave_btn.text = "Welle %d starten" % (Game.wave + 1); wave_btn.disabled = false
+		wave_btn.visible = true; wave_btn.disabled = false; wave_btn.text = "START"
 
 # ================= OVERLAYS =================
 func _make_overlay(n: String) -> void:
@@ -152,7 +175,7 @@ func _make_overlay(n: String) -> void:
 	panel.visible = false
 	ui.add_child(panel)
 	var bg := ColorRect.new()
-	bg.color = Color(0.05, 0.08, 0.06, 0.98)
+	bg.color = Color(0.05, 0.08, 0.06, 0.99)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	panel.add_child(bg)
 	var scroll := ScrollContainer.new()
@@ -172,14 +195,32 @@ func _make_overlay(n: String) -> void:
 	close.position = Vector2(14, 12)
 	close.pressed.connect(close_all)
 	panel.add_child(close)
-	overlays[n] = {"panel": panel, "content": vb}
+	overlays[n] = {"panel": panel, "content": vb, "close": close}
 
-func open_overlay(n: String) -> void:
+func open_overlay(n: String, return_to := "") -> void:
+	_nav_return = return_to
 	for k in overlays: overlays[k].panel.visible = (k == n)
 	Game.paused = true
+	_customize_close(n)
 	_build_overlay_content(n)
 
+func _customize_close(n: String) -> void:
+	var cb: Button = overlays[n].close
+	if n == "death":
+		cb.visible = false
+	elif n == "menu":
+		cb.visible = true; cb.text = "> Spielen"
+	elif _nav_return != "":
+		cb.visible = true; cb.text = "< Zurueck"
+	else:
+		cb.visible = true; cb.text = "X  Schliessen"
+
 func close_all() -> void:
+	if _nav_return != "":
+		var r: String = _nav_return
+		_nav_return = ""
+		open_overlay(r)
+		return
 	for k in overlays: overlays[k].panel.visible = false
 	Game.paused = false
 	refresh_seeds()
@@ -198,6 +239,9 @@ func _build_overlay_content(n: String) -> void:
 		"almanac": _build_almanac(vb)
 		"zombiebook": _build_zombiebook(vb)
 		"shop": _build_shop(vb)
+		"menu": _build_menu(vb)
+		"death": _build_death(vb)
+		"options": _build_options(vb)
 
 # ---- Bau-Helfer ----
 func _header(parent, text: String, col := Color(0.6, 0.9, 0.7)) -> void:
@@ -206,6 +250,21 @@ func _header(parent, text: String, col := Color(0.6, 0.9, 0.7)) -> void:
 	l.modulate = col
 	l.add_theme_font_size_override("font_size", 15)
 	parent.add_child(l)
+
+func _big(parent, text: String, size: int, col: Color) -> void:
+	var l := Label.new()
+	l.text = text
+	l.modulate = col
+	l.add_theme_font_size_override("font_size", size)
+	parent.add_child(l)
+
+func _menu_btn(parent, text: String, cb: Callable) -> void:
+	var b := Button.new()
+	b.text = text
+	b.custom_minimum_size = Vector2(320, 46)
+	b.add_theme_font_size_override("font_size", 19)
+	b.pressed.connect(cb)
+	parent.add_child(b)
 
 func _grid(parent, cols: int) -> GridContainer:
 	var g := GridContainer.new()
@@ -243,8 +302,12 @@ func _buy_equip(key: String) -> void:
 	if Game.buy_equip(key): _post_buy("lab")
 func _buy_mut(key: String) -> void:
 	if Game.buy_mut(key): _post_buy("lab")
+func _buy_lure() -> void:
+	if Game.buy_lure(): _post_buy("lab")
 func _buy_pres(key: String) -> void:
-	if Game.buy_prestige(key): _post_buy("prestige")
+	if Game.buy_prestige(key):
+		if overlays["death"].panel.visible: _post_buy("death")
+		else: _post_buy("prestige")
 func _zlab(key: String, d: int) -> void:
 	Game.zlab_change(key, d); _post_buy("lab")
 func _buy_item(key: String) -> void:
@@ -253,6 +316,74 @@ func _buy_item(key: String) -> void:
 		Game.coins -= c; lawn.item(key); _post_buy("shop")
 func _buy_pass(key: String) -> void:
 	if Game.buy_pass(key): _post_buy("shop")
+
+# ---- STARTMENUE ----
+func _build_menu(vb) -> void:
+	_big(vb, "BOTANIK - LABOR", 40, Color(0.55, 0.95, 0.5))
+	_big(vb, "Ein idle Pflanzen-vs-Zombies Labor.  Ueberlebe bis Welle 100!", 15, Color(0.7, 0.85, 0.72))
+	var sp := Control.new(); sp.custom_minimum_size = Vector2(0, 14); vb.add_child(sp)
+	_menu_btn(vb, "> Abenteuer starten", close_all)
+	_menu_btn(vb, "Almanach (Pflanzen)", _menu_open_alm)
+	_menu_btn(vb, "Zombie-Buch", _menu_open_zom)
+	_menu_btn(vb, "Optionen", _menu_open_opt)
+	var sp2 := Control.new(); sp2.custom_minimum_size = Vector2(0, 14); vb.add_child(sp2)
+	_big(vb, "Gehirne (dauerhaft): %d     Prestige-Stufen: %d" % [Game.brains, _pres_total()], 14, Color(0.88, 0.68, 1))
+	_big(vb, "Tipp: Zwischen den Wellen kommen einzelne Zombies zum Farmen.", 13, Color(0.65, 0.8, 0.68))
+
+func _menu_open_alm() -> void: open_overlay("almanac", "menu")
+func _menu_open_zom() -> void: open_overlay("zombiebook", "menu")
+func _menu_open_opt() -> void: open_overlay("options", "menu")
+
+func _pres_total() -> int:
+	var t := 0
+	for k in Game.PRES_ORDER: t += Game.pres_lvl(k)
+	return t
+
+# ---- OPTIONEN ----
+func _build_options(vb) -> void:
+	_big(vb, "OPTIONEN", 28, Color(0.8, 0.9, 1))
+	_header(vb, "Steuerung: Linksklick = Sonne sammeln / Pflanze setzen / Zombie schlagen (Faust).", Color(0.75, 0.85, 0.78))
+	_header(vb, "Leertaste = Welle starten.", Color(0.75, 0.85, 0.78))
+	var sp := Control.new(); sp.custom_minimum_size = Vector2(0, 12); vb.add_child(sp)
+	_header(vb, "Gehirne & Prestige zuruecksetzen (kann nicht rueckgaengig gemacht werden):", Color(1, 0.6, 0.6))
+	var b := Button.new()
+	b.text = "Kompletten Fortschritt loeschen"
+	b.custom_minimum_size = Vector2(320, 40)
+	b.pressed.connect(_reset_progress)
+	vb.add_child(b)
+
+func _reset_progress() -> void:
+	Game.brains = 0
+	Game.prestige = {}
+	Game.zlab = {"str": 0, "arm": 0, "spd": 0}
+	Game.carry_coins = 0
+	Game.seen = {}
+	Game.save_game()
+	lawn.reset_run()
+	_build_overlay_content("options")
+	refresh_seeds()
+
+# ---- TODES-SCREEN ----
+func _build_death(vb) -> void:
+	_big(vb, "DU WURDEST UEBERRANNT!", 34, Color(1, 0.4, 0.4))
+	_big(vb, "Es ist noch nicht vorbei. Du verlierst alle Skills dieses Runs,", 15, Color(0.9, 0.8, 0.8))
+	_big(vb, "aber deine GEHIRNE bleiben - dafuer sind sie da!", 15, Color(0.88, 0.68, 1))
+	var sp := Control.new(); sp.custom_minimum_size = Vector2(0, 10); vb.add_child(sp)
+	_build_prestige(vb)
+	var sp2 := Control.new(); sp2.custom_minimum_size = Vector2(0, 14); vb.add_child(sp2)
+	var b := Button.new()
+	b.text = "WIEDERGEBURT  -  Neuer Versuch"
+	b.custom_minimum_size = Vector2(360, 52)
+	b.add_theme_font_size_override("font_size", 20)
+	b.pressed.connect(_do_rebirth)
+	vb.add_child(b)
+
+func _do_rebirth() -> void:
+	_nav_return = ""
+	for k in overlays: overlays[k].panel.visible = false
+	Game.paused = false
+	lawn.reset_run()
+	refresh_seeds()
 
 # ---- LABOR ----
 func _build_lab(vb) -> void:
@@ -288,18 +419,29 @@ func _build_lab(vb) -> void:
 	_header(vb, "MUTATIONEN  (Feuer/Eis/Gift/Elektro fuer alle Angreifer)", Color(1, 0.6, 0.6))
 	var g4 := _grid(vb, 4)
 	for k in Game.MUT_ORDER:
-		var m = Game.MUT[k]
+		var mu = Game.MUT[k]
 		if Game.has(k):
-			_card(g4, "* " + m.n, m.d, "", false, Callable())
+			_card(g4, "* " + mu.n, mu.d, "", false, Callable())
 		else:
-			_card(g4, m.n, m.d, "FP %d" % int(m.fp), Game.fp >= int(m.fp), _buy_mut.bind(k))
+			_card(g4, mu.n, mu.d, "FP %d" % int(mu.fp), Game.fp >= int(mu.fp), _buy_mut.bind(k))
 	_header(vb, "ZOMBIE-LABOR  (hoeheres Risiko = mehr Belohnung)", Color(1, 0.55, 0.55))
 	var zc := VBoxContainer.new(); vb.add_child(zc)
+	# Lockstoff: mehr Idle-Zombies zum Farmen zwischen den Wellen
+	var lure_hb := HBoxContainer.new(); lure_hb.add_theme_constant_override("separation", 8)
+	var lure_l := Label.new()
+	lure_l.text = "Lockstoff  —  Zombies zwischen Wellen: %d / 6" % Game.idle_cap()
+	lure_l.custom_minimum_size = Vector2(360, 0)
+	lure_hb.add_child(lure_l)
+	var lure_b := Button.new()
+	if Game.lure_max(): lure_b.text = "MAX"; lure_b.disabled = true
+	else: lure_b.text = "FP %d" % Game.lure_cost(); lure_b.disabled = Game.fp < Game.lure_cost()
+	lure_b.pressed.connect(_buy_lure)
+	lure_hb.add_child(lure_b); zc.add_child(lure_hb)
 	for pair in [["str", "Staerke (HP + Schaden)"], ["arm", "Ruestung (Zaehigkeit)"], ["spd", "Geschwindigkeit"]]:
 		var key: String = pair[0]
 		var hb := HBoxContainer.new(); hb.add_theme_constant_override("separation", 8)
 		var l := Label.new(); l.text = "%s  —  St.%d/10" % [pair[1], int(Game.zlab.get(key, 0))]
-		l.custom_minimum_size = Vector2(300, 0)
+		l.custom_minimum_size = Vector2(360, 0)
 		var minus := Button.new(); minus.text = " - "; minus.pressed.connect(_zlab.bind(key, -1))
 		var plus := Button.new(); plus.text = " + "; plus.pressed.connect(_zlab.bind(key, 1))
 		hb.add_child(l); hb.add_child(minus); hb.add_child(plus); zc.add_child(hb)
@@ -308,9 +450,9 @@ func _build_lab(vb) -> void:
 	rl.modulate = Color(1, 0.7, 0.4)
 	zc.add_child(rl)
 
-# ---- WIEDERGEBURT ----
+# ---- WIEDERGEBURT / PRESTIGE-BAUM ----
 func _build_prestige(vb) -> void:
-	_header(vb, "WIEDERGEBURT  —  Gehirne: %d  (bleiben dauerhaft)" % Game.brains, Color(0.88, 0.68, 1))
+	_header(vb, "GEHIRN-UPGRADES  —  Gehirne: %d  (bleiben dauerhaft)" % Game.brains, Color(0.88, 0.68, 1))
 	var g := _grid(vb, 3)
 	for k in Game.PRES_ORDER:
 		var p = Game.PRESTIGE[k]

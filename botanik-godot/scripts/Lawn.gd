@@ -14,6 +14,7 @@ var rng := RandomNumberGenerator.new()
 var to_spawn := 0
 var spawn_timer := 0.0
 var sky_timer := 5.0
+var idle_timer := 6.0
 var msg := ""
 var msg_t := 0.0
 
@@ -28,13 +29,13 @@ func world_of(w: int) -> Dictionary:
 	return {"name":"Tag","night":false,"pond":false,"g1":Color(0.23,0.42,0.25),"g2":Color(0.27,0.49,0.29)}
 
 func reset_run() -> void:
-	Game.new_run()
+	Game.rebirth()
 	plants.clear(); zombies.clear(); peas.clear(); suns.clear(); fx.clear()
 	rows = Game.lanes_count()
 	mowers.clear()
 	for r in range(rows):
 		mowers.append({"row": r, "x": float(Game.LAWN_X - 30), "active": false, "used": false})
-	sky_timer = 5.0; to_spawn = 0; msg = "Bereit!"; msg_t = 2.0
+	sky_timer = 5.0; to_spawn = 0; idle_timer = 6.0; msg = "Bereit!"; msg_t = 2.0
 
 func start_wave() -> void:
 	if Game.phase != "prep": return
@@ -99,7 +100,7 @@ func item(name: String) -> void:
 		for m in mowers: m.used = false; m.active = false; m.x = float(Game.LAWN_X - 30)
 
 func _process(delta: float) -> void:
-	if not Game.paused and Game.phase != "won":
+	if not Game.paused and Game.phase != "won" and Game.phase != "dead":
 		_update(delta)
 	if msg_t > 0: msg_t -= delta
 	queue_redraw()
@@ -121,6 +122,12 @@ func _update(dt: float) -> void:
 			_spawn_one(); to_spawn -= 1
 		if to_spawn <= 0 and zombies.is_empty():
 			_end_wave()
+	elif Game.phase == "prep":
+		# Zwischen den Wellen kommen vereinzelt Zombies (Cap = idle_cap, im Labor upgradebar)
+		idle_timer -= dt
+		if idle_timer <= 0 and zombies.size() < Game.idle_cap():
+			idle_timer = rng.randf_range(5.0, 9.0)
+			_spawn("basic")
 	# Pflanzen
 	for p in plants:
 		var s = p.s
@@ -282,8 +289,8 @@ func _kill(z) -> void:
 	Game.coins += int(max(1, round((1 + Game.wave * 0.08 + (8 if z.boss else 0)) * Game.coin_mul() * rew)))
 
 func _lose() -> void:
-	msg = "Überrannt! Neustart."; msg_t = 3.0
-	reset_run()
+	Game.phase = "dead"
+	msg = "Überrannt!"; msg_t = 4.0
 
 # ---- Eingabe ----
 func _unhandled_input(event: InputEvent) -> void:
@@ -297,7 +304,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # ---- Klick-Steuerung ----
 func lawn_click(pos: Vector2) -> void:
-	if Game.phase == "won": return
+	if Game.phase == "won" or Game.phase == "dead": return
 	# Sonne einsammeln
 	for i in range(suns.size() - 1, -1, -1):
 		if pos.distance_to(Vector2(suns[i].x, suns[i].y)) < 30:

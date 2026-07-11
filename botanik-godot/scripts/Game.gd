@@ -74,6 +74,8 @@ var SHOP_PASS_ORDER := ["s_dmg","s_rate","s_sun","s_click","s_coin"]
 
 # ---- PRESTIGE (Gehirne) ----
 var PRESTIGE := {
+	"startpea": {"n":"Erbsen-Gen","base":5,"g":1.0,"max":1,"d":"Erbsenschütze ist von Beginn an freigeschaltet"},
+	"sunbloom": {"n":"Sonnen-Gen","base":4,"g":1.6,"max":10,"d":"+5 Sonne je Sonnenblume"},
 	"lane":  {"n":"Neue Reihe","base":3,"g":2.3,"max":4,"d":"+1 Rasenreihe (max 5)"},
 	"sun":   {"n":"Start-Sonne","base":2,"g":1.5,"max":20,"d":"+25 Start-Sonne"},
 	"srate": {"n":"Sonnenfluss","base":2,"g":1.5,"max":25,"d":"+0,15 Sonne/s"},
@@ -81,7 +83,7 @@ var PRESTIGE := {
 	"hp":    {"n":"Zäh-Zellen","base":3,"g":1.45,"max":60,"d":"+8% Pflanzen-HP"},
 	"brain": {"n":"Gehirn-Gier","base":4,"g":1.55,"max":40,"d":"+15% Gehirne von Bossen"},
 }
-var PRES_ORDER := ["lane","sun","srate","dmg","hp","brain"]
+var PRES_ORDER := ["startpea","sunbloom","lane","sun","srate","dmg","hp","brain"]
 
 # ---- ZOMBIES ----
 var ZTYPES := {
@@ -109,6 +111,7 @@ var fp := 0
 var research := {}
 var unlocked := {"sonne": true}   # chassis + equip + mutation ids
 var run_shop := {}
+var lure := 0                     # Lockstoff-Stufe: Idle-Zombies zwischen Wellen
 # --- Kampf-Laufzeit ---
 var sun := 75
 var coins := 0
@@ -122,7 +125,7 @@ const SAVE_PATH := "user://botanik_save.json"
 
 func _ready() -> void:
 	load_game()
-	new_run()
+	rebirth()
 
 # ================================================================
 # HELFER
@@ -160,6 +163,15 @@ func has_click_coin() -> bool: return has("e_clickcoin")
 func mower_fix() -> bool: return has("f_mowerfix")
 func risk_level() -> int: return int(zlab.str) + int(zlab.arm) + int(zlab.spd)
 func reward_mul() -> float: return 1.0 + 0.10 * risk_level()
+func idle_cap() -> int: return 1 + lure          # max. Zombies zwischen den Wellen
+func lure_max() -> bool: return lure >= 5
+func lure_cost() -> int: return int(ceil(18 * pow(1.7, lure)))
+func buy_lure() -> bool:
+	if lure_max(): return false
+	var c := lure_cost()
+	if fp < c: return false
+	fp -= c; lure += 1
+	return true
 func active_effects() -> Array:
 	var a := []
 	for k in MUT_ORDER:
@@ -188,6 +200,7 @@ func compute_chassis_stats(ck: String) -> Dictionary:
 	s.dmg = round(s.dmg * res_mul("r_dmg") * pres_dmg_mul() * run_dmg_mul())
 	s.hp = round(s.hp * res_mul("r_hp") * pres_hp_mul())
 	s.amount = int(round(s.amount * res_mul("r_sun") * run_sun_mul()))
+	if arch == "sun": s.amount += 5 * pres_lvl("sunbloom")
 	s.rate = s.rate * res_mul("r_rate") * run_rate_mul()
 	s.shot_int = (1.0 / s.rate) if s.rate > 0 else 0.0
 	s.cost = max(0, int(round(s.cost)))
@@ -245,6 +258,21 @@ func new_run() -> void:
 	phase = "prep"
 	run_shop.clear()
 	if not has(selected): selected = "sonne"
+
+# Wiedergeburt: ALLE Skills weg, Prestige (Gehirne) bleibt und schaltet Boni frei
+func rebirth() -> void:
+	fp = 0
+	research = {}
+	run_shop = {}
+	lure = 0
+	unlocked = {"sonne": true}
+	selected = "sonne"
+	shovel = false
+	_apply_prestige_unlocks()
+	new_run()
+
+func _apply_prestige_unlocks() -> void:
+	if pres_lvl("startpea") > 0: unlocked["pea"] = true
 
 # ================================================================
 # SPEICHERN / LADEN (nur Meta!)
