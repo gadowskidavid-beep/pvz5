@@ -34,6 +34,10 @@ const HAZARD_DMG := 65.0
 const HAZARD_MIN := 6.0
 const HAZARD_MAX := 12.0
 
+# ---- Nacht-Pilze: wachsen bis zum Ablauf (Zeitdruck-Mechanik) ----
+const SHROOM_LIFESPAN := 55.0     # Sekunden, dann verschwindet der Pilz
+const SHROOM_GROWTH_MAX := 2.6    # Endstaerke = 2.6x (Schaden bzw. Sonne)
+
 # ---- Boss-Keys je Boss-Welle (Index passend zu BOSS_WAVES) ----
 const BOSS_KEYS := ["boss_a", "boss_b", "boss_c", "megaboss"]
 
@@ -162,7 +166,7 @@ const PLANT_TREES := {
 		"u4": {"n":"Nekro-Meister","d":"Schnellere Wiederbelebung · +50% Sonne · +3 HP/s","cost":48,"req":"u3","pos":Vector2(0,-4),"eff":{"amount":0.5,"regen":3.0,"necro":1.0},"rare":true},
 	}},
 	"sonnenpilz": {"nodes": {
-		"root": {"n":"Sonnenpilz","d":"Billige Sonne, auch nachts.","cost":0,"req":"","pos":Vector2(0,0),"eff":{}},
+		"root": {"n":"Sonnenpilz","d":"Billige Nacht-Sonne. Produziert mit der Zeit immer mehr Sonne (bis 2.6x), laeuft dann aber ab.","cost":0,"req":"","pos":Vector2(0,0),"eff":{}},
 		"c1": {"n":"Ertrag","d":"+35% Sonne","cost":10,"req":"root","pos":Vector2(1,1),"eff":{"amount":0.35}},
 		"c2": {"n":"Wachstum","d":"-15% Produktionszeit","cost":10,"req":"root","pos":Vector2(-1,1),"eff":{"faster":0.15}},
 		"c3": {"n":"Robuste Wurzel","d":"+40% HP","cost":10,"req":"root","pos":Vector2(1,-1),"eff":{"hp":0.4}},
@@ -231,7 +235,7 @@ const PLANT_TREES := {
 		"u4": {"n":"Seerosenblüte","d":"+9 HP/s","cost":48,"req":"u3","pos":Vector2(0,-4),"eff":{"regen":9.0},"rare":true},
 	}},
 	"pilz": {"nodes": {
-		"root": {"n":"Pilz","d":"Nacht-Sporenwolke, trifft mehrere.","cost":0,"req":"","pos":Vector2(0,0),"eff":{}},
+		"root": {"n":"Pilz","d":"Nacht-Sporenwolke. Waechst mit der Zeit immer staerker (bis 2.6x), laeuft dann aber ab. Timing entscheidet!","cost":0,"req":"","pos":Vector2(0,0),"eff":{}},
 		"c1": {"n":"Wucht","d":"+35% Schaden","cost":10,"req":"root","pos":Vector2(1,1),"eff":{"dmg":0.35}},
 		"c2": {"n":"Tempo","d":"+25% Feuerrate","cost":10,"req":"root","pos":Vector2(-1,1),"eff":{"rate":0.25}},
 		"c3": {"n":"Wellenradius","d":"+30% Splash","cost":10,"req":"root","pos":Vector2(1,-1),"eff":{"splash":0.3}},

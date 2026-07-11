@@ -165,10 +165,19 @@ func _update(dt: float) -> void:
 				msg = "Umwelt-Schaden!"; msg_t = 1.0
 	# Pflanzen
 	var revived: Array = []   # Necromancer-Wiederbelebungen (erst nach der Schleife einfuegen)
+	var expired: Array = []   # abgelaufene Nacht-Pilze (erst nach der Schleife entfernen)
 	for p in plants:
 		var s = p.s
 		if float(s.get("regen", 0.0)) > 0.0 and p.hp < p.maxhp:
 			p.hp = min(p.maxhp, p.hp + float(s.regen) * dt)
+		# Nacht-Pilze wachsen bis zum Ablauf: staerker mit der Zeit, dann verschwinden sie
+		if str(Game.CHASSIS[p.ck].get("env", "any")) == "night":
+			p["age"] = float(p.get("age", 0.0)) + dt
+			var frac: float = clamp(p.age / BAL.SHROOM_LIFESPAN, 0.0, 1.0)
+			p["gm"] = 1.0 + frac * (BAL.SHROOM_GROWTH_MAX - 1.0)
+			if p.age >= BAL.SHROOM_LIFESPAN:
+				expired.append(p)
+				continue
 		# Blitzstrahl-Sonnenblume: zappt regelmaessig einen Zombie
 		if float(s.get("zap", 0.0)) > 0.0:
 			p["zap_t"] = float(p.get("zap_t", 0.0)) + dt
@@ -189,7 +198,7 @@ func _update(dt: float) -> void:
 			continue
 		p.t += dt
 		if p.arch == "sun":
-			if p.t >= s.interval: p.t = 0.0; suns.append({"x": p.x + rng.randf_range(-8,8), "y": p.y, "ty": p.y, "vy": 0.0, "value": int(s.amount), "falling": false, "life": 12.0})
+			if p.t >= s.interval: p.t = 0.0; suns.append({"x": p.x + rng.randf_range(-8,8), "y": p.y, "ty": p.y, "vy": 0.0, "value": int(s.amount * float(p.get("gm", 1.0))), "falling": false, "life": 12.0})
 		elif p.arch == "shooter":
 			if p.t >= s.shot_int and _lane_has(p): p.t = 0.0; _shoot(p)
 		elif p.arch == "beam":
@@ -201,6 +210,9 @@ func _update(dt: float) -> void:
 	for rp in revived:
 		plants.append(rp)
 		fx.append({"t": "boom", "x": rp.x, "y": rp.y, "life": 0.3})
+	for ep in expired:
+		fx.append({"t": "boom", "x": ep.x, "y": ep.y, "life": 0.35})
+		plants.erase(ep)
 	# Erbsen
 	for i in range(peas.size() - 1, -1, -1):
 		var pe = peas[i]
@@ -331,9 +343,10 @@ func _beam(p) -> void:
 
 func _fume(p) -> void:
 	var s = p.s
+	var gm := float(p.get("gm", 1.0))
 	var reach = p.x + (s.range if s.range > 0 else 2.6) * Game.CELL
 	for z in zombies:
-		if z.row == p.row and z.x > p.x - 6 and z.x < reach and z.hp > 0: z.hp -= s.dmg; _apply_fx(z, s.effects, s.dmg)
+		if z.row == p.row and z.x > p.x - 6 and z.x < reach and z.hp > 0: z.hp -= s.dmg * gm; _apply_fx(z, s.effects, s.dmg * gm)
 	fx.append({"t": "fume", "x": p.x, "y": p.y, "w": (s.range if s.range > 0 else 2.6) * Game.CELL, "life": 0.2})
 
 func _lob(p) -> void:
@@ -521,8 +534,15 @@ func _draw() -> void:
 	# Pflanzen
 	for p in plants:
 		var col: Color = Game.CHASSIS[p.ck].col
-		draw_circle(Vector2(p.x, p.y), 28, col)
+		# Nacht-Pilze pulsieren/wachsen sichtbar mit ihrer Staerke
+		var pr := 28.0
+		if p.has("gm"): pr = 24.0 + 6.0 * (float(p.gm) - 1.0) / max(0.01, BAL.SHROOM_GROWTH_MAX - 1.0)
+		draw_circle(Vector2(p.x, p.y), pr, col)
 		_hp_bar(p.x, p.y + 30, p.hp / p.maxhp, Color(0.35,0.85,0.4))
+		# Nacht-Pilz: verbleibende Lebensdauer (lila Balken oben)
+		if p.has("age"):
+			var lifeleft: float = clamp(1.0 - float(p.age) / BAL.SHROOM_LIFESPAN, 0.0, 1.0)
+			_hp_bar(p.x, p.y - 34, lifeleft, Color(0.72, 0.5, 0.95))
 	# Erbsen
 	for pe in peas:
 		if pe.get("lob", false):
