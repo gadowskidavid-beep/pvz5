@@ -185,6 +185,12 @@ func seed_reset(slot: int) -> void:
 	seeds[slot].nodes = {}
 	if place_slot == slot: place_slot = -1
 func slot_count() -> int: return seeds.size()
+# Welches Element hat dieser Samen schon gewaehlt? ("" = noch keins) — Knoten-Praefix f/e/b/u
+func seed_element(slot: int) -> String:
+	for id in seed_nodes(slot):
+		var p: String = str(id).substr(0, 1)
+		if p == "f" or p == "e" or p == "b" or p == "u": return p
+	return ""
 
 # ---- Pflanzen-Skill-Baum PRO SLOT ----
 func tree_nodes(ck: String) -> Dictionary:
@@ -203,6 +209,11 @@ func pt_can(slot: int, node: String) -> bool:
 	if not nodes.has(node): return false
 	var r := pt_req(slot, node)
 	if not (r == "" or pt_owned(slot, r)): return false
+	# Exklusivitaet: pro Samen nur EIN Element-Zweig (f/e/b/u)
+	var p: String = node.substr(0, 1)
+	if p == "f" or p == "e" or p == "b" or p == "u":
+		var comm := seed_element(slot)
+		if comm != "" and comm != p: return false
 	return true
 func buy_pt(slot: int, node: String) -> bool:
 	if not pt_can(slot, node): return false

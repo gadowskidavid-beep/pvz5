@@ -462,6 +462,16 @@ func _build_seed_header(holder, ck: String) -> void:
 	rb.pressed.connect(_reset_slot)
 	arow.add_child(rb)
 	holder.add_child(arow)
+	# Hinweis zur Element-Wahl
+	var comm := Game.seed_element(Game.edit_slot)
+	var hint := Label.new()
+	if comm == "":
+		hint.text = "Waehle EINE Element-Richtung:  rot=Feuer · blau=Eis · gelb=Blitz · lila=Untod"
+	else:
+		var enames := {"f": "Feuer (rot)", "e": "Eis (blau)", "b": "Blitz (gelb)", "u": "Untod (lila)"}
+		hint.text = "Element: %s  —  die anderen Richtungen sind gesperrt." % enames[comm]
+	hint.modulate = Color(0.72, 0.8, 0.72); hint.add_theme_font_size_override("font_size", 13)
+	holder.add_child(hint)
 
 func _reset_slot() -> void:
 	Game.seed_reset(Game.edit_slot)
@@ -561,9 +571,15 @@ func _rebuild_info() -> void:
 			var w := Label.new(); w.text = "Zu wenig FP (%d / %d)" % [Game.fp, cost]; w.modulate = Color(1, 0.6, 0.5)
 			d_info.add_child(w)
 	else:
-		var reqk := _n_req(info_node)
-		var reqn: String = str(nodes.get(reqk, {}).get("n", reqk))
-		var txt := "Gesperrt — schalte zuerst frei:\n%s" % reqn
+		var txt := ""
+		var np := info_node.substr(0, 1)
+		var comm := Game.seed_element(_tree_ref)
+		if (np == "f" or np == "e" or np == "b" or np == "u") and comm != "" and comm != np:
+			txt = "Gesperrt — dieser Samen ist bereits auf ein anderes Element festgelegt.\n(Pflanze wechseln, um neu zu waehlen.)"
+		else:
+			var reqk := _n_req(info_node)
+			var reqn: String = str(nodes.get(reqk, {}).get("n", reqk))
+			txt = "Gesperrt — schalte zuerst frei:\n%s" % reqn
 		var l := Label.new(); l.text = txt
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; l.custom_minimum_size = Vector2(280, 0); l.modulate = Color(0.85, 0.72, 0.5)
 		d_info.add_child(l)
@@ -609,8 +625,9 @@ func _build_tree_canvas(parent) -> void:
 		var center: Vector2 = _tree_px[id]
 		var rare := bool(nd.get("rare", false))
 		var selected: bool = (id == info_node)
+		var ecol := _elem_color(id)
 		if id == "root":
-			_tree_node(canvas, center, str(nd.n), "Basis", 0, false, "root", selected, _select_node.bind(id))
+			_tree_node(canvas, center, str(nd.n), "Basis", 0, false, "root", selected, ecol, _select_node.bind(id))
 		else:
 			var cost := _n_cost(id)
 			var owned := _n_owned(id)
@@ -620,10 +637,18 @@ func _build_tree_canvas(parent) -> void:
 			elif can and Game.fp >= cost: state = "legend_avail" if rare else "avail"
 			elif can: state = "legend_lock" if rare else "need"
 			else: state = "legend_lock" if rare else "lock"
-			_tree_node(canvas, center, str(nd.n), str(nd.d), cost, not owned, state, selected, _select_node.bind(id))
+			_tree_node(canvas, center, str(nd.n), str(nd.d), cost, not owned, state, selected, ecol, _select_node.bind(id))
 	canvas.queue_redraw()
 
-func _tree_node(canvas, center: Vector2, title: String, subtitle: String, cost: int, show_cost: bool, state: String, selected: bool, cb: Callable) -> void:
+func _elem_color(id: String) -> Color:
+	var p := id.substr(0, 1)
+	if p == "f": return Color(1.0, 0.45, 0.25)   # Feuer = rot
+	if p == "e": return Color(0.45, 0.7, 1.0)    # Eis = blau
+	if p == "b": return Color(1.0, 0.9, 0.35)    # Blitz = gelb
+	if p == "u": return Color(0.72, 0.45, 1.0)   # Untod = lila
+	return COL_ACCENT                            # Kern / Wurzel = gruen
+
+func _tree_node(canvas, center: Vector2, title: String, subtitle: String, cost: int, show_cost: bool, state: String, selected: bool, ecol: Color, cb: Callable) -> void:
 	var z := _tree_zoom
 	var w := 160.0 * z
 	var h := 60.0 * z
@@ -634,7 +659,7 @@ func _tree_node(canvas, center: Vector2, title: String, subtitle: String, cost: 
 	canvas.add_child(holder)
 	var btn := Button.new()
 	btn.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_style_tree_node(btn, state, selected)
+	_style_tree_node(btn, state, selected, ecol)
 	btn.tooltip_text = "%s\n%s" % [title, subtitle]
 	if cb.is_valid(): btn.pressed.connect(cb)
 	else: btn.disabled = true
@@ -667,18 +692,18 @@ func _pill_bd(state: String) -> Color:
 	if state == "avail": return Color(1, 0.82, 0.4)
 	return Color(0.4, 0.42, 0.46)
 
-func _style_tree_node(b: Button, state: String, selected: bool) -> void:
-	var bg := Color(0.12, 0.13, 0.16)
-	var bd := Color(0.3, 0.34, 0.4)
-	if state == "owned": bg = Color(0.13, 0.32, 0.2); bd = Color(0.42, 0.9, 0.56)
-	elif state == "root": bg = Color(0.12, 0.3, 0.2); bd = Color(0.45, 0.9, 0.6)
-	elif state == "avail": bg = Color(0.17, 0.17, 0.13); bd = Color(1, 0.82, 0.35)
-	elif state == "need": bg = Color(0.15, 0.15, 0.14); bd = Color(0.55, 0.5, 0.32)
-	elif state == "lock": bg = Color(0.11, 0.12, 0.14); bd = Color(0.28, 0.32, 0.38)
-	elif state == "legend_owned": bg = Color(0.24, 0.14, 0.34); bd = Color(0.85, 0.55, 1)
-	elif state == "legend_avail": bg = Color(0.2, 0.12, 0.3); bd = Color(0.8, 0.5, 1)
-	elif state == "legend_lock": bg = Color(0.14, 0.1, 0.18); bd = Color(0.45, 0.35, 0.55)
-	var bw := 2
+func _style_tree_node(b: Button, state: String, selected: bool, ecol: Color) -> void:
+	# Farbe kommt vom Element (rot/blau/gelb/lila), Helligkeit vom Zustand
+	var bd := ecol
+	var bg := ecol.darkened(0.80)
+	if state == "owned" or state == "root" or state == "legend_owned":
+		bg = ecol.darkened(0.58)
+	elif state == "avail" or state == "legend_avail":
+		bg = ecol.darkened(0.74)
+	else:  # lock / need / legend_lock -> abgedunkelt
+		bd = ecol.darkened(0.5)
+		bg = ecol.darkened(0.88)
+	var bw := 3 if state.begins_with("legend") else 2
 	if selected: bd = Color(1, 1, 1); bw = 3
 	for st in ["normal", "hover", "pressed", "disabled"]:
 		b.add_theme_stylebox_override(st, _sb(bg, bd, bw, 9, 6))
@@ -690,12 +715,13 @@ func _draw_tree(canvas) -> void:
 		if req == "" or not _tree_px.has(id) or not _tree_px.has(req): continue
 		var a: Vector2 = _tree_px[req]
 		var bp: Vector2 = _tree_px[id]
+		var ec := _elem_color(id)
 		if _n_owned(id):
-			canvas.draw_line(a, bp, Color(0.42, 0.9, 0.55, 0.9), 5.0 * _tree_zoom)
+			canvas.draw_line(a, bp, Color(ec.r, ec.g, ec.b, 0.95), 5.0 * _tree_zoom)
 		elif _n_can(id):
-			canvas.draw_line(a, bp, Color(1, 0.82, 0.4, 0.8), 4.0 * _tree_zoom)
+			canvas.draw_line(a, bp, Color(ec.r, ec.g, ec.b, 0.7), 4.0 * _tree_zoom)
 		else:
-			canvas.draw_dashed_line(a, bp, Color(0.5, 0.55, 0.6, 0.5), 3.0 * _tree_zoom, 9.0)
+			canvas.draw_dashed_line(a, bp, ec.darkened(0.45), 3.0 * _tree_zoom, 9.0)
 
 # ================= PAUSIERENDE OVERLAYS =================
 func _make_overlay(n: String) -> void:
