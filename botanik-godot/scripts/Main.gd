@@ -404,7 +404,7 @@ func _rebuild_drawer() -> void:
 		var sck: String = Game.seed_chain(i)
 		var lbl: String = ("S%d: %s" % [i + 1, Game.CHASSIS[sck].n]) if sck != "" else ("Samen %d" % (i + 1))
 		_tab(d_tabs, lbl, "seed" + str(i))
-	_tab(d_tabs, "Spiel", "spiel")
+	_tab(d_tabs, "Labor", "spiel")
 	_tab(d_tabs, "Zombies", "zombies")
 	# Inhalt
 	for c in d_treewrap.get_children(): c.queue_free()
@@ -422,16 +422,25 @@ func _rebuild_drawer() -> void:
 			_build_origin_picker(holder)
 		else:
 			_build_seed_header(holder, ck)
-			_build_tree_canvas(holder)
+			if Game.garage:
+				_build_tree_canvas(holder)
+			else:
+				_header(holder, "FOKUS-BAUM GESPERRT", Color(1, 0.7, 0.4))
+				_header(holder, "Schalte im Tab 'Labor' die GARAGE mit Sonne frei (%d), um Elemente zu skillen." % Game.GARAGE_COST, Color(0.85, 0.8, 0.6))
 	_rebuild_info()
 
 # Leerer Slot -> 8 Chains zur Auswahl (Ursprung)
 func _build_origin_picker(holder) -> void:
 	_header(holder, "Samen %d  —  waehle eine Pflanze:" % (Game.edit_slot + 1), COL_ACCENT)
+	_header(holder, "Gesperrte Pflanzen schaltest du mit FP frei (auch im Tab 'Labor').", Color(0.66, 0.78, 0.68))
 	var g := _grid(holder, 4)
 	for ck in Game.CH_ORDER:
 		var s = Game.compute_chassis_stats(ck)
-		_card(g, Game.CHASSIS[ck].n, "%s\nSonne %d" % [Game.CHASSIS[ck].d, int(s.cost)], "Waehlen", true, _choose_chain.bind(ck))
+		if Game.plant_unlocked(ck):
+			_card(g, Game.CHASSIS[ck].n, "%s\nSonne %d" % [Game.CHASSIS[ck].d, int(s.cost)], "Waehlen", true, _choose_chain.bind(ck))
+		else:
+			var uc := Game.plant_unlock_cost(ck)
+			_card(g, "[Gesperrt] " + Game.CHASSIS[ck].n, Game.CHASSIS[ck].d, "Frei: FP %d" % uc, Game.fp >= uc, _unlock_plant.bind(ck))
 	_header(holder, "Mehr Samen-Slots (dauerhaft, Gehirne)", COL_PURPLE)
 	var b := Button.new()
 	if Game.seed_slot_max():
@@ -444,9 +453,16 @@ func _build_origin_picker(holder) -> void:
 	holder.add_child(b)
 
 func _choose_chain(ck: String) -> void:
+	if not Game.plant_unlocked(ck): return
 	Game.seed_set_chain(Game.edit_slot, ck)
 	Game.place_slot = Game.edit_slot
 	_rebuild_drawer(); refresh_seeds()
+
+func _unlock_plant(ck: String) -> void:
+	if Game.unlock_plant(ck): _rebuild_drawer(); refresh_seeds()
+
+func _buy_garage() -> void:
+	if Game.buy_garage(): _rebuild_drawer(); refresh_seeds()
 
 func _build_seed_header(holder, ck: String) -> void:
 	var owned := 0
@@ -1145,8 +1161,23 @@ func _build_shop(vb) -> void:
 
 # ---- TAB "Spiel": Pflanzen freischalten + Ausruestung + Oekonomie ----
 func _build_general(vb) -> void:
-	_header(vb, "SPIEL & AUSRUESTUNG", Color(0.7, 0.85, 1))
-	_header(vb, "Info: Pflanzen (Chains) waehlst du frei in den Samen-Slots.", Color(0.65, 0.78, 0.68))
+	_header(vb, "HAUPT-LABOR", Color(0.7, 0.85, 1))
+	# ---- Garage (Sonne) — schaltet die Fokus-Baeume frei ----
+	_header(vb, "Garage / Labor  (Sonne)  —  schaltet die Fokus-Baeume der Pflanzen frei", Color(1, 0.85, 0.4))
+	var gg := _grid(vb, 2)
+	if Game.garage:
+		_card(gg, "* Garage offen", "Fokus-Baeume (Elemente/Mutationen) nutzbar", "", false, Callable())
+	else:
+		_card(gg, "Garage aufschliessen", "Danach kannst du jede Pflanze elementar skillen", "Sonne %d" % Game.GARAGE_COST, int(Game.sun) >= Game.GARAGE_COST, _buy_garage)
+	# ---- Pflanzen freischalten (FP) ----
+	_header(vb, "Pflanzen freischalten (FP)", Color(0.6, 0.9, 0.6))
+	var gp := _grid(vb, 4)
+	for ck in Game.CH_ORDER:
+		if Game.plant_unlocked(ck):
+			_card(gp, "* " + Game.CHASSIS[ck].n, Game.CHASSIS[ck].d, "", false, Callable())
+		else:
+			var uc := Game.plant_unlock_cost(ck)
+			_card(gp, Game.CHASSIS[ck].n, Game.CHASSIS[ck].d, "FP %d" % uc, Game.fp >= uc, _unlock_plant.bind(ck))
 	_header(vb, "Ausruestung (FP)", Color(0.55, 0.7, 1))
 	var g3 := _grid(vb, 3)
 	for k in Game.EQ_ORDER:

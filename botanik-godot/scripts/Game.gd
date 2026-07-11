@@ -112,6 +112,9 @@ var place_slot := 0               # welcher Slot ist zum Setzen gewaehlt (-1 = H
 var run_shop := {}
 var lure := 0                     # Lockstoff-Stufe: Idle-Zombies zwischen Wellen
 var god := false                  # Dev: Rasen kann nicht verloren gehen
+var plants_unlocked := {}         # Set: Chain-Key -> true (mit FP im Labor freigeschaltet)
+var garage := false               # Garage/Labor frei (mit Sonne) -> Fokus-Baeume nutzbar
+var tutorial_done := false        # Rasenmaeher-Intro (Welle 1) erledigt
 # --- Kampf-Laufzeit ---
 var sun := 75
 var coins := 0
@@ -146,7 +149,24 @@ func field_lanes() -> int:
 func lanes_count() -> int:
 	# Immer 5 Rasen-Reihen (klassisches PvZ-Layout)
 	return 5
-func start_sun() -> int: return 50 + 25 * pres_lvl("sun")
+func start_sun() -> int: return 25 * pres_lvl("sun")   # Frischstart = 0 Sonne (Himmel liefert nach)
+
+# ---- Fortschritt: Pflanzen mit FP freischalten, Garage mit Sonne ----
+const PLANT_UNLOCK := {"pea":8,"sonne":12,"wall":22,"lilypad":26,"frostbluete":40,"sonnenpilz":32,"pilz":48,"wasserpilz":58}
+const GARAGE_COST := 500          # Sonne fuer die Garage -> schaltet die Fokus-Baeume frei
+func plant_unlocked(ck: String) -> bool: return plants_unlocked.has(ck)
+func plant_unlock_cost(ck: String) -> int: return int(PLANT_UNLOCK.get(ck, 30))
+func unlock_plant(ck: String) -> bool:
+	if plant_unlocked(ck): return true
+	var c := plant_unlock_cost(ck)
+	if fp < c: return false
+	fp -= c; plants_unlocked[ck] = true
+	return true
+func buy_garage() -> bool:
+	if garage: return true
+	if sun < GARAGE_COST: return false
+	sun -= GARAGE_COST; garage = true
+	return true
 func sun_passive() -> float: return 0.15 * pres_lvl("srate")
 func brain_mul() -> float: return 1.0 + 0.15 * pres_lvl("brain")
 func pres_dmg_mul() -> float: return 1.0 + 0.08 * pres_lvl("dmg")
@@ -366,20 +386,22 @@ func new_run() -> void:
 
 # Wiedergeburt: ALLE Skills/Samen weg, Prestige (Gehirne) + Slot-Anzahl bleiben
 func rebirth() -> void:
-	fp = BAL.START_FP
+	fp = 0                                         # Frischstart: alles auf 0
 	research = {}
 	run_shop = {}
 	lure = 0
 	unlocked = {}
+	plants_unlocked = {}
+	garage = false
+	tutorial_done = false
 	shovel = false
-	place_slot = 0
+	place_slot = -1                                # nichts vorgewaehlt (Hammer/Faust)
 	edit_slot = 0
 	seeds = []
 	for i in range(max(3, unlocked_slots)):
-		seeds.append({"chain": "", "nodes": {}})
-	seeds[0].chain = "sonne"                       # Start: Slot 1 = Sonnenblume
-	if pres_lvl("startpea") > 0 and seeds.size() > 1:
-		seeds[1].chain = "pea"                     # Prestige: Slot 2 = Schuetze
+		seeds.append({"chain": "", "nodes": {}})   # kein Samen vorbelegt
+	if pres_lvl("startpea") > 0:
+		plants_unlocked["pea"] = true              # Prestige: Erbse gratis freigeschaltet
 	new_run()
 
 # ================================================================

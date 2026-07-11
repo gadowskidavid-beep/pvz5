@@ -39,6 +39,20 @@ func reset_run() -> void:
 		mowers.append({"row": r, "x": float(Game.LAWN_X - 30), "active": false, "used": false})
 	sky_timer = 5.0; to_spawn = 0; idle_timer = 6.0; hazard_timer = 9.0; msg = "Bereit!"; msg_t = 2.0
 	weather = "klar"; strike_t = 0.0
+	_maybe_tutorial()
+
+# Tutorial-Intro: die Rasenmaeher raeumen die erste Welle, danach startet das Idle
+func _maybe_tutorial() -> void:
+	if Game.tutorial_done: return
+	Game.tutorial_done = true
+	Game.wave = 1
+	Game.phase = "fight"
+	to_spawn = 0
+	for i in range(8):
+		_spawn("basic")
+	for m in mowers:
+		m.active = true               # alle Maeher losschicken (Intro-Sweep)
+	msg = "Die Rasenmaeher raeumen die erste Welle!"; msg_t = 3.5
 
 # Reihen nachziehen, wenn neue freigeschaltet wurden (mid-run kaufbar)
 func _sync_rows() -> void:
@@ -110,7 +124,8 @@ func _end_wave() -> void:
 		return
 	Game.phase = "prep"
 	Game.fp += Game.wave
-	if Game.mower_fix():
+	# Nach dem Tutorial (Welle 1) die Maeher wieder herstellen -> Spieler startet mit vollen Maehern
+	if Game.wave == 1 or Game.mower_fix():
 		for m in mowers: m.used = false; m.active = false; m.x = float(Game.LAWN_X - 30)
 	msg = "Welle %d geschafft! +%d FP" % [Game.wave, Game.wave]; msg_t = 2.0
 
