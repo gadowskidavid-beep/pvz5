@@ -51,6 +51,7 @@ var _tree_h := 0.0
 var _tree_mode := "slot"  # "slot" | "element" | "none"  (Datenquelle der Leinwand)
 var _tree_ref := 0        # Slot-Index bei mode "slot"
 var _tree_zoom := 1.0     # Zoom-Faktor fuer den Skill-Baum
+var _tree_panning := false # Linksklick-Ziehen zum Umschauen im Baum
 var info_node := ""       # aktuell gewaehlter Knoten (im aktuellen Baum)
 
 const SCREEN_W := 1152
@@ -359,6 +360,7 @@ func _build_drawer() -> void:
 	d_treewrap = ScrollContainer.new()
 	d_treewrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	d_treewrap.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	d_treewrap.gui_input.connect(_tree_wrap_input)   # Mausrad = Zoom, Linksklick-Ziehen = Umschauen
 	body.add_child(d_treewrap)
 	var infopanel := PanelContainer.new()
 	infopanel.custom_minimum_size = Vector2(300, 0)
@@ -520,12 +522,27 @@ func _pick_tree(key: String) -> void:
 	_rebuild_drawer()
 
 func _zoom_out() -> void:
-	_tree_zoom = max(0.45, _tree_zoom - 0.15)
+	_tree_zoom = max(0.35, _tree_zoom - 0.12)
 	_rebuild_drawer()
 
 func _zoom_in() -> void:
-	_tree_zoom = min(1.15, _tree_zoom + 0.15)
+	_tree_zoom = min(1.8, _tree_zoom + 0.12)
 	_rebuild_drawer()
+
+# Mausrad zoomt rein/raus; Linksklick auf freier Flaeche gedrueckt halten = umschauen (Panning)
+func _tree_wrap_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
+			_zoom_in(); d_treewrap.accept_event()
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
+			_zoom_out(); d_treewrap.accept_event()
+		elif event.button_index == MOUSE_BUTTON_LEFT:
+			_tree_panning = event.pressed
+			d_treewrap.accept_event()
+	elif event is InputEventMouseMotion and _tree_panning:
+		d_treewrap.scroll_horizontal -= int(event.relative.x)
+		d_treewrap.scroll_vertical -= int(event.relative.y)
+		d_treewrap.accept_event()
 
 func _select_node(id: String) -> void:
 	info_node = id
