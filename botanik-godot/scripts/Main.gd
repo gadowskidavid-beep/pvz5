@@ -128,12 +128,16 @@ func refresh_top() -> void:
 	fp_lbl.text = "FP: %d" % Game.fp
 	coin_lbl.text = "Muenzen: %d" % Game.coins
 	brain_lbl.text = "Gehirne: %d" % Game.brains
-	var wname: String = lawn.world_of(Game.wave).name
-	var sel := "Faust"
-	if Game.shovel: sel = "Schaufel"
-	elif Game.selected != "" and Game.has(Game.selected): sel = Game.CHASSIS[Game.selected].n
-	var m: String = lawn.msg if lawn.msg_t > 0 else ""
-	status_lbl.text = "Welle %d/100  [%s]   |   Gewaehlt: %s   |   %s" % [Game.wave, wname, sel, m]
+	var wname: String = str(lawn.world_of(Game.wave).name)
+	var sel_name: String = "Faust"
+	if Game.shovel:
+		sel_name = "Schaufel"
+	elif Game.selected != "" and Game.has(Game.selected):
+		sel_name = str(Game.CHASSIS[Game.selected].n)
+	var m: String = ""
+	if lawn.msg_t > 0:
+		m = str(lawn.msg)
+	status_lbl.text = "Welle %d/100  [%s]   |   Gewaehlt: %s   |   %s" % [Game.wave, wname, sel_name, m]
 	if Game.phase == "won":
 		wave_btn.text = "GEWONNEN! Neuer Run"; wave_btn.disabled = false
 	elif Game.phase == "fight":
