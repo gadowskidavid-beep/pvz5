@@ -110,9 +110,9 @@ const PLANT_TREES := {
 		"photo":   {"n":"Photosynthese","d":"-20% Produktionszeit","cost":10,"req":"amount1","pos":Vector2(-1,2),"eff":{"faster":0.20}},
 		"robust":  {"n":"Robuste Wurzel","d":"+40% HP","cost":9,"req":"amount1","pos":Vector2(1,2),"eff":{"hp":0.40}},
 		"amount2": {"n":"Ertrag II","d":"+35% Sonne","cost":16,"req":"amount1","pos":Vector2(0,2),"eff":{"amount":0.35}},
-		"twin":    {"n":"Zwillingsblüte","d":"Produziert doppelte Sonne","cost":45,"req":"amount2","pos":Vector2(0,3),"eff":{"twin":true}},
+		"twin":    {"n":"Zwillingsblüte","d":"Legendär · Produziert doppelte Sonne","cost":45,"req":"amount2","pos":Vector2(0,3),"eff":{"twin":true},"rare":true},
 	}},
-	"pea": {"nodes": {
+	"pea": {"branches":[[-1.0,"Tempo"],[0.0,"Schaden"],[1.0,"Spezial"]], "nodes": {
 		"root":  {"n":"Erbsenschütze","d":"Basis","cost":0,"req":"","pos":Vector2(0,0),"eff":{}},
 		"dmg1":  {"n":"Schaden I","d":"+30% Schaden","cost":6,"req":"root","pos":Vector2(0,1),"eff":{"dmg":0.30}},
 		"rate1": {"n":"Feuerrate I","d":"+25% Feuerrate","cost":8,"req":"root","pos":Vector2(-1,1),"eff":{"rate":0.25}},
@@ -120,7 +120,7 @@ const PLANT_TREES := {
 		"pierce":{"n":"Durchschuss","d":"Erbse durchdringt +1 Zombie","cost":22,"req":"dmg1","pos":Vector2(1,2),"eff":{"pierce":1}},
 		"fire":  {"n":"Feuer","d":"Setzt Zombies in Brand","cost":30,"req":"rate1","pos":Vector2(-1,2),"eff":{"burn":true}},
 		"ice":   {"n":"Eis","d":"Verlangsamt Zombies","cost":30,"req":"rate1","pos":Vector2(-2,2),"eff":{"slow":true}},
-		"elec":  {"n":"Elektro","d":"Blitz springt auf Nachbarn","cost":48,"req":"dmg2","pos":Vector2(0,3),"eff":{"chain":true}},
+		"elec":  {"n":"Nuklear-Erbse","d":"Legendär · Blitz springt auf mehrere Zombies","cost":48,"req":"dmg2","pos":Vector2(0,3),"eff":{"chain":true},"rare":true},
 	}},
 	"wall": {"nodes": {
 		"root":  {"n":"Wal-Nuss","d":"Basis","cost":0,"req":"","pos":Vector2(0,0),"eff":{}},
@@ -163,6 +163,6 @@ const PLANT_TREES := {
 		"dmg1": {"n":"Schaden I","d":"+35% Schaden","cost":14,"req":"root","pos":Vector2(0,1),"eff":{"dmg":0.35}},
 		"rate1":{"n":"Frequenz","d":"+25% Feuerrate","cost":18,"req":"dmg1","pos":Vector2(-1,2),"eff":{"rate":0.25}},
 		"dmg2": {"n":"Schaden II","d":"+45% Schaden","cost":28,"req":"dmg1","pos":Vector2(0,2),"eff":{"dmg":0.45}},
-		"elec": {"n":"Elektro","d":"Blitz springt auf Nachbarn","cost":50,"req":"dmg1","pos":Vector2(1,2),"eff":{"chain":true}},
+		"elec": {"n":"Überladung","d":"Legendär · Blitz springt auf mehrere Zombies","cost":50,"req":"dmg1","pos":Vector2(1,2),"eff":{"chain":true},"rare":true},
 	}},
 }

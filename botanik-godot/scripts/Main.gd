@@ -367,21 +367,22 @@ func _pick_tree(ck: String) -> void:
 func _buy_pt(ck: String, node: String) -> void:
 	if Game.buy_pt(ck, node): _post_buy("lab")
 
-# ---- Visueller Skill-Baum (Knoten + Pfade) ----
+# ---- Visueller Skill-Baum (Karten-Knoten + Pfade + Aeste) ----
 func _build_tree_canvas(parent, ck: String) -> void:
-	var nodes = Game.tree_nodes(ck)
+	var tree = BAL.PLANT_TREES.get(ck, {})
+	var nodes = tree.get("nodes", {})
 	var minc := 0.0
 	var maxc := 0.0
 	var maxr := 0.0
 	for id in nodes:
 		var p = nodes[id].pos
 		minc = min(minc, p.x); maxc = max(maxc, p.x); maxr = max(maxr, p.y)
-	var sx := 130.0
-	var sy := 98.0
-	var width := (maxc - minc) * sx + 230.0
-	var height := maxr * sy + 150.0
-	var ox := -minc * sx + 115.0
-	var oy := height - 66.0
+	var sx := 190.0
+	var sy := 124.0
+	var width := (maxc - minc) * sx + 340.0
+	var height := maxr * sy + 200.0
+	var ox := -minc * sx + 170.0
+	var oy := height - 100.0
 	_tree_px = {}
 	for id in nodes:
 		var pp = nodes[id].pos
@@ -392,33 +393,101 @@ func _build_tree_canvas(parent, ck: String) -> void:
 	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.draw.connect(_draw_tree.bind(canvas))
 	parent.add_child(canvas)
+	# Ast-Labels unten
+	for br in tree.get("branches", []):
+		var lb := Label.new(); lb.text = "Ast: " + str(br[1]); lb.modulate = Color(0.55, 0.62, 0.58)
+		lb.add_theme_font_size_override("font_size", 12)
+		lb.position = Vector2(ox + float(br[0]) * sx - 34, oy + 46)
+		canvas.add_child(lb)
+	# Knoten
 	for id in nodes:
 		var nd = nodes[id]
 		var center: Vector2 = _tree_px[id]
-		var nb := Button.new()
-		nb.custom_minimum_size = Vector2(100, 62)
-		nb.size = Vector2(100, 62)
-		nb.position = center - Vector2(50, 31)
-		nb.add_theme_font_size_override("font_size", 12)
+		var rare := bool(nd.get("rare", false))
 		if id == "root":
-			nb.text = nd.n
-			nb.disabled = true
-			_style_node(nb, "root")
+			_tree_node(canvas, center, str(nd.n), "Freigeschaltet", 0, false, "root", Callable())
 		else:
 			var cost := int(nd.cost)
-			nb.text = "%s\nFP %d" % [nd.n, cost]
-			nb.tooltip_text = "%s\n%s\nKosten: %d FP" % [nd.n, nd.d, cost]
-			if Game.pt_owned(ck, id):
-				_style_node(nb, "owned"); nb.disabled = true
-			elif Game.pt_can(ck, id):
-				if Game.fp >= cost:
-					_style_node(nb, "avail"); nb.pressed.connect(_buy_pt.bind(ck, id))
-				else:
-					_style_node(nb, "need"); nb.disabled = true
-			else:
-				_style_node(nb, "lock"); nb.disabled = true
-		canvas.add_child(nb)
+			var owned := Game.pt_owned(ck, id)
+			var can := Game.pt_can(ck, id)
+			var state := "lock"
+			var cb := Callable()
+			if owned: state = "legend_owned" if rare else "owned"
+			elif can and Game.fp >= cost:
+				state = "legend_avail" if rare else "avail"
+				cb = _buy_pt.bind(ck, id)
+			elif can: state = "legend_lock" if rare else "need"
+			else: state = "legend_lock" if rare else "lock"
+			_tree_node(canvas, center, str(nd.n), str(nd.d), cost, not owned, state, cb)
 	canvas.queue_redraw()
+
+func _tree_node(canvas, center: Vector2, title: String, subtitle: String, cost: int, show_cost: bool, state: String, cb: Callable) -> void:
+	var w := 160.0
+	var h := 62.0
+	var holder := Control.new()
+	holder.size = Vector2(w, h)
+	holder.position = center - Vector2(w / 2.0, h / 2.0)
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(holder)
+	var btn := Button.new()
+	btn.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_style_tree_node(btn, state)
+	btn.tooltip_text = "%s\n%s" % [title, subtitle]
+	if cb.is_valid(): btn.pressed.connect(cb)
+	else: btn.disabled = true
+	holder.add_child(btn)
+	var box := VBoxContainer.new()
+	box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	box.add_theme_constant_override("separation", 1)
+	var t := Label.new(); t.text = title
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	t.add_theme_font_size_override("font_size", 13); t.modulate = Color(0.96, 0.99, 0.96)
+	box.add_child(t)
+	var stl := Label.new(); stl.text = subtitle
+	stl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; stl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stl.add_theme_font_size_override("font_size", 10); stl.modulate = _node_sub_col(state)
+	stl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; stl.custom_minimum_size = Vector2(w - 10, 0)
+	box.add_child(stl)
+	holder.add_child(box)
+	if show_cost:
+		var pill := Label.new(); pill.text = "%d FP" % cost
+		pill.add_theme_font_size_override("font_size", 12); pill.modulate = Color(1, 0.96, 0.82)
+		pill.add_theme_stylebox_override("normal", _sb(_pill_bg(state), _pill_bd(state), 1, 9, 4))
+		pill.position = Vector2(w / 2.0 - 30, -22)
+		pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		holder.add_child(pill)
+
+func _node_sub_col(state: String) -> Color:
+	if state.begins_with("legend"): return Color(0.82, 0.62, 1)
+	if state == "owned" or state == "root": return Color(0.6, 0.9, 0.68)
+	if state == "avail": return Color(0.92, 0.84, 0.5)
+	return Color(0.6, 0.66, 0.7)
+
+func _pill_bg(state: String) -> Color:
+	if state.begins_with("legend"): return Color(0.25, 0.15, 0.35)
+	if state == "avail": return Color(0.35, 0.28, 0.1)
+	return Color(0.15, 0.16, 0.18)
+
+func _pill_bd(state: String) -> Color:
+	if state.begins_with("legend"): return Color(0.8, 0.55, 1)
+	if state == "avail": return Color(1, 0.82, 0.4)
+	return Color(0.4, 0.42, 0.46)
+
+func _style_tree_node(b: Button, state: String) -> void:
+	var bg := Color(0.12, 0.13, 0.16)
+	var bd := Color(0.3, 0.34, 0.4)
+	if state == "owned": bg = Color(0.13, 0.32, 0.2); bd = Color(0.42, 0.9, 0.56)
+	elif state == "root": bg = Color(0.12, 0.3, 0.2); bd = Color(0.45, 0.9, 0.6)
+	elif state == "avail": bg = Color(0.17, 0.17, 0.13); bd = Color(1, 0.82, 0.35)
+	elif state == "need": bg = Color(0.15, 0.15, 0.14); bd = Color(0.55, 0.5, 0.32)
+	elif state == "lock": bg = Color(0.11, 0.12, 0.14); bd = Color(0.28, 0.32, 0.38)
+	elif state == "legend_owned": bg = Color(0.24, 0.14, 0.34); bd = Color(0.85, 0.55, 1)
+	elif state == "legend_avail": bg = Color(0.2, 0.12, 0.3); bd = Color(0.8, 0.5, 1)
+	elif state == "legend_lock": bg = Color(0.14, 0.1, 0.18); bd = Color(0.45, 0.35, 0.55)
+	for st in ["normal", "hover", "pressed", "disabled"]:
+		b.add_theme_stylebox_override(st, _sb(bg, bd, 2, 9, 6))
 
 func _draw_tree(canvas) -> void:
 	if _tree_ck == "": return
@@ -426,21 +495,14 @@ func _draw_tree(canvas) -> void:
 	for id in nodes:
 		var req := str(nodes[id].get("req", ""))
 		if req == "" or not _tree_px.has(id) or not _tree_px.has(req): continue
-		var col: Color
-		if Game.pt_owned(_tree_ck, id): col = Color(0.4, 0.85, 0.5, 0.9)
-		elif Game.pt_can(_tree_ck, id): col = Color(0.95, 0.82, 0.4, 0.75)
-		else: col = Color(0.42, 0.46, 0.52, 0.5)
-		canvas.draw_line(_tree_px[req], _tree_px[id], col, 4.0)
-
-func _style_node(b: Button, state: String) -> void:
-	var bg := Color(0.14, 0.16, 0.18)
-	var bd := Color(0.3, 0.34, 0.38)
-	if state == "owned": bg = Color(0.17, 0.40, 0.24); bd = Color(0.5, 0.95, 0.6)
-	elif state == "avail": bg = Color(0.40, 0.34, 0.12); bd = Color(1, 0.86, 0.4)
-	elif state == "need": bg = Color(0.24, 0.20, 0.12); bd = Color(0.6, 0.52, 0.3)
-	elif state == "root": bg = Color(0.18, 0.28, 0.45); bd = Color(0.6, 0.82, 1)
-	for st in ["normal", "hover", "pressed", "disabled"]:
-		b.add_theme_stylebox_override(st, _sb(bg, bd, 2, 8, 5))
+		var a: Vector2 = _tree_px[req]
+		var bp: Vector2 = _tree_px[id]
+		if Game.pt_owned(_tree_ck, id):
+			canvas.draw_line(a, bp, Color(0.42, 0.9, 0.55, 0.9), 5.0)
+		elif Game.pt_can(_tree_ck, id):
+			canvas.draw_line(a, bp, Color(1, 0.82, 0.4, 0.8), 4.0)
+		else:
+			canvas.draw_dashed_line(a, bp, Color(0.5, 0.55, 0.6, 0.5), 3.0, 9.0)
 func _buy_lure() -> void:
 	if Game.buy_lure(): _post_buy("lab")
 func _buy_pres(key: String) -> void:
@@ -616,24 +678,61 @@ func _do_rebirth() -> void:
 
 # ---- LABOR ----
 func _build_lab(vb) -> void:
-	_big(vb, "LABOR", 28, COL_ACCENT)
-	# ===== PFLANZEN-SKILL-TREES (Herzstueck) =====
-	_header(vb, "PFLANZEN-SKILL-TREES  —  FP aus getoeteten Zombies", COL_CYAN)
-	var selrow := _grid(vb, 6)
+	# ===== KOPFZEILE: Titel + FP/Sonne-Pillen =====
+	var hdr := HBoxContainer.new(); hdr.add_theme_constant_override("separation", 12)
+	var title := Label.new(); title.text = "Skill Trees"; title.add_theme_font_size_override("font_size", 27); title.modulate = COL_ACCENT
+	hdr.add_child(title)
+	var hsp := Control.new(); hsp.size_flags_horizontal = Control.SIZE_EXPAND_FILL; hsp.custom_minimum_size = Vector2(160, 0)
+	hdr.add_child(hsp)
+	_pill(hdr, "%d FP" % Game.fp, COL_CYAN)
+	_pill(hdr, "%d Sonne" % int(Game.sun), COL_GOLD)
+	vb.add_child(hdr)
+	# ===== TABS =====
+	var tabs := _grid(vb, 7)
 	for ck in Game.CH_ORDER:
-		if not Game.has(ck): continue
-		var pb := Button.new()
-		pb.text = Game.CHASSIS[ck].n
-		pb.custom_minimum_size = Vector2(150, 34)
-		if ck == _tree_sel: pb.add_theme_color_override("font_color", Color(1, 0.95, 0.5))
-		pb.pressed.connect(_pick_tree.bind(ck))
-		selrow.add_child(pb)
+		if Game.has(ck): _tab(tabs, Game.CHASSIS[ck].n, ck)
+	_tab(tabs, "Spiel", "spiel")
+	_tab(tabs, "Zombies", "zombies")
+	# ===== INHALT je Tab =====
+	if _tree_sel == "spiel": _build_general(vb); return
+	if _tree_sel == "zombies": _build_ztab(vb); return
 	if not Game.has(_tree_sel): _tree_sel = "sonne"
 	var ck2: String = _tree_sel
-	_header(vb, "Baum:  %s   (Grün=frei · Gold=kaufbar · Grau=gesperrt · Hover=Info)" % Game.CHASSIS[ck2].n, Color(0.6, 0.95, 0.6))
+	var owned := 0
+	var total := 0
+	for id in Game.tree_nodes(ck2):
+		if id == "root": continue
+		total += 1
+		if Game.pt_owned(ck2, id): owned += 1
+	var sub := HBoxContainer.new(); sub.add_theme_constant_override("separation", 10)
+	var sl := Label.new()
+	sl.text = "%s   ·   Stufe %d   ·   %d/%d Skills" % [Game.CHASSIS[ck2].n, owned, owned, total]
+	sl.add_theme_font_size_override("font_size", 16); sl.modulate = Color(0.88, 0.97, 0.88)
+	sub.add_child(sl)
+	var ssp := Control.new(); ssp.size_flags_horizontal = Control.SIZE_EXPAND_FILL; sub.add_child(ssp)
+	var hint := Label.new(); hint.text = "FP durch getötete Zombies"; hint.modulate = Color(0.58, 0.66, 0.6); hint.add_theme_font_size_override("font_size", 13)
+	sub.add_child(hint)
+	vb.add_child(sub)
 	_build_tree_canvas(vb, ck2)
-	# ===== PFLANZEN FREISCHALTEN =====
-	_header(vb, "PFLANZEN FREISCHALTEN  (neue Chassis)", Color(0.5, 0.9, 0.55))
+
+func _pill(parent, text: String, col: Color) -> void:
+	var pc := PanelContainer.new()
+	pc.add_theme_stylebox_override("panel", _sb(Color(0.09, 0.13, 0.11), col, 1, 13, 6))
+	var l := Label.new(); l.text = text; l.modulate = col; l.add_theme_font_size_override("font_size", 15)
+	pc.add_child(l); parent.add_child(pc)
+
+func _tab(parent, label: String, key: String) -> void:
+	var b := Button.new(); b.text = label; b.custom_minimum_size = Vector2(120, 38)
+	b.add_theme_font_size_override("font_size", 15)
+	if _tree_sel == key:
+		b.add_theme_stylebox_override("normal", _sb(Color(0.17, 0.4, 0.24), COL_ACCENT, 2, 8, 8))
+		b.add_theme_color_override("font_color", Color(0.82, 1, 0.86))
+	b.pressed.connect(_pick_tree.bind(key))
+	parent.add_child(b)
+
+func _build_general(vb) -> void:
+	_header(vb, "SPIEL & AUSRUESTUNG", Color(0.7, 0.85, 1))
+	_header(vb, "Pflanzen freischalten", Color(0.5, 0.9, 0.55))
 	var g2 := _grid(vb, 3)
 	for k in Game.CH_ORDER:
 		if k == "sonne": continue
@@ -644,8 +743,7 @@ func _build_lab(vb) -> void:
 			var ok_c := Game.chassis_req_ok(k)
 			var sub_c: String = ch.d if ok_c else ("Braucht: " + str(Game.CHASSIS[ch.req].n))
 			_card(g2, ch.n, sub_c, "FP %d" % int(ch.fp), ok_c and Game.fp >= int(ch.fp), _buy_chassis.bind(k))
-	# ===== AUSRUESTUNG =====
-	_header(vb, "AUSRUESTUNG  (Schaufel, Reihen, Almanach ...)", Color(0.55, 0.7, 1))
+	_header(vb, "Ausruestung", Color(0.55, 0.7, 1))
 	var g3 := _grid(vb, 3)
 	for k in Game.EQ_ORDER:
 		var e = Game.EQUIP[k]
@@ -655,8 +753,7 @@ func _build_lab(vb) -> void:
 			var ok_e := Game.equip_req_ok(k)
 			var sub_e: String = e.d if ok_e else ("Braucht: " + str(Game.EQUIP[e.req].n))
 			_card(g3, e.n, sub_e, "FP %d" % int(e.fp), ok_e and Game.fp >= int(e.fp), _buy_equip.bind(k))
-	# ===== ALLGEMEIN (vorlaeufig -> spaeter Sonnen-Tree) =====
-	_header(vb, "ALLGEMEIN  (Oekonomie, vorlaeufig)", Color(0.8, 0.85, 0.6))
+	_header(vb, "Oekonomie", Color(0.8, 0.85, 0.6))
 	var g1 := _grid(vb, 3)
 	for k in Game.RES_ORDER:
 		var r = Game.RESEARCH[k]
@@ -664,7 +761,8 @@ func _build_lab(vb) -> void:
 		var c_r := Game.res_cost(k)
 		var eff := ("+%d%%" % int(r.per * 100 * lv_r)) if r.kind == "pct" else ("+%d" % int(r.per * lv_r))
 		_card(g1, "%s  St.%d" % [r.n, lv_r], "%s  (%s)" % [r.d, eff], "FP %d" % c_r, Game.fp >= c_r, _buy_res.bind(k))
-	# ===== ZOMBIES (Lockstoff) =====
+
+func _build_ztab(vb) -> void:
 	_header(vb, "ZOMBIES  —  Lockstoff (mehr Idle-Zombies zum Farmen)", Color(1, 0.55, 0.55))
 	var zc := VBoxContainer.new(); vb.add_child(zc)
 	var lure_hb := HBoxContainer.new(); lure_hb.add_theme_constant_override("separation", 8)
