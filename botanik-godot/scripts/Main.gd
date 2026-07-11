@@ -43,12 +43,12 @@ var _nav_return := ""
 var _death_open := false
 
 # Skill-Tree Zustand
-var _tree_sel := "sonne"
+var _tree_sel := "seed"   # aktueller Tab: "seed" | "element" | "spiel" | "zombies"
 var _tree_px := {}
-var _tree_ck := ""
-var _tree_zoom := 1.0     # Zoom-Faktor fuer den Skill-Baum (rauszoomen = mehr sehen)
-var info_ck := ""
-var info_node := ""
+var _tree_mode := "slot"  # "slot" | "element" | "none"  (Datenquelle der Leinwand)
+var _tree_ref := 0        # Slot-Index bei mode "slot"
+var _tree_zoom := 1.0     # Zoom-Faktor fuer den Skill-Baum
+var info_node := ""       # aktuell gewaehlter Knoten (im aktuellen Baum)
 
 const SCREEN_W := 1152
 const SCREEN_H := 648
@@ -100,7 +100,7 @@ func _process(_delta: float) -> void:
 		wave_btn.visible = true; wave_btn.disabled = false; wave_btn.text = "START"
 	# Werkzeug-Highlight
 	if tool_ham != null:
-		tool_ham.modulate = Color(1, 1, 0.6) if (Game.selected == "" and not Game.shovel) else Color(1, 1, 1)
+		tool_ham.modulate = Color(1, 1, 0.6) if (Game.place_slot < 0 and not Game.shovel) else Color(1, 1, 1)
 	if tool_sho != null:
 		tool_sho.modulate = Color(1, 1, 0.6) if Game.shovel else Color(1, 1, 1)
 	if Game.phase == "dead":
@@ -243,7 +243,7 @@ func _build_bottom() -> void:
 	var st := Button.new(); st.text = "Skill Trees"; st.custom_minimum_size = Vector2(130, 46)
 	st.pressed.connect(_toggle_drawer); tools.add_child(st)
 	tool_ham = Button.new(); tool_ham.text = "Hammer"; tool_ham.custom_minimum_size = Vector2(96, 46)
-	tool_ham.pressed.connect(_select.bind("")); tools.add_child(tool_ham)
+	tool_ham.pressed.connect(_pick_hammer); tools.add_child(tool_ham)
 	tool_sho = Button.new(); tool_sho.text = "Schaufel"; tool_sho.custom_minimum_size = Vector2(96, 46)
 	tool_sho.pressed.connect(_toggle_shovel); tools.add_child(tool_sho)
 	# Pfeil zum Aufziehen (mittig unten)
@@ -256,42 +256,55 @@ func _build_bottom() -> void:
 func refresh_seeds() -> void:
 	for c in seed_box.get_children():
 		c.queue_free()
-	# Nur die aktiven Chains (Deck) sind spielbar
-	for ck in Game.active:
+	# Ein Kaertchen je Samen-Slot
+	for i in range(Game.slot_count()):
 		var card := Button.new()
-		card.custom_minimum_size = Vector2(108, 52)
+		card.custom_minimum_size = Vector2(112, 52)
 		card.add_theme_font_size_override("font_size", 12)
-		var s = Game.compute_chassis_stats(ck)
-		card.text = "%s\nSonne %d · Lv%d" % [Game.CHASSIS[ck].n, int(s.cost), _plant_level(ck)]
-		# Highlight der aktuell gewaehlten Pflanze
-		if Game.selected == ck and not Game.shovel:
-			card.add_theme_stylebox_override("normal", _sb(Color(0.2, 0.45, 0.28), Color(0.6, 1, 0.7), 3, 8))
-			card.add_theme_color_override("font_color", Color(1, 1, 0.85))
-		card.pressed.connect(_select.bind(ck))
+		var ck: String = Game.seed_chain(i)
+		if ck == "":
+			card.text = "Slot %d\n(leer)" % (i + 1)
+			card.add_theme_color_override("font_color", Color(0.6, 0.66, 0.6))
+			card.pressed.connect(_edit_slot_open.bind(i))
+		else:
+			var s = Game.seed_stats(i)
+			card.text = "%s\nSonne %d · Lv%d" % [Game.CHASSIS[ck].n, int(s.cost), _plant_level(i)]
+			if Game.place_slot == i and not Game.shovel:
+				card.add_theme_stylebox_override("normal", _sb(Color(0.2, 0.45, 0.28), Color(0.6, 1, 0.7), 3, 8))
+				card.add_theme_color_override("font_color", Color(1, 1, 0.85))
+			card.pressed.connect(_pick_slot.bind(i))
 		seed_box.add_child(card)
-	# freie Deck-Slots anzeigen
-	for i in range(Game.active.size(), BAL.MAX_CHAINS):
-		var slot := Button.new()
-		slot.custom_minimum_size = Vector2(108, 52)
-		slot.add_theme_font_size_override("font_size", 12)
-		slot.text = "+ Chain\n(im Baum)"
-		slot.pressed.connect(_toggle_drawer)
-		seed_box.add_child(slot)
 
-func _plant_level(ck: String) -> int:
+func _plant_level(slot: int) -> int:
 	var n := 0
+	var ck := Game.seed_chain(slot)
+	if ck == "": return 0
+	var owned := Game.seed_nodes(slot)
 	for id in Game.tree_nodes(ck):
-		if id != "root" and Game.pt_owned(ck, id): n += 1
+		if id != "root" and owned.has(id): n += 1
 	return n
 
-func _select(key: String) -> void:
-	Game.selected = key
+func _pick_slot(i: int) -> void:
+	if Game.seed_chain(i) == "":
+		_edit_slot_open(i); return
+	Game.place_slot = i
 	Game.shovel = false
 	refresh_seeds()
 
+func _pick_hammer() -> void:
+	Game.place_slot = -1
+	Game.shovel = false
+	refresh_seeds()
+
+func _edit_slot_open(i: int) -> void:
+	Game.edit_slot = i
+	_tree_sel = "seed"; info_node = ""
+	if not drawer_open: _toggle_drawer()
+	else: _rebuild_drawer()
+
 func _toggle_shovel() -> void:
 	Game.shovel = not Game.shovel
-	Game.selected = ""
+	if Game.shovel: Game.place_slot = -1
 	refresh_seeds()
 
 func _on_wave() -> void:
@@ -380,105 +393,131 @@ func _animate_drawer() -> void:
 	_dtween.tween_property(drawer, "position:y", ty, 0.3).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 func _rebuild_drawer() -> void:
-	# Tabs: ALLE Chains (aktive markiert mit Punkt) + Spiel + Zombies
+	# Tabs: die Samen-Slots + Element + Spiel + Zombies
 	for c in d_tabs.get_children(): c.queue_free()
-	for ck in Game.CH_ORDER:
-		var lbl: String = ("* " + Game.CHASSIS[ck].n) if Game.is_active(ck) else Game.CHASSIS[ck].n
-		_tab(d_tabs, lbl, ck)
+	for i in range(Game.slot_count()):
+		var sck: String = Game.seed_chain(i)
+		var lbl: String = ("S%d: %s" % [i + 1, Game.CHASSIS[sck].n]) if sck != "" else ("Samen %d" % (i + 1))
+		_tab(d_tabs, lbl, "seed" + str(i))
 	_tab(d_tabs, "Element", "element")
 	_tab(d_tabs, "Spiel", "spiel")
 	_tab(d_tabs, "Zombies", "zombies")
-	# Baum-Bereich
+	# Inhalt
 	for c in d_treewrap.get_children(): c.queue_free()
 	var holder := VBoxContainer.new()
 	holder.add_theme_constant_override("separation", 6)
 	d_treewrap.add_child(holder)
 	if _tree_sel == "spiel":
-		_build_general(holder)
+		_tree_mode = "none"; _build_general(holder)
 	elif _tree_sel == "zombies":
-		_build_ztab(holder)
+		_tree_mode = "none"; _build_ztab(holder)
 	elif _tree_sel == "element":
-		_build_element(holder)
+		_tree_mode = "element"
+		var el := Label.new()
+		el.text = "ELEMENT-MUTATIONEN (FP) — 4 Richtungen: BLITZ (oben) · UNTOD (unten) · FEUER (rechts) · EIS (links). Schaltet & verstaerkt die Element-Knoten ALLER Samen. Bosse: Feuer/Eis/Blitz — Finale: der Untote."
+		el.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; el.custom_minimum_size = Vector2(620, 0); el.modulate = Color(0.85, 0.85, 0.7)
+		holder.add_child(el)
+		_build_tree_canvas(holder)
 	else:
-		if not Game.CHASSIS.has(_tree_sel): _tree_sel = "sonne"
-		var ck: String = _tree_sel
-		var owned := 0
-		var total := 0
-		for id in Game.tree_nodes(ck):
-			if id == "root": continue
-			total += 1
-			if Game.pt_owned(ck, id): owned += 1
-		# Kopfzeile des Baums: Name/Skills + Deck-Zaehler + Aktion
-		var arow := HBoxContainer.new(); arow.add_theme_constant_override("separation", 12)
-		var sl := Label.new()
-		sl.text = "%s   ·   %d/%d Skills" % [Game.CHASSIS[ck].n, owned, total]
-		sl.add_theme_font_size_override("font_size", 15); sl.modulate = Color(0.88, 0.97, 0.88)
-		arow.add_child(sl)
-		var dk := Label.new(); dk.text = "Deck: %d/%d" % [Game.active_count(), BAL.MAX_CHAINS]
-		dk.modulate = COL_ACCENT; dk.add_theme_font_size_override("font_size", 15)
-		arow.add_child(dk)
-		var asp := Control.new(); asp.size_flags_horizontal = Control.SIZE_EXPAND_FILL; arow.add_child(asp)
-		_chain_action_button(arow, ck)
-		holder.add_child(arow)
-		_build_tree_canvas(holder, ck)
+		_tree_mode = "slot"; _tree_ref = Game.edit_slot
+		var ck: String = Game.seed_chain(Game.edit_slot)
+		if ck == "":
+			_build_origin_picker(holder)
+		else:
+			_build_seed_header(holder, ck)
+			_build_tree_canvas(holder)
 	_rebuild_info()
 
-func _build_element(holder) -> void:
-	var el := Label.new()
-	el.text = "ELEMENT-MUTATIONEN (FP)  —  waechst in 4 Richtungen: BLITZ (oben) · UNTOD (unten) · FEUER (rechts) · EIS (links). Schaltet & verstaerkt die Element-Knoten ALLER Pflanzen. Bosse: Feuer/Eis/Blitz — Finale: der Untote."
-	el.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	el.custom_minimum_size = Vector2(620, 0); el.modulate = Color(0.85, 0.85, 0.7)
-	holder.add_child(el)
-	_build_tree_canvas(holder, "element")
-
-func _chain_action_button(parent, ck: String) -> void:
+# Leerer Slot -> 8 Chains zur Auswahl (Ursprung)
+func _build_origin_picker(holder) -> void:
+	_header(holder, "Samen %d  —  waehle eine Pflanze:" % (Game.edit_slot + 1), COL_ACCENT)
+	var g := _grid(holder, 4)
+	for ck in Game.CH_ORDER:
+		var s = Game.compute_chassis_stats(ck)
+		_card(g, Game.CHASSIS[ck].n, "%s\nSonne %d" % [Game.CHASSIS[ck].d, int(s.cost)], "Waehlen", true, _choose_chain.bind(ck))
+	_header(holder, "Mehr Samen-Slots (dauerhaft, Gehirne)", COL_PURPLE)
 	var b := Button.new()
-	b.custom_minimum_size = Vector2(210, 36)
-	if not Game.has(ck):
-		var cost := int(Game.CHASSIS[ck].fp)
-		var ok := Game.chassis_req_ok(ck)
-		if ok:
-			b.text = "Chain freischalten  (%d FP)" % cost
-			b.disabled = Game.fp < cost
-			b.pressed.connect(_unlock_chain.bind(ck))
-		else:
-			b.text = "Braucht: %s" % str(Game.CHASSIS[Game.CHASSIS[ck].req].n)
-			b.disabled = true
-	elif Game.is_active(ck):
-		b.text = "Aus Deck entfernen"
-		b.add_theme_stylebox_override("normal", _sb(Color(0.4, 0.2, 0.2), Color(0.9, 0.5, 0.5), 2, 8))
-		b.pressed.connect(_deactivate_chain.bind(ck))
-	elif Game.deck_full():
-		b.text = "Deck voll (%d/%d)" % [Game.active_count(), BAL.MAX_CHAINS]
-		b.disabled = true
+	if Game.seed_slot_max():
+		b.text = "Maximale Slots erreicht (%d)" % Game.slot_count(); b.disabled = true
 	else:
-		b.text = "Ins Deck aktivieren"
-		b.add_theme_stylebox_override("normal", _sb(Color(0.18, 0.42, 0.26), COL_ACCENT, 2, 8))
-		b.pressed.connect(_activate_chain.bind(ck))
-	parent.add_child(b)
+		b.text = "Neuer Slot  (%d Gehirne)" % Game.seed_slot_cost()
+		b.disabled = Game.brains < Game.seed_slot_cost()
+		b.pressed.connect(_buy_slot)
+	b.custom_minimum_size = Vector2(300, 38)
+	holder.add_child(b)
 
-func _unlock_chain(ck: String) -> void:
-	if Game.buy_chassis(ck): _rebuild_drawer(); refresh_seeds()
+func _choose_chain(ck: String) -> void:
+	Game.seed_set_chain(Game.edit_slot, ck)
+	Game.place_slot = Game.edit_slot
+	_rebuild_drawer(); refresh_seeds()
 
-func _activate_chain(ck: String) -> void:
-	if Game.activate_chain(ck): _rebuild_drawer(); refresh_seeds()
+func _build_seed_header(holder, ck: String) -> void:
+	var owned := 0
+	var total := 0
+	var on := Game.seed_nodes(Game.edit_slot)
+	for id in Game.tree_nodes(ck):
+		if id == "root": continue
+		total += 1
+		if on.has(id): owned += 1
+	var arow := HBoxContainer.new(); arow.add_theme_constant_override("separation", 12)
+	var sl := Label.new()
+	sl.text = "Samen %d: %s   ·   %d/%d Skills" % [Game.edit_slot + 1, Game.CHASSIS[ck].n, owned, total]
+	sl.add_theme_font_size_override("font_size", 15); sl.modulate = Color(0.88, 0.97, 0.88)
+	arow.add_child(sl)
+	var asp := Control.new(); asp.size_flags_horizontal = Control.SIZE_EXPAND_FILL; arow.add_child(asp)
+	var rb := Button.new(); rb.text = "Pflanze wechseln (kein FP zurueck)"
+	rb.add_theme_stylebox_override("normal", _sb(Color(0.4, 0.2, 0.2), Color(0.9, 0.5, 0.5), 2, 8))
+	rb.pressed.connect(_reset_slot)
+	arow.add_child(rb)
+	holder.add_child(arow)
 
-func _deactivate_chain(ck: String) -> void:
-	Game.deactivate_chain(ck); _rebuild_drawer(); refresh_seeds()
+func _reset_slot() -> void:
+	Game.seed_reset(Game.edit_slot)
+	_rebuild_drawer(); refresh_seeds()
+
+func _buy_slot() -> void:
+	if Game.buy_seed_slot(): _rebuild_drawer(); refresh_seeds()
+
+# ---- Dispatcher: Leinwand nutzt je nach _tree_mode Slot- oder Element-Daten ----
+func _n_nodes() -> Dictionary:
+	if _tree_mode == "element": return Game.tree_nodes("element")
+	return Game.tree_nodes(Game.seed_chain(_tree_ref))
+func _n_owned(id: String) -> bool:
+	if _tree_mode == "element": return Game.elem_owned(id)
+	return Game.pt_owned(_tree_ref, id)
+func _n_can(id: String) -> bool:
+	if _tree_mode == "element": return Game.elem_can(id)
+	return Game.pt_can(_tree_ref, id)
+func _n_cost(id: String) -> int:
+	if _tree_mode == "element": return Game.elem_node_cost(id)
+	return Game.pt_node_cost(_tree_ref, id)
+func _n_req(id: String) -> String:
+	if _tree_mode == "element": return Game.elem_req(id)
+	return Game.pt_req(_tree_ref, id)
+func _n_buy(id: String) -> bool:
+	if _tree_mode == "element": return Game.buy_elem(id)
+	return Game.buy_pt(_tree_ref, id)
 
 func _tab(parent, label: String, key: String) -> void:
-	var b := Button.new(); b.text = label; b.custom_minimum_size = Vector2(94, 32)
+	var b := Button.new(); b.text = label; b.custom_minimum_size = Vector2(100, 32)
 	b.add_theme_font_size_override("font_size", 12)
 	b.clip_text = true
-	if _tree_sel == key:
+	var active := (key == _tree_sel)
+	if key.begins_with("seed") and _tree_sel == "seed" and key == "seed" + str(Game.edit_slot):
+		active = true
+	if active:
 		b.add_theme_stylebox_override("normal", _sb(Color(0.17, 0.4, 0.24), COL_ACCENT, 2, 8, 8))
 		b.add_theme_color_override("font_color", Color(0.82, 1, 0.86))
 	b.pressed.connect(_pick_tree.bind(key))
 	parent.add_child(b)
 
 func _pick_tree(key: String) -> void:
-	_tree_sel = key
-	info_ck = ""; info_node = ""
+	if key.begins_with("seed"):
+		Game.edit_slot = int(key.substr(4))
+		_tree_sel = "seed"
+	else:
+		_tree_sel = key
+	info_node = ""
 	_rebuild_drawer()
 
 func _zoom_out() -> void:
@@ -489,12 +528,12 @@ func _zoom_in() -> void:
 	_tree_zoom = min(1.15, _tree_zoom + 0.15)
 	_rebuild_drawer()
 
-func _select_node(ck: String, id: String) -> void:
-	info_ck = ck; info_node = id
+func _select_node(id: String) -> void:
+	info_node = id
 	_rebuild_info()
 
 func _buy_selected() -> void:
-	if Game.buy_pt(info_ck, info_node):
+	if _n_buy(info_node):
 		_rebuild_drawer()
 		refresh_seeds()
 
@@ -502,12 +541,11 @@ func _buy_selected() -> void:
 func _rebuild_info() -> void:
 	for c in d_info.get_children(): c.queue_free()
 	_big(d_info, "Info", 18, COL_ACCENT)
-	if info_ck == "" or Game.tree_nodes(info_ck).is_empty() or _tree_sel == "spiel" or _tree_sel == "zombies":
+	var nodes := _n_nodes()
+	if _tree_sel == "spiel" or _tree_sel == "zombies" or info_node == "" or nodes.is_empty() or not nodes.has(info_node):
 		var h := Label.new(); h.text = "Klicke einen Skill-Knoten, um Name, Effekt und Kosten zu sehen."
 		h.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; h.custom_minimum_size = Vector2(280, 0); h.modulate = Color(0.7, 0.78, 0.72)
 		d_info.add_child(h); return
-	var nodes = Game.tree_nodes(info_ck)
-	if not nodes.has(info_node): return
 	var nd = nodes[info_node]
 	var rare := bool(nd.get("rare", false))
 	var title := Label.new(); title.text = str(nd.n); title.add_theme_font_size_override("font_size", 19)
@@ -522,13 +560,13 @@ func _rebuild_info() -> void:
 		d_info.add_child(cdl)
 	_spacer(d_info, 8)
 	if info_node == "root":
-		var b0 := Label.new(); b0.text = "Basis-Chassis (immer aktiv)"; b0.modulate = Color(0.6, 0.9, 0.68)
+		var b0 := Label.new(); b0.text = "Basis (immer aktiv)"; b0.modulate = Color(0.6, 0.9, 0.68)
 		d_info.add_child(b0)
-	elif Game.pt_owned(info_ck, info_node):
+	elif _n_owned(info_node):
 		var b1 := Label.new(); b1.text = "Freigeschaltet"; b1.modulate = Color(0.5, 0.95, 0.6); b1.add_theme_font_size_override("font_size", 16)
 		d_info.add_child(b1)
-	elif Game.pt_can(info_ck, info_node):
-		var cost := int(nd.cost)
+	elif _n_can(info_node):
+		var cost := _n_cost(info_node)
 		var btn := Button.new(); btn.text = "Freischalten  (%d FP)" % cost; btn.custom_minimum_size = Vector2(0, 42)
 		btn.add_theme_font_size_override("font_size", 16); btn.disabled = Game.fp < cost
 		btn.pressed.connect(_buy_selected)
@@ -538,11 +576,11 @@ func _rebuild_info() -> void:
 			d_info.add_child(w)
 	else:
 		var txt := ""
-		var miss: String = Game.elem_missing(nd.get("eff", {})) if info_ck != "element" else ""
+		var miss: String = Game.elem_missing(nd.get("eff", {})) if _tree_mode != "element" else ""
 		if miss != "":
 			txt = "Gesperrt — schalte zuerst das Element frei: %s  (im Tab Element)" % miss
 		else:
-			var reqk := Game.pt_req(info_ck, info_node)
+			var reqk := _n_req(info_node)
 			var reqn: String = str(nodes.get(reqk, {}).get("n", reqk))
 			txt = "Gesperrt — schalte zuerst frei:\n%s" % reqn
 		var l := Label.new(); l.text = txt
@@ -550,9 +588,12 @@ func _rebuild_info() -> void:
 		d_info.add_child(l)
 
 # ---- Visueller Skill-Baum (Karten-Knoten + Pfade + Aeste) ----
-func _build_tree_canvas(parent, ck: String) -> void:
-	var tree = BAL.PLANT_TREES.get(ck, {})
-	var nodes = tree.get("nodes", {})
+func _build_tree_canvas(parent) -> void:
+	var nodes := _n_nodes()
+	if nodes.is_empty(): return
+	var branches := []
+	if _tree_mode == "slot":
+		branches = BAL.PLANT_TREES.get(Game.seed_chain(_tree_ref), {}).get("branches", [])
 	var minc := 0.0
 	var maxc := 0.0
 	var maxr := 0.0
@@ -572,13 +613,12 @@ func _build_tree_canvas(parent, ck: String) -> void:
 	for id in nodes:
 		var pp = nodes[id].pos
 		_tree_px[id] = Vector2(ox + pp.x * sx, oy - pp.y * sy)
-	_tree_ck = ck
 	var canvas := Control.new()
 	canvas.custom_minimum_size = Vector2(width, height)
 	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.draw.connect(_draw_tree.bind(canvas))
 	parent.add_child(canvas)
-	for br in tree.get("branches", []):
+	for br in branches:
 		var lb := Label.new(); lb.text = "Ast: " + str(br[1]); lb.modulate = Color(0.55, 0.62, 0.58)
 		lb.add_theme_font_size_override("font_size", int(max(9, 12 * z)))
 		lb.position = Vector2(ox + float(br[0]) * sx - 34 * z, oy + 46 * z)
@@ -587,19 +627,19 @@ func _build_tree_canvas(parent, ck: String) -> void:
 		var nd = nodes[id]
 		var center: Vector2 = _tree_px[id]
 		var rare := bool(nd.get("rare", false))
-		var selected: bool = (ck == info_ck and id == info_node)
+		var selected: bool = (id == info_node)
 		if id == "root":
-			_tree_node(canvas, center, str(nd.n), "Basis", 0, false, "root", false, Callable())
+			_tree_node(canvas, center, str(nd.n), "Basis", 0, false, "root", selected, _select_node.bind(id))
 		else:
-			var cost := int(nd.cost)
-			var owned := Game.pt_owned(ck, id)
-			var can := Game.pt_can(ck, id)
+			var cost := _n_cost(id)
+			var owned := _n_owned(id)
+			var can := _n_can(id)
 			var state := "lock"
 			if owned: state = "legend_owned" if rare else "owned"
 			elif can and Game.fp >= cost: state = "legend_avail" if rare else "avail"
 			elif can: state = "legend_lock" if rare else "need"
 			else: state = "legend_lock" if rare else "lock"
-			_tree_node(canvas, center, str(nd.n), str(nd.d), cost, not owned, state, selected, _select_node.bind(ck, id))
+			_tree_node(canvas, center, str(nd.n), str(nd.d), cost, not owned, state, selected, _select_node.bind(id))
 	canvas.queue_redraw()
 
 func _tree_node(canvas, center: Vector2, title: String, subtitle: String, cost: int, show_cost: bool, state: String, selected: bool, cb: Callable) -> void:
@@ -663,16 +703,15 @@ func _style_tree_node(b: Button, state: String, selected: bool) -> void:
 		b.add_theme_stylebox_override(st, _sb(bg, bd, bw, 9, 6))
 
 func _draw_tree(canvas) -> void:
-	if _tree_ck == "": return
-	var nodes = Game.tree_nodes(_tree_ck)
+	var nodes := _n_nodes()
 	for id in nodes:
 		var req := str(nodes[id].get("req", ""))
 		if req == "" or not _tree_px.has(id) or not _tree_px.has(req): continue
 		var a: Vector2 = _tree_px[req]
 		var bp: Vector2 = _tree_px[id]
-		if Game.pt_owned(_tree_ck, id):
+		if _n_owned(id):
 			canvas.draw_line(a, bp, Color(0.42, 0.9, 0.55, 0.9), 5.0 * _tree_zoom)
-		elif Game.pt_can(_tree_ck, id):
+		elif _n_can(id):
 			canvas.draw_line(a, bp, Color(1, 0.82, 0.4, 0.8), 4.0 * _tree_zoom)
 		else:
 			canvas.draw_dashed_line(a, bp, Color(0.5, 0.55, 0.6, 0.5), 3.0 * _tree_zoom, 9.0)
@@ -788,8 +827,6 @@ func _card(grid, title: String, desc: String, btn_text: String, enabled: bool, c
 # ---- Kauf-Handler (Drawer-Inhalt -> Drawer neu bauen) ----
 func _buy_res(key: String) -> void:
 	if Game.buy_research(key): _rebuild_drawer(); refresh_seeds()
-func _buy_chassis(key: String) -> void:
-	if Game.buy_chassis(key): _rebuild_drawer(); refresh_seeds()
 func _buy_equip(key: String) -> void:
 	if Game.buy_equip(key): _rebuild_drawer(); refresh_seeds()
 func _buy_lure() -> void:
@@ -847,6 +884,7 @@ func _reset_progress() -> void:
 	Game.zlab = {"str": 0, "arm": 0, "spd": 0}
 	Game.carry_coins = 0
 	Game.seen = {}
+	Game.unlocked_slots = 3
 	Game.save_game()
 	lawn.reset_run()
 	_build_overlay_content("options")
@@ -902,16 +940,17 @@ func _dev_god(pressed: bool) -> void:
 	Game.god = pressed
 
 func _dev_unlock_all() -> void:
-	for k in Game.CH_ORDER: Game.unlocked[k] = true
 	for k in Game.EQ_ORDER: Game.unlocked[k] = true
-	for ck in BAL.PLANT_TREES:
-		if not Game.ptree.has(ck): Game.ptree[ck] = {}
-		for node in Game.tree_nodes(ck):
-			if node != "root": Game.ptree[ck][node] = true
-	# Element-Tree ebenfalls voll
-	if not Game.ptree.has("element"): Game.ptree["element"] = {}
+	# Element-Tree voll
 	for eid in BAL.ELEMENT_TREE:
-		if eid != "root": Game.ptree["element"][eid] = true
+		if eid != "root": Game.etree[eid] = true
+	# Samen-Slots mit Chains fuellen + deren Baeume voll
+	for i in range(Game.slot_count()):
+		if Game.seed_chain(i) == "":
+			Game.seed_set_chain(i, Game.CH_ORDER[i % Game.CH_ORDER.size()])
+		var ck := Game.seed_chain(i)
+		for node in Game.tree_nodes(ck):
+			if node != "root": Game.seed_nodes(i)[node] = true
 	refresh_seeds(); _build_overlay_content("dev")
 
 func _dev_seen_all() -> void:
@@ -967,11 +1006,8 @@ func _build_almanac(vb) -> void:
 	var g := _grid(vb, 3)
 	for ck in Game.CH_ORDER:
 		var c = Game.CHASSIS[ck]
-		if Game.has(ck):
-			var s = Game.compute_chassis_stats(ck)
-			_card(g, c.n, "%s\nSonne %d  HP %d" % [c.d, int(s.cost), int(s.hp)], "", false, Callable())
-		else:
-			_card(g, "???", "Noch nicht freigeschaltet", "", false, Callable())
+		var s = Game.compute_chassis_stats(ck)
+		_card(g, c.n, "%s\nSonne %d  HP %d" % [c.d, int(s.cost), int(s.hp)], "", false, Callable())
 
 # ---- ZOMBIE-BUCH ----
 func _build_zombiebook(vb) -> void:
@@ -1007,18 +1043,8 @@ func _build_shop(vb) -> void:
 # ---- TAB "Spiel": Pflanzen freischalten + Ausruestung + Oekonomie ----
 func _build_general(vb) -> void:
 	_header(vb, "SPIEL & AUSRUESTUNG", Color(0.7, 0.85, 1))
-	_header(vb, "Pflanzen freischalten", Color(0.5, 0.9, 0.55))
-	var g2 := _grid(vb, 3)
-	for k in Game.CH_ORDER:
-		if k == "sonne": continue
-		var ch = Game.CHASSIS[k]
-		if Game.has(k):
-			_card(g2, "* " + ch.n, ch.d, "", false, Callable())
-		else:
-			var ok_c := Game.chassis_req_ok(k)
-			var sub_c: String = ch.d if ok_c else ("Braucht: " + str(Game.CHASSIS[ch.req].n))
-			_card(g2, ch.n, sub_c, "FP %d" % int(ch.fp), ok_c and Game.fp >= int(ch.fp), _buy_chassis.bind(k))
-	_header(vb, "Ausruestung", Color(0.55, 0.7, 1))
+	_header(vb, "Info: Pflanzen (Chains) waehlst du frei in den Samen-Slots.", Color(0.65, 0.78, 0.68))
+	_header(vb, "Ausruestung (FP)", Color(0.55, 0.7, 1))
 	var g3 := _grid(vb, 3)
 	for k in Game.EQ_ORDER:
 		var e = Game.EQUIP[k]
@@ -1028,7 +1054,7 @@ func _build_general(vb) -> void:
 			var ok_e := Game.equip_req_ok(k)
 			var sub_e: String = e.d if ok_e else ("Braucht: " + str(Game.EQUIP[e.req].n))
 			_card(g3, e.n, sub_e, "FP %d" % int(e.fp), ok_e and Game.fp >= int(e.fp), _buy_equip.bind(k))
-	_header(vb, "Oekonomie", Color(0.8, 0.85, 0.6))
+	_header(vb, "Oekonomie (FP)", Color(0.8, 0.85, 0.6))
 	var g1 := _grid(vb, 3)
 	for k in Game.RES_ORDER:
 		var r = Game.RESEARCH[k]

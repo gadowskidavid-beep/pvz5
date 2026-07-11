@@ -98,12 +98,15 @@ var prestige := {}
 var seen := {}          # Set: zombie-key -> true
 var carry_coins := 0
 var zlab := {"str":0,"arm":0,"spd":0}
+var unlocked_slots := 3           # Anzahl Samen-Slots (dauerhaft, via Gehirne erweiterbar)
 # --- Skills (NICHT gespeichert, bleiben aber während der Sitzung) ---
 var fp := 0
 var research := {}
-var ptree := {}                   # Pflanzen-Skill-Trees: {plant_key: {node: level}}
-var unlocked := {"sonne": true}   # chassis + equip ids
-var active := ["sonne"]           # Deck: max 3 aktive Chains (nur die sind spielbar)
+var etree := {}                   # Element-Tree (gemeinsam): {node: true}
+var unlocked := {}                # nur EQUIP-ids (Schaufel/Reihen/Almanach ...)
+var seeds := []                   # Samen-Slots: [{chain, nodes}] — je Slot ein eigener Bau
+var edit_slot := 0                # welcher Slot wird im Drawer bearbeitet
+var place_slot := 0               # welcher Slot ist zum Setzen gewaehlt (-1 = Hammer/Faust)
 var run_shop := {}
 var lure := 0                     # Lockstoff-Stufe: Idle-Zombies zwischen Wellen
 var god := false                  # Dev: Rasen kann nicht verloren gehen
@@ -112,7 +115,6 @@ var sun := 75
 var coins := 0
 var wave := 0
 var phase := "prep"     # "prep" | "fight"
-var selected := "sonne"
 var shovel := false
 var paused := false      # true wenn ein Overlay offen ist
 
@@ -167,35 +169,92 @@ func buy_lure() -> bool:
 	if fp < c: return false
 	fp -= c; lure += 1
 	return true
-# ---- Pflanzen-Skill-Tree Helfer (einmalige Knoten mit Pfaden) ----
+# ---- Samen-Slots (jeder Slot ein eigener Bau: chain + eigene Skill-Knoten) ----
+func seed_chain(slot: int) -> String:
+	if slot < 0 or slot >= seeds.size(): return ""
+	return str(seeds[slot].chain)
+func seed_nodes(slot: int) -> Dictionary:
+	if slot < 0 or slot >= seeds.size(): return {}
+	return seeds[slot].nodes
+func seed_set_chain(slot: int, ck: String) -> void:
+	if slot < 0 or slot >= seeds.size(): return
+	seeds[slot].chain = ck
+	seeds[slot].nodes = {}       # neue Pflanze -> Skills weg (kein FP zurueck)
+func seed_reset(slot: int) -> void:
+	if slot < 0 or slot >= seeds.size(): return
+	seeds[slot].chain = ""
+	seeds[slot].nodes = {}
+	if place_slot == slot: place_slot = -1
+func slot_count() -> int: return seeds.size()
+
+# ---- Pflanzen-Skill-Baum PRO SLOT ----
 func tree_nodes(ck: String) -> Dictionary:
 	if ck == "element": return BAL.ELEMENT_TREE
 	return BAL.PLANT_TREES.get(ck, {}).get("nodes", {})
-func pt_owned(ck: String, node: String) -> bool:
-	if node == "root": return ck == "element" or has(ck)
-	return ptree.get(ck, {}).has(node)
-func pt_node_cost(ck: String, node: String) -> int:
-	return int(tree_nodes(ck).get(node, {}).get("cost", 0))
-func pt_req(ck: String, node: String) -> String:
-	return str(tree_nodes(ck).get(node, {}).get("req", ""))
-func pt_can(ck: String, node: String) -> bool:
-	if pt_owned(ck, node): return false
-	if not tree_nodes(ck).has(node): return false
-	var r := pt_req(ck, node)
-	if not (r == "" or pt_owned(ck, r)): return false
-	# Element-Gate: Mutations-Knoten der Pflanzen brauchen erst den Element-Tree
-	if ck != "element":
-		var eff = tree_nodes(ck)[node].get("eff", {})
-		for kind in ["burn", "slow", "poison", "chain"]:
-			if eff.get(kind, false) and not elem_unlocked(kind): return false
+func pt_owned(slot: int, node: String) -> bool:
+	if node == "root": return seed_chain(slot) != ""
+	return seed_nodes(slot).has(node)
+func pt_node_cost(slot: int, node: String) -> int:
+	return int(tree_nodes(seed_chain(slot)).get(node, {}).get("cost", 0))
+func pt_req(slot: int, node: String) -> String:
+	return str(tree_nodes(seed_chain(slot)).get(node, {}).get("req", ""))
+func pt_can(slot: int, node: String) -> bool:
+	if seed_chain(slot) == "": return false
+	if pt_owned(slot, node): return false
+	var nodes := tree_nodes(seed_chain(slot))
+	if not nodes.has(node): return false
+	var r := pt_req(slot, node)
+	if not (r == "" or pt_owned(slot, r)): return false
+	var eff = nodes[node].get("eff", {})
+	for kind in ["burn", "slow", "poison", "chain"]:
+		if eff.get(kind, false) and not elem_unlocked(kind): return false
 	return true
+func buy_pt(slot: int, node: String) -> bool:
+	if not pt_can(slot, node): return false
+	var c := pt_node_cost(slot, node)
+	if fp < c: return false
+	fp -= c
+	seed_nodes(slot)[node] = true
+	return true
+func plant_bonus(slot: int) -> Dictionary:
+	var b := _zero_bonus()
+	var ck := seed_chain(slot)
+	if ck == "": return b
+	var nodes := tree_nodes(ck)
+	var owned := seed_nodes(slot)
+	for id in nodes:
+		if id == "root" or not owned.has(id): continue
+		var eff = nodes[id].get("eff", {})
+		for key in eff:
+			if not b.has(key): continue
+			if typeof(eff[key]) == TYPE_BOOL: b[key] = b[key] or eff[key]
+			else: b[key] = float(b[key]) + float(eff[key])
+	return b
+func _zero_bonus() -> Dictionary:
+	return {"dmg":0.0,"rate":0.0,"hp":0.0,"amount":0.0,"pierce":0.0,"splash":0.0,"range":0.0,"radius":0.0,"regen":0.0,"thorns":0.0,"faster":0.0,"burn":false,"slow":false,"poison":false,"chain":false,"twin":false}
 
-# ---- Element-Tree (gemeinsam, gated + boostet Element-Effekte) ----
+# ---- Element-Tree (gemeinsam, FP; gespeichert in etree) ----
+func elem_owned(node: String) -> bool:
+	if node == "root": return true
+	return etree.has(node)
+func elem_node_cost(node: String) -> int: return int(BAL.ELEMENT_TREE.get(node, {}).get("cost", 0))
+func elem_req(node: String) -> String: return str(BAL.ELEMENT_TREE.get(node, {}).get("req", ""))
+func elem_can(node: String) -> bool:
+	if elem_owned(node): return false
+	if not BAL.ELEMENT_TREE.has(node): return false
+	var r := elem_req(node)
+	return r == "" or elem_owned(r)
+func buy_elem(node: String) -> bool:
+	if not elem_can(node): return false
+	var c := elem_node_cost(node)
+	if fp < c: return false
+	fp -= c; etree[node] = true
+	return true
 func elem_unlocked(kind: String) -> bool:
-	if kind == "burn": return pt_owned("element", "feuer1")
-	if kind == "slow": return pt_owned("element", "eis1")
-	if kind == "poison": return pt_owned("element", "untod1")
-	if kind == "chain": return pt_owned("element", "blitz1")
+	if kind == "burn": return elem_owned("feuer1")
+	if kind == "slow": return elem_owned("eis1")
+	if kind == "poison": return elem_owned("untod1")
+	if kind == "chain": return elem_owned("blitz1")
 	return true
 func elem_missing(eff: Dictionary) -> String:
 	if eff.get("burn", false) and not elem_unlocked("burn"): return "Feuer"
@@ -211,51 +270,27 @@ func elem_boost(kind: String) -> float:
 	elif kind == "chain": pre = "blitz"
 	if pre == "": return 1.0
 	var n := 0
-	for id in ptree.get("element", {}):
+	for id in etree:
 		if str(id).begins_with(pre): n += 1
 	return 1.0 + 0.35 * n
-func buy_pt(ck: String, node: String) -> bool:
-	if not pt_can(ck, node): return false
-	var c := pt_node_cost(ck, node)
-	if fp < c: return false
-	fp -= c
-	if not ptree.has(ck): ptree[ck] = {}
-	ptree[ck][node] = true
-	return true
-# Summiert alle besessenen Knoten-Effekte einer Pflanze
-func plant_bonus(ck: String) -> Dictionary:
-	var b := {"dmg":0.0,"rate":0.0,"hp":0.0,"amount":0.0,"pierce":0.0,"splash":0.0,"range":0.0,"radius":0.0,"regen":0.0,"thorns":0.0,"faster":0.0,"burn":false,"slow":false,"poison":false,"chain":false,"twin":false}
-	var nodes := tree_nodes(ck)
-	for id in nodes:
-		if id == "root" or not pt_owned(ck, id): continue
-		var eff = nodes[id].get("eff", {})
-		for key in eff:
-			if not b.has(key): continue
-			if typeof(eff[key]) == TYPE_BOOL: b[key] = b[key] or eff[key]
-			else: b[key] = float(b[key]) + float(eff[key])
-	return b
-func chassis_req_ok(ck: String) -> bool:
-	var r: String = CHASSIS[ck].req
-	return r == "" or has(r)
+
 func equip_req_ok(k: String) -> bool:
 	var r: String = EQUIP[k].req
 	return r == "" or has(r)
 func pass_cost(k: String) -> int:
 	return int(SHOP_PASS[k].base) * (int(run_shop.get(k, 0)) + 1)
 
-# ---- Deck: max 3 aktive Chains ----
-func is_active(ck: String) -> bool: return active.has(ck)
-func active_count() -> int: return active.size()
-func deck_full() -> bool: return active.size() >= BAL.MAX_CHAINS
-func can_activate(ck: String) -> bool:
-	return has(ck) and not is_active(ck) and not deck_full()
-func activate_chain(ck: String) -> bool:
-	if not can_activate(ck): return false
-	active.append(ck)
+# ---- Samen-Slots freischalten (Gehirne, dauerhaft) ----
+func seed_slot_max() -> bool: return unlocked_slots >= 6
+func seed_slot_cost() -> int: return int(15 * pow(2.2, max(0, unlocked_slots - 3)))
+func buy_seed_slot() -> bool:
+	if seed_slot_max(): return false
+	var c := seed_slot_cost()
+	if brains < c: return false
+	brains -= c; unlocked_slots += 1
+	seeds.append({"chain": "", "nodes": {}})
+	save_game()
 	return true
-func deactivate_chain(ck: String) -> void:
-	active.erase(ck)
-	if selected == ck: selected = ""
 
 # Umgebungs-Multiplikator: Nacht-Pflanzen stark bei Nacht, Tag-Pflanzen schwaecher nachts
 func env_mul(ck: String) -> float:
@@ -265,11 +300,15 @@ func env_mul(ck: String) -> float:
 	if env == "day": return 0.85 if night else 1.0
 	return 1.0
 
-func compute_chassis_stats(ck: String) -> Dictionary:
+func seed_stats(slot: int) -> Dictionary:
+	return _compute(seed_chain(slot), plant_bonus(slot))
+func compute_chassis_stats(ck: String) -> Dictionary:   # Basis (Almanach/Anzeige)
+	return _compute(ck, _zero_bonus())
+func _compute(ck: String, b: Dictionary) -> Dictionary:
+	if ck == "" or not CHASSIS.has(ck): return {"arch": "", "key": "", "cost": 0, "hp": 0.0, "effects": []}
 	var c = CHASSIS[ck]
 	var arch: String = c.arch
 	var attacker := ["shooter","beam","fume","lobber","spike","bomb"].has(arch)
-	var b := plant_bonus(ck)
 	var em := env_mul(ck)
 	var eff_list := []
 	if attacker:
@@ -314,15 +353,6 @@ func buy_research(k: String) -> bool:
 	fp -= c
 	research[k] = res_lvl(k) + 1
 	return true
-func buy_chassis(ck: String) -> bool:
-	if has(ck) or not chassis_req_ok(ck): return false
-	var c := int(CHASSIS[ck].fp)
-	if fp < c: return false
-	fp -= c; unlocked[ck] = true
-	# Frisch freigeschaltete Chain automatisch ins Deck (falls Platz)
-	if not is_active(ck) and not deck_full(): active.append(ck)
-	if is_active(ck): selected = ck
-	return true
 func buy_equip(k: String) -> bool:
 	if has(k) or not equip_req_ok(k): return false
 	var c := int(EQUIP[k].fp)
@@ -354,32 +384,31 @@ func new_run() -> void:
 	wave = 0
 	phase = "prep"
 	run_shop.clear()
-	if not has(selected): selected = "sonne"
 
-# Wiedergeburt: ALLE Skills weg, Prestige (Gehirne) bleibt und schaltet Boni frei
+# Wiedergeburt: ALLE Skills/Samen weg, Prestige (Gehirne) + Slot-Anzahl bleiben
 func rebirth() -> void:
 	fp = BAL.START_FP
 	research = {}
-	ptree = {}
+	etree = {}
 	run_shop = {}
 	lure = 0
-	unlocked = {"sonne": true}
-	active = ["sonne"]
-	selected = "sonne"
+	unlocked = {}
 	shovel = false
-	_apply_prestige_unlocks()
+	place_slot = 0
+	edit_slot = 0
+	seeds = []
+	for i in range(max(3, unlocked_slots)):
+		seeds.append({"chain": "", "nodes": {}})
+	seeds[0].chain = "sonne"                       # Start: Slot 1 = Sonnenblume
+	if pres_lvl("startpea") > 0 and seeds.size() > 1:
+		seeds[1].chain = "pea"                     # Prestige: Slot 2 = Schuetze
 	new_run()
-
-func _apply_prestige_unlocks() -> void:
-	if pres_lvl("startpea") > 0:
-		unlocked["pea"] = true
-		if not is_active("pea") and not deck_full(): active.append("pea")
 
 # ================================================================
 # SPEICHERN / LADEN (nur Meta!)
 # ================================================================
 func save_game() -> void:
-	var data := {"brains": brains, "prestige": prestige, "carry_coins": carry_coins, "zlab": zlab, "seen": seen.keys()}
+	var data := {"brains": brains, "prestige": prestige, "carry_coins": carry_coins, "zlab": zlab, "seen": seen.keys(), "slots": unlocked_slots}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(data))
@@ -392,6 +421,7 @@ func load_game() -> void:
 	var data = JSON.parse_string(txt)
 	if typeof(data) != TYPE_DICTIONARY: return
 	brains = int(data.get("brains", 0))
+	unlocked_slots = int(data.get("slots", 3))
 	if data.has("prestige") and typeof(data.prestige) == TYPE_DICTIONARY: prestige = data.prestige
 	carry_coins = int(data.get("carry_coins", 0))
 	if data.has("zlab") and typeof(data.zlab) == TYPE_DICTIONARY:

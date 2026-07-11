@@ -367,8 +367,8 @@ func lawn_click(pos: Vector2) -> void:
 		for p in plants:
 			if p.col == col and p.row == row: plants.erase(p); return
 		return
-	# Klick-Kampf (keine Pflanze gewählt)
-	if Game.selected == "":
+	# Hammer/Faust (kein Samen gewählt)
+	if Game.place_slot < 0:
 		var best = null; var bd := 1.0e9
 		for z in zombies:
 			if z.hp > 0:
@@ -378,13 +378,14 @@ func lawn_click(pos: Vector2) -> void:
 			best.hp -= Game.click_dmg()
 			if Game.has_click_coin(): Game.coins += int(max(1, round(Game.coin_mul())))
 		return
-	# Pflanze setzen
+	# Pflanze aus dem gewaehlten Samen-Slot setzen
 	_place(col, row)
 
 func _place(col: int, row: int) -> void:
-	var ck: String = Game.selected
-	if ck == "" or not Game.has(ck): return
-	var s = Game.compute_chassis_stats(ck)
+	var slot: int = Game.place_slot
+	var ck: String = Game.seed_chain(slot)
+	if slot < 0 or ck == "": return
+	var s = Game.seed_stats(slot)
 	if s.arch != "bomb":
 		for p in plants:
 			if p.col == col and p.row == row: return
