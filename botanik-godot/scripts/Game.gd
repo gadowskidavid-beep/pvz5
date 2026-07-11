@@ -165,27 +165,41 @@ func buy_lure() -> bool:
 	if fp < c: return false
 	fp -= c; lure += 1
 	return true
-# ---- Pflanzen-Skill-Tree Helfer ----
-func pt(ck: String) -> Dictionary: return ptree.get(ck, {})
-func pt_lvl(ck: String, node: String) -> int: return int(pt(ck).get(node, 0))
-func pt_max(ck: String, node: String) -> bool: return pt_lvl(ck, node) >= int(BAL.PT_NODES[node].max)
-func pt_has(ck: String, node: String) -> bool: return pt_lvl(ck, node) > 0
-func pt_cost(ck: String, node: String) -> int:
-	var nd = BAL.PT_NODES[node]
-	return int(ceil(nd.base * pow(nd.g, pt_lvl(ck, node))))
-func pt_pct(ck: String, node: String) -> float:
-	return 1.0 + float(BAL.PT_NODES[node].per) * pt_lvl(ck, node)
-func pt_add(ck: String, node: String) -> float:
-	return float(BAL.PT_NODES[node].per) * pt_lvl(ck, node)
-func nodes_for(ck: String) -> Array:
-	return BAL.ARCH_TREE.get(CHASSIS[ck].arch, [])
-func plant_effects(ck: String) -> Array:
-	var a := []
-	if pt_has(ck, "e_fire"): a.append("burn")
-	if pt_has(ck, "e_ice"): a.append("slow")
-	if pt_has(ck, "e_poison"): a.append("poison")
-	if pt_has(ck, "e_elec"): a.append("chain")
-	return a
+# ---- Pflanzen-Skill-Tree Helfer (einmalige Knoten mit Pfaden) ----
+func tree_nodes(ck: String) -> Dictionary:
+	return BAL.PLANT_TREES.get(ck, {}).get("nodes", {})
+func pt_owned(ck: String, node: String) -> bool:
+	if node == "root": return has(ck)
+	return ptree.get(ck, {}).has(node)
+func pt_node_cost(ck: String, node: String) -> int:
+	return int(tree_nodes(ck).get(node, {}).get("cost", 0))
+func pt_req(ck: String, node: String) -> String:
+	return str(tree_nodes(ck).get(node, {}).get("req", ""))
+func pt_can(ck: String, node: String) -> bool:
+	if pt_owned(ck, node): return false
+	if not tree_nodes(ck).has(node): return false
+	var r := pt_req(ck, node)
+	return r == "" or pt_owned(ck, r)
+func buy_pt(ck: String, node: String) -> bool:
+	if not pt_can(ck, node): return false
+	var c := pt_node_cost(ck, node)
+	if fp < c: return false
+	fp -= c
+	if not ptree.has(ck): ptree[ck] = {}
+	ptree[ck][node] = true
+	return true
+# Summiert alle besessenen Knoten-Effekte einer Pflanze
+func plant_bonus(ck: String) -> Dictionary:
+	var b := {"dmg":0.0,"rate":0.0,"hp":0.0,"amount":0.0,"pierce":0.0,"splash":0.0,"range":0.0,"radius":0.0,"regen":0.0,"thorns":0.0,"faster":0.0,"burn":false,"slow":false,"poison":false,"chain":false,"twin":false}
+	var nodes := tree_nodes(ck)
+	for id in nodes:
+		if id == "root" or not pt_owned(ck, id): continue
+		var eff = nodes[id].get("eff", {})
+		for key in eff:
+			if not b.has(key): continue
+			if typeof(eff[key]) == TYPE_BOOL: b[key] = b[key] or eff[key]
+			else: b[key] = float(b[key]) + float(eff[key])
+	return b
 func chassis_req_ok(ck: String) -> bool:
 	var r: String = CHASSIS[ck].req
 	return r == "" or has(r)
@@ -199,31 +213,37 @@ func compute_chassis_stats(ck: String) -> Dictionary:
 	var c = CHASSIS[ck]
 	var arch: String = c.arch
 	var attacker := ["shooter","beam","fume","lobber","spike","bomb"].has(arch)
+	var b := plant_bonus(ck)
+	var eff_list := []
+	if attacker:
+		if b.burn: eff_list.append("burn")
+		if b.slow: eff_list.append("slow")
+		if b.poison: eff_list.append("poison")
+		if b.chain: eff_list.append("chain")
 	var s := {
 		"arch": arch, "key": ck,
 		"cost": int(c.get("cost", 0)), "hp": float(c.get("hp", 60)), "cd": float(c.get("cd", 6)),
 		"dmg": float(c.get("dmg", 0)), "rate": float(c.get("rate", 0.0)), "speed": float(c.get("speed", 0.0)),
 		"splash": float(c.get("splash", 0.0)), "range": float(c.get("range", 0.0)),
 		"amount": int(c.get("amount", 0)), "interval": float(c.get("interval", 0.0)), "radius": float(c.get("radius", 0.0)),
-		"effects": (plant_effects(ck) if attacker else []),
-		"pierce": int(pt_add(ck, "pierce")),
-		"thorns": float(BAL.PT_NODES["thorns"].per) * pt_lvl(ck, "thorns"),
-		"regen": pt_add(ck, "regen"),
+		"effects": eff_list,
+		"pierce": int(b.pierce),
+		"thorns": float(b.thorns),
+		"regen": float(b.regen),
 	}
-	# Pflanzen-eigener Skill-Tree + Prestige + Run-Shop
-	s.dmg = round(s.dmg * pt_pct(ck, "dmg") * pres_dmg_mul() * run_dmg_mul())
-	s.hp = round(s.hp * pt_pct(ck, "hp") * pres_hp_mul())
-	s.amount = int(round(s.amount * pt_pct(ck, "amount") * run_sun_mul()))
+	# Pflanzen-eigener Skill-Baum (einmalige Knoten) + Prestige + Run-Shop
+	s.dmg = round(s.dmg * (1.0 + b.dmg) * pres_dmg_mul() * run_dmg_mul())
+	s.hp = round(s.hp * (1.0 + b.hp) * pres_hp_mul())
+	s.amount = int(round(s.amount * (1.0 + b.amount) * run_sun_mul()))
 	if arch == "sun":
 		s.amount += 5 * pres_lvl("sunbloom")
-		if pt_has(ck, "twin"): s.amount *= 2
-	s.rate = s.rate * pt_pct(ck, "rate") * run_rate_mul()
+		if b.twin: s.amount *= 2
+	s.rate = s.rate * (1.0 + b.rate) * run_rate_mul()
 	s.shot_int = (1.0 / s.rate) if s.rate > 0 else 0.0
-	s.interval = s.interval * clamp(1.0 - float(BAL.PT_NODES["faster"].per) * pt_lvl(ck, "faster"), 0.4, 1.0)
-	s.cd = s.cd * clamp(1.0 - float(BAL.PT_NODES["recharge"].per) * pt_lvl(ck, "recharge"), 0.4, 1.0)
-	s.splash = s.splash * pt_pct(ck, "splash")
-	s.range = s.range + pt_add(ck, "range")
-	s.radius = s.radius * pt_pct(ck, "radius")
+	s.interval = s.interval * clamp(1.0 - float(b.faster), 0.3, 1.0)
+	s.splash = s.splash * (1.0 + b.splash)
+	s.range = s.range + float(b.range)
+	s.radius = s.radius * (1.0 + b.radius)
 	s.cost = max(0, int(round(s.cost)))
 	return s
 
@@ -248,14 +268,7 @@ func buy_equip(k: String) -> bool:
 	if fp < c: return false
 	fp -= c; unlocked[k] = true
 	return true
-func buy_pt(ck: String, node: String) -> bool:
-	if pt_max(ck, node): return false
-	var c := pt_cost(ck, node)
-	if fp < c: return false
-	fp -= c
-	if not ptree.has(ck): ptree[ck] = {}
-	ptree[ck][node] = pt_lvl(ck, node) + 1
-	return true
+
 func buy_prestige(k: String) -> bool:
 	if pres_max(k): return false
 	var c := pres_cost(k)

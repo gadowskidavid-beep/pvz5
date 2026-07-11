@@ -91,39 +91,78 @@ static func boss_key(w: int) -> String:
 
 
 # ================================================================
-# PFLANZEN-SKILL-TREES  —  Herzstueck der Progression (Waehrung: FP)
-# PT_NODES: Knoten-Vorlagen.  ARCH_TREE: welche Knoten je Archetyp.
-# kind: "pct" (multiplikativ 1+per*lvl) | "add" (per*lvl) | "unlock" (max 1)
+# PFLANZEN-SKILL-TREES  —  Herzstueck (Waehrung: FP)
+# Jede Pflanze hat einen eigenen BAUM: Knoten mit Position (pos),
+# Voraussetzung (req = Eltern-Knoten) und EINMALIGEM Effekt (eff).
+# Jeder Skill wird nur EINMAL freigeschaltet (kein Level-Grind).
+# "root" = die Pflanze selbst (automatisch besessen, Anker + Startpunkt).
+# eff-Keys: dmg/rate/hp/amount/splash/radius (=% als Bruch),
+#           pierce/range/regen (=additiv), thorns/faster (=Bruch),
+#           burn/slow/poison/chain/twin (=true).
+# pos: Vector2(spalte, reihe) — reihe 0 = unten (Wurzel), nach oben groesser.
 # ================================================================
 const START_FP := 10          # Tutorial: genau genug fuer 1 Schuetzen
 
-const PT_NODES := {
-	"dmg":      {"n":"Schaden","base":4,"g":1.27,"per":0.12,"kind":"pct","max":40,"d":"+12% Schaden"},
-	"rate":     {"n":"Feuerrate","base":6,"g":1.28,"per":0.08,"kind":"pct","max":30,"d":"+8% Feuerrate"},
-	"hp":       {"n":"Zellwand","base":5,"g":1.26,"per":0.10,"kind":"pct","max":30,"d":"+10% HP"},
-	"pierce":   {"n":"Durchschuss","base":35,"g":2.0,"per":1,"kind":"add","max":4,"d":"Erbse durchdringt +1 Zombie"},
-	"splash":   {"n":"Wurfradius","base":24,"g":1.55,"per":0.18,"kind":"pct","max":8,"d":"+18% Splash-Radius"},
-	"range":    {"n":"Reichweite","base":22,"g":1.5,"per":0.30,"kind":"add","max":5,"d":"+0,3 Nebel-Reichweite"},
-	"amount":   {"n":"Sonnen-Ertrag","base":5,"g":1.30,"per":0.15,"kind":"pct","max":40,"d":"+15% Sonne je Ernte"},
-	"faster":   {"n":"Photosynthese","base":8,"g":1.32,"per":0.05,"kind":"pct","max":12,"d":"-5% Produktionszeit"},
-	"radius":   {"n":"Sprengkraft","base":26,"g":1.55,"per":0.15,"kind":"pct","max":8,"d":"+15% Explosionsradius"},
-	"recharge": {"n":"Nachladen","base":22,"g":1.5,"per":0.06,"kind":"pct","max":8,"d":"-6% Abklingzeit"},
-	"thorns":   {"n":"Dornenpanzer","base":30,"g":1.7,"per":0.15,"kind":"pct","max":5,"d":"Reflektiert 15% Schaden je Stufe"},
-	"regen":    {"n":"Regeneration","base":28,"g":1.6,"per":3.0,"kind":"add","max":6,"d":"+3 HP/s Selbstheilung"},
-	"e_fire":   {"n":"Feuer","base":40,"g":1.0,"per":0,"kind":"unlock","max":1,"d":"Treffer setzen Zombies in Brand"},
-	"e_ice":    {"n":"Eis","base":40,"g":1.0,"per":0,"kind":"unlock","max":1,"d":"Treffer verlangsamen Zombies"},
-	"e_poison": {"n":"Gift","base":55,"g":1.0,"per":0,"kind":"unlock","max":1,"d":"Treffer vergiften Zombies"},
-	"e_elec":   {"n":"Elektro","base":75,"g":1.0,"per":0,"kind":"unlock","max":1,"d":"Blitz springt auf Nachbar-Zombies"},
-	"twin":     {"n":"Zwillingsblüte","base":80,"g":1.0,"per":0,"kind":"unlock","max":1,"d":"Produziert doppelte Sonne"},
-}
-
-const ARCH_TREE := {
-	"sun":     ["amount", "faster", "hp", "twin"],
-	"shooter": ["dmg", "rate", "hp", "pierce", "e_fire", "e_ice", "e_poison", "e_elec"],
-	"lobber":  ["dmg", "rate", "splash", "hp", "e_fire", "e_poison"],
-	"fume":    ["dmg", "rate", "range", "hp", "e_poison", "e_ice"],
-	"beam":    ["dmg", "rate", "hp", "e_elec"],
-	"spike":   ["dmg", "hp", "e_poison"],
-	"wall":    ["hp", "thorns", "regen"],
-	"bomb":    ["dmg", "radius"],
+const PLANT_TREES := {
+	"sonne": {"nodes": {
+		"root":    {"n":"Sonnenblume","d":"Basis","cost":0,"req":"","pos":Vector2(0,0),"eff":{}},
+		"amount1": {"n":"Ertrag I","d":"+25% Sonne je Ernte","cost":6,"req":"root","pos":Vector2(0,1),"eff":{"amount":0.25}},
+		"photo":   {"n":"Photosynthese","d":"-20% Produktionszeit","cost":10,"req":"amount1","pos":Vector2(-1,2),"eff":{"faster":0.20}},
+		"robust":  {"n":"Robuste Wurzel","d":"+40% HP","cost":9,"req":"amount1","pos":Vector2(1,2),"eff":{"hp":0.40}},
+		"amount2": {"n":"Ertrag II","d":"+35% Sonne","cost":16,"req":"amount1","pos":Vector2(0,2),"eff":{"amount":0.35}},
+		"twin":    {"n":"Zwillingsblüte","d":"Produziert doppelte Sonne","cost":45,"req":"amount2","pos":Vector2(0,3),"eff":{"twin":true}},
+	}},
+	"pea": {"nodes": {
+		"root":  {"n":"Erbsenschütze","d":"Basis","cost":0,"req":"","pos":Vector2(0,0),"eff":{}},
+		"dmg1":  {"n":"Schaden I","d":"+30% Schaden","cost":6,"req":"root","pos":Vector2(0,1),"eff":{"dmg":0.30}},
+		"rate1": {"n":"Feuerrate I","d":"+25% Feuerrate","cost":8,"req":"root","pos":Vector2(-1,1),"eff":{"rate":0.25}},
+		"dmg2":  {"n":"Schaden II","d":"+40% Schaden","cost":16,"req":"dmg1","pos":Vector2(0,2),"eff":{"dmg":0.40}},
+		"pierce":{"n":"Durchschuss","d":"Erbse durchdringt +1 Zombie","cost":22,"req":"dmg1","pos":Vector2(1,2),"eff":{"pierce":1}},
+		"fire":  {"n":"Feuer","d":"Setzt Zombies in Brand","cost":30,"req":"rate1","pos":Vector2(-1,2),"eff":{"burn":true}},
+		"ice":   {"n":"Eis","d":"Verlangsamt Zombies","cost":30,"req":"rate1","pos":Vector2(-2,2),"eff":{"slow":true}},
+		"elec":  {"n":"Elektro","d":"Blitz springt auf Nachbarn","cost":48,"req":"dmg2","pos":Vector2(0,3),"eff":{"chain":true}},
+	}},
+	"wall": {"nodes": {
+		"root":  {"n":"Wal-Nuss","d":"Basis","cost":0,"req":"","pos":Vector2(0,0),"eff":{}},
+		"hp1":   {"n":"Panzer I","d":"+50% HP","cost":8,"req":"root","pos":Vector2(0,1),"eff":{"hp":0.50}},
+		"thorns":{"n":"Dornenpanzer","d":"Reflektiert 30% Schaden","cost":18,"req":"hp1","pos":Vector2(-1,2),"eff":{"thorns":0.30}},
+		"regen": {"n":"Regeneration","d":"+5 HP/s Selbstheilung","cost":20,"req":"hp1","pos":Vector2(1,2),"eff":{"regen":5.0}},
+		"hp2":   {"n":"Panzer II","d":"+60% HP","cost":22,"req":"hp1","pos":Vector2(0,2),"eff":{"hp":0.60}},
+	}},
+	"werfer": {"nodes": {
+		"root":  {"n":"Kohl-Werfer","d":"Basis","cost":0,"req":"","pos":Vector2(0,0),"eff":{}},
+		"dmg1":  {"n":"Schaden I","d":"+35% Schaden","cost":8,"req":"root","pos":Vector2(0,1),"eff":{"dmg":0.35}},
+		"rate1": {"n":"Wurftempo","d":"+25% Feuerrate","cost":12,"req":"dmg1","pos":Vector2(-1,2),"eff":{"rate":0.25}},
+		"splash":{"n":"Wurfradius","d":"+35% Splash-Radius","cost":16,"req":"dmg1","pos":Vector2(1,2),"eff":{"splash":0.35}},
+		"fire":  {"n":"Feuer","d":"Brand-Fläche","cost":30,"req":"dmg1","pos":Vector2(0,2),"eff":{"burn":true}},
+		"poison":{"n":"Gift","d":"Gift-Fläche","cost":34,"req":"splash","pos":Vector2(1,3),"eff":{"poison":true}},
+	}},
+	"stachel": {"nodes": {
+		"root":  {"n":"Stachel","d":"Basis","cost":0,"req":"","pos":Vector2(0,0),"eff":{}},
+		"dmg1":  {"n":"Schärfe I","d":"+40% Schaden","cost":8,"req":"root","pos":Vector2(0,1),"eff":{"dmg":0.40}},
+		"hp":    {"n":"Verankert","d":"+40% HP","cost":10,"req":"root","pos":Vector2(-1,1),"eff":{"hp":0.40}},
+		"dmg2":  {"n":"Schärfe II","d":"+50% Schaden","cost":18,"req":"dmg1","pos":Vector2(1,2),"eff":{"dmg":0.50}},
+		"poison":{"n":"Gift","d":"Vergiftet Zombies","cost":28,"req":"dmg1","pos":Vector2(0,2),"eff":{"poison":true}},
+	}},
+	"nebler": {"nodes": {
+		"root":  {"n":"Nebler","d":"Basis","cost":0,"req":"","pos":Vector2(0,0),"eff":{}},
+		"dmg1":  {"n":"Schaden I","d":"+30% Schaden","cost":10,"req":"root","pos":Vector2(0,1),"eff":{"dmg":0.30}},
+		"rate1": {"n":"Feuerrate","d":"+25% Feuerrate","cost":14,"req":"dmg1","pos":Vector2(-1,2),"eff":{"rate":0.25}},
+		"range": {"n":"Reichweite","d":"+0,6 Nebel-Reichweite","cost":16,"req":"dmg1","pos":Vector2(1,2),"eff":{"range":0.6}},
+		"poison":{"n":"Gift","d":"Vergiftet Zombies","cost":32,"req":"dmg1","pos":Vector2(0,2),"eff":{"poison":true}},
+		"ice":   {"n":"Eis","d":"Verlangsamt Zombies","cost":32,"req":"rate1","pos":Vector2(-1,3),"eff":{"slow":true}},
+	}},
+	"bombe": {"nodes": {
+		"root": {"n":"Bombe","d":"Basis","cost":0,"req":"","pos":Vector2(0,0),"eff":{}},
+		"dmg1": {"n":"Sprengkraft I","d":"+40% Schaden","cost":12,"req":"root","pos":Vector2(0,1),"eff":{"dmg":0.40}},
+		"radius":{"n":"Radius","d":"+35% Explosionsradius","cost":20,"req":"dmg1","pos":Vector2(0,2),"eff":{"radius":0.35}},
+		"dmg2": {"n":"Sprengkraft II","d":"+60% Schaden","cost":26,"req":"radius","pos":Vector2(0,3),"eff":{"dmg":0.60}},
+	}},
+	"beam": {"nodes": {
+		"root": {"n":"Mais-Beam","d":"Basis","cost":0,"req":"","pos":Vector2(0,0),"eff":{}},
+		"dmg1": {"n":"Schaden I","d":"+35% Schaden","cost":14,"req":"root","pos":Vector2(0,1),"eff":{"dmg":0.35}},
+		"rate1":{"n":"Frequenz","d":"+25% Feuerrate","cost":18,"req":"dmg1","pos":Vector2(-1,2),"eff":{"rate":0.25}},
+		"dmg2": {"n":"Schaden II","d":"+45% Schaden","cost":28,"req":"dmg1","pos":Vector2(0,2),"eff":{"dmg":0.45}},
+		"elec": {"n":"Elektro","d":"Blitz springt auf Nachbarn","cost":50,"req":"dmg1","pos":Vector2(1,2),"eff":{"chain":true}},
+	}},
 }

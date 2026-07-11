@@ -16,6 +16,8 @@ var overlays := {}       # name -> {"panel":Panel, "content":VBoxContainer, "clo
 var _nav_return := ""     # Overlay, zu dem "Zurueck" springt (sonst Spiel)
 var _death_open := false  # ist der Todes-Screen bereits offen?
 var _tree_sel := "sonne"  # welche Pflanze ist im Skill-Tree gewaehlt
+var _tree_px := {}        # node_id -> Vector2 (Zentrum) fuer die aktuelle Baum-Leinwand
+var _tree_ck := ""        # welche Pflanze wird gerade gezeichnet
 
 const SCREEN_W := 1152
 const SCREEN_H := 648
@@ -364,6 +366,81 @@ func _pick_tree(ck: String) -> void:
 	_build_overlay_content("lab")
 func _buy_pt(ck: String, node: String) -> void:
 	if Game.buy_pt(ck, node): _post_buy("lab")
+
+# ---- Visueller Skill-Baum (Knoten + Pfade) ----
+func _build_tree_canvas(parent, ck: String) -> void:
+	var nodes = Game.tree_nodes(ck)
+	var minc := 0.0
+	var maxc := 0.0
+	var maxr := 0.0
+	for id in nodes:
+		var p = nodes[id].pos
+		minc = min(minc, p.x); maxc = max(maxc, p.x); maxr = max(maxr, p.y)
+	var sx := 130.0
+	var sy := 98.0
+	var width := (maxc - minc) * sx + 230.0
+	var height := maxr * sy + 150.0
+	var ox := -minc * sx + 115.0
+	var oy := height - 66.0
+	_tree_px = {}
+	for id in nodes:
+		var pp = nodes[id].pos
+		_tree_px[id] = Vector2(ox + pp.x * sx, oy - pp.y * sy)
+	_tree_ck = ck
+	var canvas := Control.new()
+	canvas.custom_minimum_size = Vector2(width, height)
+	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.draw.connect(_draw_tree.bind(canvas))
+	parent.add_child(canvas)
+	for id in nodes:
+		var nd = nodes[id]
+		var center: Vector2 = _tree_px[id]
+		var nb := Button.new()
+		nb.custom_minimum_size = Vector2(100, 62)
+		nb.size = Vector2(100, 62)
+		nb.position = center - Vector2(50, 31)
+		nb.add_theme_font_size_override("font_size", 12)
+		if id == "root":
+			nb.text = nd.n
+			nb.disabled = true
+			_style_node(nb, "root")
+		else:
+			var cost := int(nd.cost)
+			nb.text = "%s\nFP %d" % [nd.n, cost]
+			nb.tooltip_text = "%s\n%s\nKosten: %d FP" % [nd.n, nd.d, cost]
+			if Game.pt_owned(ck, id):
+				_style_node(nb, "owned"); nb.disabled = true
+			elif Game.pt_can(ck, id):
+				if Game.fp >= cost:
+					_style_node(nb, "avail"); nb.pressed.connect(_buy_pt.bind(ck, id))
+				else:
+					_style_node(nb, "need"); nb.disabled = true
+			else:
+				_style_node(nb, "lock"); nb.disabled = true
+		canvas.add_child(nb)
+	canvas.queue_redraw()
+
+func _draw_tree(canvas) -> void:
+	if _tree_ck == "": return
+	var nodes = Game.tree_nodes(_tree_ck)
+	for id in nodes:
+		var req := str(nodes[id].get("req", ""))
+		if req == "" or not _tree_px.has(id) or not _tree_px.has(req): continue
+		var col: Color
+		if Game.pt_owned(_tree_ck, id): col = Color(0.4, 0.85, 0.5, 0.9)
+		elif Game.pt_can(_tree_ck, id): col = Color(0.95, 0.82, 0.4, 0.75)
+		else: col = Color(0.42, 0.46, 0.52, 0.5)
+		canvas.draw_line(_tree_px[req], _tree_px[id], col, 4.0)
+
+func _style_node(b: Button, state: String) -> void:
+	var bg := Color(0.14, 0.16, 0.18)
+	var bd := Color(0.3, 0.34, 0.38)
+	if state == "owned": bg = Color(0.17, 0.40, 0.24); bd = Color(0.5, 0.95, 0.6)
+	elif state == "avail": bg = Color(0.40, 0.34, 0.12); bd = Color(1, 0.86, 0.4)
+	elif state == "need": bg = Color(0.24, 0.20, 0.12); bd = Color(0.6, 0.52, 0.3)
+	elif state == "root": bg = Color(0.18, 0.28, 0.45); bd = Color(0.6, 0.82, 1)
+	for st in ["normal", "hover", "pressed", "disabled"]:
+		b.add_theme_stylebox_override(st, _sb(bg, bd, 2, 8, 5))
 func _buy_lure() -> void:
 	if Game.buy_lure(): _post_buy("lab")
 func _buy_pres(key: String) -> void:
@@ -494,11 +571,11 @@ func _dev_god(pressed: bool) -> void:
 func _dev_unlock_all() -> void:
 	for k in Game.CH_ORDER: Game.unlocked[k] = true
 	for k in Game.EQ_ORDER: Game.unlocked[k] = true
-	# alle Pflanzen-Skill-Baeume maxen
-	for ck in Game.CH_ORDER:
+	# alle Pflanzen-Skill-Baeume komplett freischalten
+	for ck in BAL.PLANT_TREES:
 		if not Game.ptree.has(ck): Game.ptree[ck] = {}
-		for node in Game.nodes_for(ck):
-			Game.ptree[ck][node] = int(BAL.PT_NODES[node].max)
+		for node in Game.tree_nodes(ck):
+			if node != "root": Game.ptree[ck][node] = true
 	refresh_seeds(); _build_overlay_content("dev")
 
 func _dev_seen_all() -> void:
@@ -553,18 +630,8 @@ func _build_lab(vb) -> void:
 		selrow.add_child(pb)
 	if not Game.has(_tree_sel): _tree_sel = "sonne"
 	var ck2: String = _tree_sel
-	_header(vb, "Baum:  %s   —   %s" % [Game.CHASSIS[ck2].n, Game.CHASSIS[ck2].d], Color(0.6, 0.95, 0.6))
-	var gt := _grid(vb, 3)
-	for node in Game.nodes_for(ck2):
-		var nd = BAL.PT_NODES[node]
-		var lv_t := Game.pt_lvl(ck2, node)
-		if Game.pt_max(ck2, node):
-			var done_txt: String = "freigeschaltet" if nd.kind == "unlock" else "MAX"
-			_card(gt, "%s  [%s]" % [nd.n, done_txt], nd.d, "", false, Callable())
-		else:
-			var c_t := Game.pt_cost(ck2, node)
-			var lvtxt: String = "noch nicht" if nd.kind == "unlock" else "St.%d/%d" % [lv_t, int(nd.max)]
-			_card(gt, "%s  %s" % [nd.n, lvtxt], nd.d, "FP %d" % c_t, Game.fp >= c_t, _buy_pt.bind(ck2, node))
+	_header(vb, "Baum:  %s   (Grün=frei · Gold=kaufbar · Grau=gesperrt · Hover=Info)" % Game.CHASSIS[ck2].n, Color(0.6, 0.95, 0.6))
+	_build_tree_canvas(vb, ck2)
 	# ===== PFLANZEN FREISCHALTEN =====
 	_header(vb, "PFLANZEN FREISCHALTEN  (neue Chassis)", Color(0.5, 0.9, 0.55))
 	var g2 := _grid(vb, 3)
