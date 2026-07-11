@@ -399,7 +399,6 @@ func _rebuild_drawer() -> void:
 		var sck: String = Game.seed_chain(i)
 		var lbl: String = ("S%d: %s" % [i + 1, Game.CHASSIS[sck].n]) if sck != "" else ("Samen %d" % (i + 1))
 		_tab(d_tabs, lbl, "seed" + str(i))
-	_tab(d_tabs, "Element", "element")
 	_tab(d_tabs, "Spiel", "spiel")
 	_tab(d_tabs, "Zombies", "zombies")
 	# Inhalt
@@ -411,13 +410,6 @@ func _rebuild_drawer() -> void:
 		_tree_mode = "none"; _build_general(holder)
 	elif _tree_sel == "zombies":
 		_tree_mode = "none"; _build_ztab(holder)
-	elif _tree_sel == "element":
-		_tree_mode = "element"
-		var el := Label.new()
-		el.text = "ELEMENT-MUTATIONEN (FP) — 4 Richtungen: BLITZ (oben) · UNTOD (unten) · FEUER (rechts) · EIS (links). Schaltet & verstaerkt die Element-Knoten ALLER Samen. Bosse: Feuer/Eis/Blitz — Finale: der Untote."
-		el.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; el.custom_minimum_size = Vector2(620, 0); el.modulate = Color(0.85, 0.85, 0.7)
-		holder.add_child(el)
-		_build_tree_canvas(holder)
 	else:
 		_tree_mode = "slot"; _tree_ref = Game.edit_slot
 		var ck: String = Game.seed_chain(Game.edit_slot)
@@ -480,22 +472,16 @@ func _buy_slot() -> void:
 
 # ---- Dispatcher: Leinwand nutzt je nach _tree_mode Slot- oder Element-Daten ----
 func _n_nodes() -> Dictionary:
-	if _tree_mode == "element": return Game.tree_nodes("element")
 	return Game.tree_nodes(Game.seed_chain(_tree_ref))
 func _n_owned(id: String) -> bool:
-	if _tree_mode == "element": return Game.elem_owned(id)
 	return Game.pt_owned(_tree_ref, id)
 func _n_can(id: String) -> bool:
-	if _tree_mode == "element": return Game.elem_can(id)
 	return Game.pt_can(_tree_ref, id)
 func _n_cost(id: String) -> int:
-	if _tree_mode == "element": return Game.elem_node_cost(id)
 	return Game.pt_node_cost(_tree_ref, id)
 func _n_req(id: String) -> String:
-	if _tree_mode == "element": return Game.elem_req(id)
 	return Game.pt_req(_tree_ref, id)
 func _n_buy(id: String) -> bool:
-	if _tree_mode == "element": return Game.buy_elem(id)
 	return Game.buy_pt(_tree_ref, id)
 
 func _tab(parent, label: String, key: String) -> void:
@@ -575,14 +561,9 @@ func _rebuild_info() -> void:
 			var w := Label.new(); w.text = "Zu wenig FP (%d / %d)" % [Game.fp, cost]; w.modulate = Color(1, 0.6, 0.5)
 			d_info.add_child(w)
 	else:
-		var txt := ""
-		var miss: String = Game.elem_missing(nd.get("eff", {})) if _tree_mode != "element" else ""
-		if miss != "":
-			txt = "Gesperrt — schalte zuerst das Element frei: %s  (im Tab Element)" % miss
-		else:
-			var reqk := _n_req(info_node)
-			var reqn: String = str(nodes.get(reqk, {}).get("n", reqk))
-			txt = "Gesperrt — schalte zuerst frei:\n%s" % reqn
+		var reqk := _n_req(info_node)
+		var reqn: String = str(nodes.get(reqk, {}).get("n", reqk))
+		var txt := "Gesperrt — schalte zuerst frei:\n%s" % reqn
 		var l := Label.new(); l.text = txt
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; l.custom_minimum_size = Vector2(280, 0); l.modulate = Color(0.85, 0.72, 0.5)
 		d_info.add_child(l)
@@ -941,9 +922,6 @@ func _dev_god(pressed: bool) -> void:
 
 func _dev_unlock_all() -> void:
 	for k in Game.EQ_ORDER: Game.unlocked[k] = true
-	# Element-Tree voll
-	for eid in BAL.ELEMENT_TREE:
-		if eid != "root": Game.etree[eid] = true
 	# Samen-Slots mit Chains fuellen + deren Baeume voll
 	for i in range(Game.slot_count()):
 		if Game.seed_chain(i) == "":

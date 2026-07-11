@@ -102,7 +102,6 @@ var unlocked_slots := 3           # Anzahl Samen-Slots (dauerhaft, via Gehirne e
 # --- Skills (NICHT gespeichert, bleiben aber während der Sitzung) ---
 var fp := 0
 var research := {}
-var etree := {}                   # Element-Tree (gemeinsam): {node: true}
 var unlocked := {}                # nur EQUIP-ids (Schaufel/Reihen/Almanach ...)
 var seeds := []                   # Samen-Slots: [{chain, nodes}] — je Slot ein eigener Bau
 var edit_slot := 0                # welcher Slot wird im Drawer bearbeitet
@@ -189,7 +188,6 @@ func slot_count() -> int: return seeds.size()
 
 # ---- Pflanzen-Skill-Baum PRO SLOT ----
 func tree_nodes(ck: String) -> Dictionary:
-	if ck == "element": return BAL.ELEMENT_TREE
 	return BAL.PLANT_TREES.get(ck, {}).get("nodes", {})
 func pt_owned(slot: int, node: String) -> bool:
 	if node == "root": return seed_chain(slot) != ""
@@ -205,9 +203,6 @@ func pt_can(slot: int, node: String) -> bool:
 	if not nodes.has(node): return false
 	var r := pt_req(slot, node)
 	if not (r == "" or pt_owned(slot, r)): return false
-	var eff = nodes[node].get("eff", {})
-	for kind in ["burn", "slow", "poison", "chain"]:
-		if eff.get(kind, false) and not elem_unlocked(kind): return false
 	return true
 func buy_pt(slot: int, node: String) -> bool:
 	if not pt_can(slot, node): return false
@@ -231,48 +226,7 @@ func plant_bonus(slot: int) -> Dictionary:
 			else: b[key] = float(b[key]) + float(eff[key])
 	return b
 func _zero_bonus() -> Dictionary:
-	return {"dmg":0.0,"rate":0.0,"hp":0.0,"amount":0.0,"pierce":0.0,"splash":0.0,"range":0.0,"radius":0.0,"regen":0.0,"thorns":0.0,"faster":0.0,"burn":false,"slow":false,"poison":false,"chain":false,"twin":false}
-
-# ---- Element-Tree (gemeinsam, FP; gespeichert in etree) ----
-func elem_owned(node: String) -> bool:
-	if node == "root": return true
-	return etree.has(node)
-func elem_node_cost(node: String) -> int: return int(BAL.ELEMENT_TREE.get(node, {}).get("cost", 0))
-func elem_req(node: String) -> String: return str(BAL.ELEMENT_TREE.get(node, {}).get("req", ""))
-func elem_can(node: String) -> bool:
-	if elem_owned(node): return false
-	if not BAL.ELEMENT_TREE.has(node): return false
-	var r := elem_req(node)
-	return r == "" or elem_owned(r)
-func buy_elem(node: String) -> bool:
-	if not elem_can(node): return false
-	var c := elem_node_cost(node)
-	if fp < c: return false
-	fp -= c; etree[node] = true
-	return true
-func elem_unlocked(kind: String) -> bool:
-	if kind == "burn": return elem_owned("feuer1")
-	if kind == "slow": return elem_owned("eis1")
-	if kind == "poison": return elem_owned("untod1")
-	if kind == "chain": return elem_owned("blitz1")
-	return true
-func elem_missing(eff: Dictionary) -> String:
-	if eff.get("burn", false) and not elem_unlocked("burn"): return "Feuer"
-	if eff.get("slow", false) and not elem_unlocked("slow"): return "Eis"
-	if eff.get("poison", false) and not elem_unlocked("poison"): return "Untod"
-	if eff.get("chain", false) and not elem_unlocked("chain"): return "Blitz"
-	return ""
-func elem_boost(kind: String) -> float:
-	var pre := ""
-	if kind == "burn": pre = "feuer"
-	elif kind == "slow": pre = "eis"
-	elif kind == "poison": pre = "untod"
-	elif kind == "chain": pre = "blitz"
-	if pre == "": return 1.0
-	var n := 0
-	for id in etree:
-		if str(id).begins_with(pre): n += 1
-	return 1.0 + 0.35 * n
+	return {"dmg":0.0,"rate":0.0,"hp":0.0,"amount":0.0,"pierce":0.0,"splash":0.0,"range":0.0,"radius":0.0,"regen":0.0,"thorns":0.0,"faster":0.0,"extra_lanes":0.0,"burn":false,"slow":false,"poison":false,"chain":false,"twin":false}
 
 func equip_req_ok(k: String) -> bool:
 	var r: String = EQUIP[k].req
@@ -327,6 +281,7 @@ func _compute(ck: String, b: Dictionary) -> Dictionary:
 		"pierce": int(b.pierce),
 		"thorns": float(b.thorns),
 		"regen": float(b.regen),
+		"extra_lanes": int(b.extra_lanes),
 	}
 	# Pflanzen-eigener Skill-Baum (einmalige Knoten) + Prestige + Run-Shop
 	s.dmg = round(s.dmg * (1.0 + b.dmg) * pres_dmg_mul() * run_dmg_mul() * em)
@@ -335,7 +290,7 @@ func _compute(ck: String, b: Dictionary) -> Dictionary:
 	if arch == "sun":
 		s.amount += 5 * pres_lvl("sunbloom")
 		if b.twin: s.amount *= 2
-	s.rate = s.rate * (1.0 + b.rate) * run_rate_mul()
+	s.rate = s.rate * max(0.25, 1.0 + b.rate) * run_rate_mul()
 	s.shot_int = (1.0 / s.rate) if s.rate > 0 else 0.0
 	s.interval = s.interval * clamp(1.0 - float(b.faster), 0.3, 1.0)
 	s.splash = s.splash * (1.0 + b.splash)
@@ -389,7 +344,6 @@ func new_run() -> void:
 func rebirth() -> void:
 	fp = BAL.START_FP
 	research = {}
-	etree = {}
 	run_shop = {}
 	lure = 0
 	unlocked = {}

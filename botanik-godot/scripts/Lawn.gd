@@ -201,8 +201,8 @@ func _update(dt: float) -> void:
 	# Zombies
 	for i in range(zombies.size() - 1, -1, -1):
 		var z = zombies[i]
-		if z.burn > 0: z.hp -= 8.0 * dt * Game.elem_boost("burn"); z.burn -= dt
-		if z.poison > 0: z.hp -= 9.0 * dt * Game.elem_boost("poison"); z.poison -= dt
+		if z.burn > 0: z.hp -= 8.0 * dt; z.burn -= dt
+		if z.poison > 0: z.hp -= 9.0 * dt; z.poison -= dt
 		if z.slow > 0: z.slow -= dt
 		if z.hp <= 0: _kill(z); zombies.remove_at(i); continue
 		var sl := 0.5 if z.slow > 0 else 1.0
@@ -262,7 +262,15 @@ func _lane_has(p) -> bool:
 
 func _shoot(p) -> void:
 	var s = p.s
-	peas.append({"row": p.row, "x": p.x + 20, "y": p.y - 6, "vx": s.speed if s.speed > 0 else 340.0, "dmg": s.dmg, "effects": s.effects, "lob": false, "pierce": int(s.get("pierce", 0)), "hit": []})
+	var ex := int(s.get("extra_lanes", 0))
+	_spawn_pea(p, p.row, s)
+	for d in range(1, ex + 1):
+		if p.row - d >= 0: _spawn_pea(p, p.row - d, s)
+		if p.row + d < rows: _spawn_pea(p, p.row + d, s)
+
+func _spawn_pea(p, lane: int, s) -> void:
+	var y := Game.LAWN_Y + lane * Game.CELL + Game.CELL / 2.0 - 6.0
+	peas.append({"row": lane, "x": p.x + 20, "y": y, "vx": s.speed if s.speed > 0 else 340.0, "dmg": s.dmg, "effects": s.effects, "lob": false, "pierce": int(s.get("pierce", 0)), "hit": []})
 
 func _beam(p) -> void:
 	var s = p.s
@@ -301,7 +309,7 @@ func _bomb(p) -> void:
 
 func _apply_fx(z, effects, dmg) -> void:
 	for e in effects:
-		if e == "slow": z.slow = 3.0 * Game.elem_boost("slow")
+		if e == "slow": z.slow = 3.0
 		elif e == "burn": z.burn = 4.0
 		elif e == "poison": z.poison = 5.0
 		elif e == "chain": _chain(z, dmg)
@@ -312,7 +320,7 @@ func _chain(z, dmg) -> void:
 		if o != z and o.hp > 0: others.append(o)
 	others.sort_custom(func(a, b): return Vector2(a.x,a.y).distance_to(Vector2(z.x,z.y)) < Vector2(b.x,b.y).distance_to(Vector2(z.x,z.y)))
 	for i in range(min(2, others.size())):
-		others[i].hp -= dmg * 0.5 * Game.elem_boost("chain")
+		others[i].hp -= dmg * 0.5
 		fx.append({"t": "bolt", "x": z.x, "y": z.y, "x2": others[i].x, "y2": others[i].y, "life": 0.2})
 
 func _mow(row: int) -> bool:
