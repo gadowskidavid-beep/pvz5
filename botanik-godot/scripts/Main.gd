@@ -491,7 +491,7 @@ func _build_tree_canvas(parent, ck: String) -> void:
 		var nd = nodes[id]
 		var center: Vector2 = _tree_px[id]
 		var rare := bool(nd.get("rare", false))
-		var selected := (ck == info_ck and id == info_node)
+		var selected: bool = (ck == info_ck and id == info_node)
 		if id == "root":
 			_tree_node(canvas, center, str(nd.n), "Basis", 0, false, "root", false, Callable())
 		else:
