@@ -1,0 +1,11 @@
+# Godot 4 .NET
+.godot/
+.import/
+export.cfg
+export_presets.cfg
+
+# .NET / C# build output
+.mono/
+bin/
+obj/
+*.user
