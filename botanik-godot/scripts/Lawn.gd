@@ -19,6 +19,9 @@ var idle_timer := 6.0
 var hazard_timer := 8.0
 var msg := ""
 var msg_t := 0.0
+# ---- Wetter ----
+var weather := "klar"      # klar / gewitter / nebel / frost
+var strike_t := 0.0        # Timer fuer Gewitter-Blitze
 
 func _ready() -> void:
 	rng.randomize()
@@ -35,6 +38,7 @@ func reset_run() -> void:
 	for r in range(rows):
 		mowers.append({"row": r, "x": float(Game.LAWN_X - 30), "active": false, "used": false})
 	sky_timer = 5.0; to_spawn = 0; idle_timer = 6.0; hazard_timer = 9.0; msg = "Bereit!"; msg_t = 2.0
+	weather = "klar"; strike_t = 0.0
 
 # Reihen nachziehen, wenn neue freigeschaltet wurden (mid-run kaufbar)
 func _sync_rows() -> void:
@@ -48,6 +52,7 @@ func start_wave() -> void:
 	if Game.phase != "prep": return
 	Game.wave += 1
 	Game.phase = "fight"
+	_roll_weather()
 	_sync_rows()
 	to_spawn = BAL.WAVE_BASE + int(Game.wave * BAL.WAVE_PER) + int(Game.wave / 6.0) * Game.lanes_count()
 	spawn_timer = 0.5
@@ -63,6 +68,38 @@ func start_wave() -> void:
 	elif Game.wave == BAL.MINIBOSS_WAVE:
 		_spawn("miniboss")
 	msg = "Welle %d startet!" % Game.wave; msg_t = 1.6
+
+func _roll_weather() -> void:
+	# Boss-Wellen behalten ihr thematisches Wetter dem Boss ueberlassen -> klar
+	if BAL.is_boss_wave(Game.wave):
+		weather = "klar"; strike_t = 2.0; return
+	var r := rng.randf()
+	if r < 0.45: weather = "klar"
+	elif r < 0.63: weather = "gewitter"
+	elif r < 0.81: weather = "nebel"
+	else: weather = "frost"
+	strike_t = 2.0
+	if weather != "klar":
+		msg = "Wetter: %s!" % weather_name(); msg_t = 2.2
+
+func weather_name() -> String:
+	match weather:
+		"gewitter": return "Gewitter"
+		"nebel": return "Nebel"
+		"frost": return "Frost"
+		_: return "Klar"
+
+func weather_hud() -> String:
+	return "" if weather == "klar" else "  ·  " + weather_name()
+
+func _storm_strike() -> void:
+	var alive := []
+	for z in zombies:
+		if z.hp > 0: alive.append(z)
+	if alive.is_empty(): return
+	var t = alive[rng.randi() % alive.size()]
+	t.hp -= 70.0
+	fx.append({"t": "bolt", "x": t.x, "y": float(Game.LAWN_Y - 50), "x2": t.x, "y2": t.y, "life": 0.28})
 
 func _end_wave() -> void:
 	if Game.wave >= 100:
@@ -137,6 +174,12 @@ func _update(dt: float) -> void:
 		var x := Game.LAWN_X + 40 + rng.randf() * (Game.COLS * Game.CELL - 80)
 		var val := int(round(25 * (0.5 if wo.night else 1.0)))
 		suns.append({"x": x, "y": float(Game.LAWN_Y - 10), "ty": Game.LAWN_Y + 50 + rng.randf() * (rows * Game.CELL - 120), "vy": 70.0, "value": val, "falling": true, "life": 12.0})
+	# Wetter: Gewitter schlaegt Blitze auf Zombies (Blitz-Synergie)
+	if weather == "gewitter" and not zombies.is_empty():
+		strike_t -= dt
+		if strike_t <= 0:
+			strike_t = rng.randf_range(1.8, 3.0)
+			_storm_strike()
 	# Wellensteuerung
 	if Game.phase == "fight":
 		spawn_timer -= dt
@@ -189,6 +232,7 @@ func _update(dt: float) -> void:
 		if float(s.get("zap", 0.0)) > 0.0:
 			p["zap_t"] = float(p.get("zap_t", 0.0)) + dt
 			var zap_iv := 2.0 if float(s.get("zap", 0.0)) >= 2.0 else 3.0
+			if weather == "gewitter": zap_iv *= 0.5   # Gewitter-Synergie: doppelt so oft zappen
 			if p.zap_t >= zap_iv:
 				p.zap_t = 0.0
 				_zap_random(p)
@@ -203,6 +247,7 @@ func _update(dt: float) -> void:
 		if float(s.get("aimbot", 0.0)) > 0.0:
 			p["aim_t"] = float(p.get("aim_t", 0.0)) + dt
 			var aim_iv := 1.0 if float(s.get("aimbot", 0.0)) >= 2.0 else 1.5
+			if weather == "gewitter": aim_iv *= 0.6   # Gewitter-Synergie: Katze zielt schneller
 			if p.aim_t >= aim_iv:
 				p.aim_t = 0.0
 				_cattail_fire(p)
@@ -264,7 +309,9 @@ func _update(dt: float) -> void:
 			if z.ability_t >= 6.0:
 				z.ability_t = 0.0
 				_boss_ability(z)
-		var sl := 0.5 if z.slow > 0 else 1.0
+		var sl := 1.0
+		if z.slow > 0: sl = 0.4 if weather == "frost" else 0.5   # Frost verstaerkt Slows
+		elif weather == "frost": sl = 0.85                        # Frost bremst generell
 		var tgt = null
 		for p in plants:
 			if p.arch == "spike" or p.arch == "bomb": continue
@@ -351,8 +398,10 @@ func _update(dt: float) -> void:
 		if fx[i].life <= 0: fx.remove_at(i)
 
 func _lane_has(p) -> bool:
+	var maxx := 1.0e9
+	if weather == "nebel": maxx = p.x + 4.0 * Game.CELL   # Nebel verkuerzt die Sicht der Schuetzen
 	for z in zombies:
-		if z.row == p.row and z.x > p.x - 10 and z.hp > 0: return true
+		if z.row == p.row and z.x > p.x - 10 and z.x < maxx and z.hp > 0: return true
 	return false
 
 func _shoot(p) -> void:
@@ -602,6 +651,11 @@ func _draw() -> void:
 			draw_rect(Rect2(Game.LAWN_X + c * Game.CELL, Game.LAWN_Y + r * Game.CELL, Game.CELL, Game.CELL), g)
 	if wo.night: draw_rect(Rect2(Game.LAWN_X, Game.LAWN_Y, Game.COLS * Game.CELL, rows * Game.CELL), Color(0.08,0.12,0.25,0.30))
 	if wo.get("roof", false): draw_rect(Rect2(Game.LAWN_X, Game.LAWN_Y, Game.COLS * Game.CELL, rows * Game.CELL), Color(0.5,0.35,0.18,0.14))
+	# Wetter-Overlay
+	var lawn_rect := Rect2(Game.LAWN_X, Game.LAWN_Y, Game.COLS * Game.CELL, rows * Game.CELL)
+	if weather == "nebel": draw_rect(lawn_rect, Color(0.82, 0.84, 0.88, 0.24))
+	elif weather == "frost": draw_rect(lawn_rect, Color(0.55, 0.72, 1.0, 0.15))
+	elif weather == "gewitter": draw_rect(lawn_rect, Color(0.12, 0.12, 0.28, 0.22))
 	draw_rect(Rect2(Game.LAWN_X - 14, Game.LAWN_Y, 9, rows * Game.CELL), Color(0.42,0.32,0.62))
 	# Rasenmäher
 	for m in mowers:

@@ -89,7 +89,7 @@ func _process(_delta: float) -> void:
 	sun_lbl.text = "Sonne  %d" % int(Game.sun)
 	fp_lbl.text = "FP  %d" % Game.fp
 	brain_lbl.text = "Gehirne  %d" % Game.brains
-	wave_lbl.text = "Welle %d / 100" % Game.wave
+	wave_lbl.text = "Welle %d / 100%s" % [Game.wave, lawn.weather_hud()]
 	wave_bar.queue_redraw()
 	if d_fp != null: d_fp.text = "%d FP" % Game.fp
 	msg_lbl.text = str(lawn.msg) if lawn.msg_t > 0 else ""
