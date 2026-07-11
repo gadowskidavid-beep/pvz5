@@ -237,7 +237,7 @@ func plant_bonus(slot: int) -> Dictionary:
 			else: b[key] = float(b[key]) + float(eff[key])
 	return b
 func _zero_bonus() -> Dictionary:
-	return {"dmg":0.0,"rate":0.0,"hp":0.0,"amount":0.0,"pierce":0.0,"splash":0.0,"range":0.0,"radius":0.0,"regen":0.0,"thorns":0.0,"faster":0.0,"extra_lanes":0.0,"lane_switch":0.0,"contact_dmg":0.0,"tall":0.0,"chill":0.0,"lightning_rod":0.0,"burn":false,"slow":false,"poison":false,"chain":false,"twin":false}
+	return {"dmg":0.0,"rate":0.0,"hp":0.0,"amount":0.0,"pierce":0.0,"splash":0.0,"range":0.0,"radius":0.0,"regen":0.0,"thorns":0.0,"faster":0.0,"extra_lanes":0.0,"lane_switch":0.0,"contact_dmg":0.0,"tall":0.0,"chill":0.0,"lightning_rod":0.0,"necro":0.0,"fire_death":0.0,"zap":0.0,"burn":false,"slow":false,"poison":false,"chain":false,"twin":false}
 
 func equip_req_ok(k: String) -> bool:
 	var r: String = EQUIP[k].req
@@ -298,6 +298,9 @@ func _compute(ck: String, b: Dictionary) -> Dictionary:
 		"tall": float(b.tall),
 		"chill": float(b.chill),
 		"lightning_rod": float(b.lightning_rod),
+		"necro": float(b.necro),
+		"fire_death": float(b.fire_death),
+		"zap": float(b.zap),
 	}
 	# Pflanzen-eigener Skill-Baum (einmalige Knoten) + Prestige + Run-Shop
 	s.dmg = round(s.dmg * (1.0 + b.dmg) * pres_dmg_mul() * run_dmg_mul() * em)

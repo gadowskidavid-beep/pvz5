@@ -9,6 +9,7 @@ var peas: Array = []
 var suns: Array = []
 var mowers: Array = []
 var fx: Array = []
+var graveyard: Array = []   # tote Pflanzen fuer Necromancer-Wiederbelebung
 var rng := RandomNumberGenerator.new()
 
 var to_spawn := 0
@@ -28,7 +29,7 @@ func world_of(w: int) -> Dictionary:
 
 func reset_run() -> void:
 	Game.rebirth()
-	plants.clear(); zombies.clear(); peas.clear(); suns.clear(); fx.clear()
+	plants.clear(); zombies.clear(); peas.clear(); suns.clear(); fx.clear(); graveyard.clear()
 	rows = Game.lanes_count()
 	mowers.clear()
 	for r in range(rows):
@@ -160,13 +161,28 @@ func _update(dt: float) -> void:
 			else:
 				ph.hp -= BAL.HAZARD_DMG
 				fx.append({"t": "boom", "x": ph.x, "y": ph.y, "life": 0.3})
-				if ph.hp <= 0: plants.erase(ph)
+				if ph.hp <= 0: _plant_dies(ph)
 				msg = "Umwelt-Schaden!"; msg_t = 1.0
 	# Pflanzen
+	var revived: Array = []   # Necromancer-Wiederbelebungen (erst nach der Schleife einfuegen)
 	for p in plants:
 		var s = p.s
 		if float(s.get("regen", 0.0)) > 0.0 and p.hp < p.maxhp:
 			p.hp = min(p.maxhp, p.hp + float(s.regen) * dt)
+		# Blitzstrahl-Sonnenblume: zappt regelmaessig einen Zombie
+		if float(s.get("zap", 0.0)) > 0.0:
+			p["zap_t"] = float(p.get("zap_t", 0.0)) + dt
+			var zap_iv := 2.0 if float(s.get("zap", 0.0)) >= 2.0 else 3.0
+			if p.zap_t >= zap_iv:
+				p.zap_t = 0.0
+				_zap_random(p)
+		# Necromancer-Sonnenblume: belebt regelmaessig eine tote Pflanze wieder
+		if float(s.get("necro", 0.0)) > 0.0 and not graveyard.is_empty():
+			p["necro_t"] = float(p.get("necro_t", 0.0)) + dt
+			if p.necro_t >= 8.0:
+				p.necro_t = 0.0
+				var rev = _necro_revive()
+				if rev != null: revived.append(rev)
 		if p.arch == "bomb":
 			p.fuse -= dt
 			if p.fuse <= 0 and not p.done: _bomb(p); p.done = true
@@ -182,6 +198,9 @@ func _update(dt: float) -> void:
 			if p.t >= s.shot_int and _lane_has(p): p.t = 0.0; _fume(p)
 		elif p.arch == "lobber":
 			if p.t >= s.shot_int and _lane_has(p): p.t = 0.0; _lob(p)
+	for rp in revived:
+		plants.append(rp)
+		fx.append({"t": "boom", "x": rp.x, "y": rp.y, "life": 0.3})
 	# Erbsen
 	for i in range(peas.size() - 1, -1, -1):
 		var pe = peas[i]
@@ -226,7 +245,7 @@ func _update(dt: float) -> void:
 		elif tgt != null and z.smash:
 			# Smasher/Boss zerschmettert die Pflanze sofort -> Meta muss sich anpassen
 			var px = tgt.x; var py = tgt.y
-			plants.erase(tgt)
+			_plant_dies(tgt)
 			fx.append({"t": "boom", "x": px, "y": py, "life": 0.28})
 		elif tgt != null and float(tgt.s.get("lane_switch", 0.0)) > 0.0 and not z.switched and not z.boss and not z.final:
 			# Untote Nuss: schmeckt so ekelhaft, dass der Zombie angewidert die Lane wechselt
@@ -243,7 +262,7 @@ func _update(dt: float) -> void:
 			else:
 				# keine Nachbar-Lane frei -> normal fressen
 				tgt.hp -= z.dmg * dt
-				if tgt.hp <= 0: plants.erase(tgt)
+				if tgt.hp <= 0: _plant_dies(tgt)
 		elif tgt != null:
 			tgt.hp -= z.dmg * dt
 			if float(tgt.s.get("thorns", 0.0)) > 0.0:
@@ -259,7 +278,7 @@ func _update(dt: float) -> void:
 			# Eisnuss: verlangsamt Angreifer
 			if float(tgt.s.get("chill", 0.0)) > 0.0:
 				z.slow = max(z.slow, 1.5)
-			if tgt.hp <= 0: plants.erase(tgt)
+			if tgt.hp <= 0: _plant_dies(tgt)
 		else:
 			z.x -= z.speed * sl * dt
 		if z.x < Game.LAWN_X + 10:
@@ -360,6 +379,48 @@ func _chain(z, dmg) -> void:
 	for i in range(min(2, others.size())):
 		others[i].hp -= dmg * 0.5
 		fx.append({"t": "bolt", "x": z.x, "y": z.y, "x2": others[i].x, "y2": others[i].y, "life": 0.2})
+
+# ---- Element-Effekte der Sonnenblume ----
+
+func _plant_dies(p) -> void:
+	# Feuerblume: entzuendet beim Tod Zombies in der Naehe (Zuenderholz = groesser)
+	var fd := float(p.s.get("fire_death", 0.0))
+	if fd > 0.0:
+		var rr := (1.1 + 0.4 * fd) * Game.CELL
+		for z in zombies:
+			if z.hp > 0 and Vector2(z.x, z.y).distance_to(Vector2(p.x, p.y)) < rr:
+				z.hp -= 35.0 * fd
+				z.burn = max(z.burn, 3.0)
+		fx.append({"t": "boom", "x": p.x, "y": p.y, "life": 0.35})
+	# Nicht-Bomben landen im Friedhof (Necromancer kann sie wiederbeleben)
+	if p.arch != "bomb":
+		graveyard.append({"ck": p.ck, "arch": p.arch, "row": p.row, "col": p.col, "x": p.x, "y": p.y, "s": p.s, "maxhp": p.maxhp})
+		if graveyard.size() > 12: graveyard.pop_front()
+	plants.erase(p)
+
+func _tile_free(row: int, col: int) -> bool:
+	for p in plants:
+		if p.row == row and p.col == col: return false
+	return true
+
+func _necro_revive():
+	# neueste tote Pflanze zuerst, deren Kachel wieder frei ist
+	while not graveyard.is_empty():
+		var g = graveyard.pop_back()
+		if _tile_free(int(g.row), int(g.col)):
+			return {"ck": g.ck, "arch": g.arch, "row": int(g.row), "col": int(g.col), "x": g.x, "y": g.y, "hp": float(g.maxhp) * 0.5, "maxhp": float(g.maxhp), "s": g.s, "t": 0.0, "fuse": (0.7 if g.arch == "bomb" else 0.0), "done": false}
+	return null
+
+func _zap_random(p) -> void:
+	var alive := []
+	for z in zombies:
+		if z.hp > 0: alive.append(z)
+	if alive.is_empty(): return
+	var zapv := float(p.s.get("zap", 1.0))
+	var t = alive[rng.randi() % alive.size()]
+	t.hp -= 40.0 * zapv
+	t.slow = max(t.slow, 0.6)
+	fx.append({"t": "bolt", "x": p.x, "y": p.y, "x2": t.x, "y2": t.y, "life": 0.2})
 
 func _mow(row: int) -> bool:
 	for m in mowers:
