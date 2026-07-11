@@ -466,6 +466,11 @@ func _unlock_plant(ck: String) -> void:
 func _buy_garage() -> void:
 	if Game.buy_garage(): _rebuild_drawer(); refresh_seeds()
 
+func _buy_lane() -> void:
+	if Game.buy_lane():
+		lawn._sync_rows()          # neue Reihe sofort sichtbar (inkl. Maeher)
+		_rebuild_drawer(); refresh_seeds()
+
 func _build_seed_header(holder, ck: String) -> void:
 	var owned := 0
 	var total := 0
@@ -1166,6 +1171,13 @@ func _build_general(vb) -> void:
 	_header(vb, "HAUPT-LABOR  —  Sonnen-Baum", Color(1, 0.85, 0.4))
 	_header(vb, "Mitte = Garage (Sonne) · Strahlen = Pflanzen (FP) · Mausrad zoomt, Ziehen schaut um", Color(0.66, 0.78, 0.68))
 	_build_sun_tree(vb)
+	# ---- Rasen-Reihen (FP) ----
+	_header(vb, "Rasen-Reihen (FP)  —  aktuell %d / %d" % [Game.lanes_count(), Game.LANE_MAX], Color(0.6, 0.9, 0.6))
+	var gl := _grid(vb, 2)
+	if Game.lane_count_max():
+		_card(gl, "* Alle Reihen frei", "%d / %d Reihen aktiv" % [Game.LANE_MAX, Game.LANE_MAX], "", false, Callable())
+	else:
+		_card(gl, "Neue Rasen-Reihe", "Schaltet die naechste Reihe frei (max %d)" % Game.LANE_MAX, "FP %d" % Game.lane_cost(), Game.fp >= Game.lane_cost(), _buy_lane)
 	_header(vb, "Ausruestung (FP)", Color(0.55, 0.7, 1))
 	var g3 := _grid(vb, 3)
 	for k in Game.EQ_ORDER:

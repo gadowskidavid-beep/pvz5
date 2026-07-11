@@ -113,6 +113,7 @@ var place_slot := 0               # welcher Slot ist zum Setzen gewaehlt (-1 = H
 var run_shop := {}
 var lure := 0                     # Lockstoff-Stufe: Idle-Zombies zwischen Wellen
 var god := false                  # Dev: Rasen kann nicht verloren gehen
+var lanes_bought := 0             # zusaetzliche Rasen-Reihen (mit FP gekauft, Start = 1 Reihe)
 var plants_unlocked := {}         # Set: Chain-Key -> true (mit FP im Labor freigeschaltet)
 var garage := false               # Garage/Labor frei (mit Sonne) -> Fokus-Baeume nutzbar
 var tutorial_done := false        # Rasenmaeher-Intro (Welle 1) erledigt
@@ -147,9 +148,17 @@ func pres_cost(k: String) -> int:
 	return int(ceil(p.base * pow(p.g, pres_lvl(k))))
 func field_lanes() -> int:
 	return (1 if has("f_lane2") else 0) + (1 if has("f_lane3") else 0)
+const LANE_MAX := 5
 func lanes_count() -> int:
-	# Immer 5 Rasen-Reihen (klassisches PvZ-Layout)
-	return 5
+	return clampi(1 + lanes_bought, 1, LANE_MAX)   # Start = 1 Reihe, bis 5 mit FP freischaltbar
+func lane_count_max() -> bool: return lanes_count() >= LANE_MAX
+func lane_cost() -> int: return int(30 * pow(2.0, lanes_bought))   # 30, 60, 120, 240
+func buy_lane() -> bool:
+	if lane_count_max(): return false
+	var c := lane_cost()
+	if fp < c: return false
+	fp -= c; lanes_bought += 1
+	return true
 func start_sun() -> int: return 50 + 25 * pres_lvl("sun")   # genug fuer die erste Sonnenblume
 
 # ---- Fortschritt: Pflanzen mit FP freischalten, Garage mit Sonne ----
@@ -396,6 +405,7 @@ func rebirth() -> void:
 	plants_unlocked = {}
 	garage = false
 	tutorial_done = false
+	lanes_bought = 0
 	shovel = false
 	edit_slot = 0
 	seeds = []
