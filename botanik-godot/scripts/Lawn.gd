@@ -595,7 +595,11 @@ func _kill(z) -> void:
 		var bc := int(max(1, round(z.brain * Game.brain_mul() * rew)))
 		Game.brains += bc; Game.save_game()
 		msg = "Gehirn erbeutet! +%d" % bc; msg_t = 1.5
-	Game.fp += int(max(1, round(z.fp * Game.fp_mul() * rew)))
+	var fpg := int(max(1, round(z.fp * Game.fp_mul() * rew)))
+	if rng.randf() < Game.loot_chance():
+		fpg *= 2
+		fx.append({"t": "boom", "x": z.x, "y": z.y - 20, "life": 0.25})   # Gluecks-Beute!
+	Game.fp += fpg
 	Game.coins += int(max(1, round((1 + Game.wave * 0.08 + (8 if z.boss else 0)) * Game.coin_mul() * rew)))
 
 func _lose() -> void:

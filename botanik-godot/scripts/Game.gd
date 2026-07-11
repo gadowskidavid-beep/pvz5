@@ -29,8 +29,9 @@ var RESEARCH := {
 	"r_click": {"n":"Klick-Kraft","base":5,"g":1.26,"per":6,"kind":"add","d":"+6 Klick-Schaden (Faust)"},
 	"r_coin":  {"n":"Münzausbeute","base":9,"g":1.34,"per":0.12,"kind":"pct","d":"+12% Münzen"},
 	"r_fp":    {"n":"Forschungsdrang","base":14,"g":1.45,"per":0.10,"kind":"pct","d":"+10% FP von Zombies"},
+	"r_loot":  {"n":"Glücksbringer","base":18,"g":1.5,"per":0.08,"kind":"pct","d":"+8% Chance auf doppelte FP-Beute (Dropchance)"},
 }
-var RES_ORDER := ["r_click","r_coin","r_fp"]
+var RES_ORDER := ["r_click","r_coin","r_fp","r_loot"]
 
 # ---- EQUIP (einmalig, FP) ----
 var EQUIP := {
@@ -179,6 +180,7 @@ func click_dmg() -> int:
 func coin_mul() -> float:
 	return res_mul("r_coin") * (1.0 + 0.5 * int(run_shop.get("s_coin", 0)))
 func fp_mul() -> float: return res_mul("r_fp")
+func loot_chance() -> float: return min(0.9, 0.08 * res_lvl("r_loot"))   # Chance auf doppelte FP-Beute
 func has_click_coin() -> bool: return has("e_clickcoin")
 func mower_fix() -> bool: return has("f_mowerfix")
 func risk_level() -> int: return 0
