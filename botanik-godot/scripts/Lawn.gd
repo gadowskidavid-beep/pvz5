@@ -201,8 +201,8 @@ func _update(dt: float) -> void:
 	# Zombies
 	for i in range(zombies.size() - 1, -1, -1):
 		var z = zombies[i]
-		if z.burn > 0: z.hp -= 8.0 * dt; z.burn -= dt
-		if z.poison > 0: z.hp -= 9.0 * dt; z.poison -= dt
+		if z.burn > 0: z.hp -= 8.0 * dt * Game.elem_boost("burn"); z.burn -= dt
+		if z.poison > 0: z.hp -= 9.0 * dt * Game.elem_boost("poison"); z.poison -= dt
 		if z.slow > 0: z.slow -= dt
 		if z.hp <= 0: _kill(z); zombies.remove_at(i); continue
 		var sl := 0.5 if z.slow > 0 else 1.0
@@ -301,7 +301,7 @@ func _bomb(p) -> void:
 
 func _apply_fx(z, effects, dmg) -> void:
 	for e in effects:
-		if e == "slow": z.slow = 3.0
+		if e == "slow": z.slow = 3.0 * Game.elem_boost("slow")
 		elif e == "burn": z.burn = 4.0
 		elif e == "poison": z.poison = 5.0
 		elif e == "chain": _chain(z, dmg)
@@ -312,7 +312,7 @@ func _chain(z, dmg) -> void:
 		if o != z and o.hp > 0: others.append(o)
 	others.sort_custom(func(a, b): return Vector2(a.x,a.y).distance_to(Vector2(z.x,z.y)) < Vector2(b.x,b.y).distance_to(Vector2(z.x,z.y)))
 	for i in range(min(2, others.size())):
-		others[i].hp -= dmg * 0.5
+		others[i].hp -= dmg * 0.5 * Game.elem_boost("chain")
 		fx.append({"t": "bolt", "x": z.x, "y": z.y, "x2": others[i].x, "y2": others[i].y, "life": 0.2})
 
 func _mow(row: int) -> bool:

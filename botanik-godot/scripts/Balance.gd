@@ -201,3 +201,36 @@ const PLANT_TREES := {
 		"schock":  {"n":"Frostschock","d":"Legendär · Eisblitz springt auf mehrere Zombies. Cooldown: 35 Sek.","cost":85,"req":"dmg3","pos":Vector2(0,4),"eff":{"chain":true},"rare":true,"cd":35},
 	}},
 }
+
+
+# ================================================================
+# ELEMENT-TREE (gemeinsam fuer ALLE Chains, Waehrung: FP)
+# Waechst von der Mitte in 4 Richtungen. Schaltet die Element-Mutationen
+# der Pflanzen frei (Gate) und verstaerkt die Element-Effekte.
+# "bis zur Mutation dauert es" -> erste Element-Knoten sind teuer.
+# Richtungen: FEUER (rechts +x), EIS (links -x), BLITZ (oben +y), UNTOD (unten -y)
+# id-Praefix = Richtung (feuer/eis/blitz/untod) -> steuert Boost-Zaehlung.
+# ================================================================
+const ELEMENT_TREE := {
+	"root":   {"n":"Mutations-Kern","d":"Zentrum. Waehle eine Element-Richtung, in die du investierst.","cost":0,"req":"","pos":Vector2(0,0),"eff":{}},
+	# --- FEUER (rechts) — Zerstoerung/Brand ---
+	"feuer1": {"n":"Feuer: Zündung","d":"Schaltet FEUER-Mutationen aller Pflanzen frei (Brand-Knoten).","cost":40,"req":"root","pos":Vector2(1,0),"eff":{}},
+	"feuer2": {"n":"Feuer: Lodern","d":"+35% Feuer-Schaden ueber Zeit.","cost":70,"req":"feuer1","pos":Vector2(2,0),"eff":{}},
+	"feuer3": {"n":"Feuer: Feuersturm","d":"+35% Feuer-Schaden.","cost":115,"req":"feuer2","pos":Vector2(3,0),"eff":{}},
+	"feuer4": {"n":"Feuer: Inferno","d":"Legendär · massiver Feuer-Boost. Synergie mit dem Feuerboss.","cost":180,"req":"feuer3","pos":Vector2(4,0),"eff":{},"rare":true},
+	# --- EIS (links) — Kontrolle/Kaelte ---
+	"eis1":   {"n":"Eis: Frost","d":"Schaltet EIS-Mutationen aller Pflanzen frei (Verlangsamung).","cost":40,"req":"root","pos":Vector2(-1,0),"eff":{}},
+	"eis2":   {"n":"Eis: Raureif","d":"+35% laengere Verlangsamung.","cost":70,"req":"eis1","pos":Vector2(-2,0),"eff":{}},
+	"eis3":   {"n":"Eis: Blizzard","d":"+35% laengere Verlangsamung.","cost":115,"req":"eis2","pos":Vector2(-3,0),"eff":{}},
+	"eis4":   {"n":"Eis: Absoluter Nullpunkt","d":"Legendär · massive Kaelte. Synergie mit dem Eisboss.","cost":180,"req":"eis3","pos":Vector2(-4,0),"eff":{},"rare":true},
+	# --- BLITZ (oben) — Sturm/Elektrizitaet ---
+	"blitz1": {"n":"Blitz: Funke","d":"Schaltet BLITZ-Mutationen aller Pflanzen frei (Kettenblitz).","cost":45,"req":"root","pos":Vector2(0,1),"eff":{}},
+	"blitz2": {"n":"Blitz: Ladung","d":"+35% Kettenblitz-Schaden.","cost":75,"req":"blitz1","pos":Vector2(0,2),"eff":{}},
+	"blitz3": {"n":"Blitz: Gewitter","d":"+35% Kettenblitz-Schaden.","cost":120,"req":"blitz2","pos":Vector2(0,3),"eff":{}},
+	"blitz4": {"n":"Blitz: Sturmherr","d":"Legendär · Gewitter wird zur Chance. Synergie mit dem Blitzboss.","cost":185,"req":"blitz3","pos":Vector2(0,4),"eff":{},"rare":true},
+	# --- UNTOD (unten) — Verfall/Gift ---
+	"untod1": {"n":"Untod: Verwesung","d":"Schaltet UNTOD-Mutationen aller Pflanzen frei (Gift).","cost":45,"req":"root","pos":Vector2(0,-1),"eff":{}},
+	"untod2": {"n":"Untod: Faeulnis","d":"+35% Gift-Schaden.","cost":75,"req":"untod1","pos":Vector2(0,-2),"eff":{}},
+	"untod3": {"n":"Untod: Seuche","d":"+35% Gift-Schaden.","cost":120,"req":"untod2","pos":Vector2(0,-3),"eff":{}},
+	"untod4": {"n":"Untod: Nekromantie","d":"Legendär · dunkle Macht. Synergie mit dem finalen Untoten.","cost":185,"req":"untod3","pos":Vector2(0,-4),"eff":{},"rare":true},
+}

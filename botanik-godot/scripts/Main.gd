@@ -385,6 +385,7 @@ func _rebuild_drawer() -> void:
 	for ck in Game.CH_ORDER:
 		var lbl: String = ("* " + Game.CHASSIS[ck].n) if Game.is_active(ck) else Game.CHASSIS[ck].n
 		_tab(d_tabs, lbl, ck)
+	_tab(d_tabs, "Element", "element")
 	_tab(d_tabs, "Spiel", "spiel")
 	_tab(d_tabs, "Zombies", "zombies")
 	# Baum-Bereich
@@ -396,6 +397,8 @@ func _rebuild_drawer() -> void:
 		_build_general(holder)
 	elif _tree_sel == "zombies":
 		_build_ztab(holder)
+	elif _tree_sel == "element":
+		_build_element(holder)
 	else:
 		if not Game.CHASSIS.has(_tree_sel): _tree_sel = "sonne"
 		var ck: String = _tree_sel
@@ -419,6 +422,14 @@ func _rebuild_drawer() -> void:
 		holder.add_child(arow)
 		_build_tree_canvas(holder, ck)
 	_rebuild_info()
+
+func _build_element(holder) -> void:
+	var el := Label.new()
+	el.text = "ELEMENT-MUTATIONEN (FP)  —  waechst in 4 Richtungen: BLITZ (oben) · UNTOD (unten) · FEUER (rechts) · EIS (links). Schaltet & verstaerkt die Element-Knoten ALLER Pflanzen. Bosse: Feuer/Eis/Blitz — Finale: der Untote."
+	el.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	el.custom_minimum_size = Vector2(620, 0); el.modulate = Color(0.85, 0.85, 0.7)
+	holder.add_child(el)
+	_build_tree_canvas(holder, "element")
 
 func _chain_action_button(parent, ck: String) -> void:
 	var b := Button.new()
@@ -491,7 +502,7 @@ func _buy_selected() -> void:
 func _rebuild_info() -> void:
 	for c in d_info.get_children(): c.queue_free()
 	_big(d_info, "Info", 18, COL_ACCENT)
-	if info_ck == "" or not BAL.PLANT_TREES.has(info_ck) or _tree_sel == "spiel" or _tree_sel == "zombies":
+	if info_ck == "" or Game.tree_nodes(info_ck).is_empty() or _tree_sel == "spiel" or _tree_sel == "zombies":
 		var h := Label.new(); h.text = "Klicke einen Skill-Knoten, um Name, Effekt und Kosten zu sehen."
 		h.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; h.custom_minimum_size = Vector2(280, 0); h.modulate = Color(0.7, 0.78, 0.72)
 		d_info.add_child(h); return
@@ -526,9 +537,15 @@ func _rebuild_info() -> void:
 			var w := Label.new(); w.text = "Zu wenig FP (%d / %d)" % [Game.fp, cost]; w.modulate = Color(1, 0.6, 0.5)
 			d_info.add_child(w)
 	else:
-		var reqk := Game.pt_req(info_ck, info_node)
-		var reqn: String = str(nodes.get(reqk, {}).get("n", reqk))
-		var l := Label.new(); l.text = "Gesperrt — schalte zuerst frei:\n%s" % reqn
+		var txt := ""
+		var miss: String = Game.elem_missing(nd.get("eff", {})) if info_ck != "element" else ""
+		if miss != "":
+			txt = "Gesperrt — schalte zuerst das Element frei: %s  (im Tab Element)" % miss
+		else:
+			var reqk := Game.pt_req(info_ck, info_node)
+			var reqn: String = str(nodes.get(reqk, {}).get("n", reqk))
+			txt = "Gesperrt — schalte zuerst frei:\n%s" % reqn
+		var l := Label.new(); l.text = txt
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; l.custom_minimum_size = Vector2(280, 0); l.modulate = Color(0.85, 0.72, 0.5)
 		d_info.add_child(l)
 
@@ -539,16 +556,18 @@ func _build_tree_canvas(parent, ck: String) -> void:
 	var minc := 0.0
 	var maxc := 0.0
 	var maxr := 0.0
+	var minr := 0.0
 	for id in nodes:
 		var p = nodes[id].pos
-		minc = min(minc, p.x); maxc = max(maxc, p.x); maxr = max(maxr, p.y)
+		minc = min(minc, p.x); maxc = max(maxc, p.x)
+		maxr = max(maxr, p.y); minr = min(minr, p.y)
 	var z := _tree_zoom
 	var sx := 190.0 * z
 	var sy := 122.0 * z
 	var width := (maxc - minc) * sx + 340.0 * z
-	var height := maxr * sy + 200.0 * z
+	var height := (maxr - minr) * sy + 200.0 * z
 	var ox := -minc * sx + 170.0 * z
-	var oy := height - 96.0 * z
+	var oy := maxr * sy + 100.0 * z
 	_tree_px = {}
 	for id in nodes:
 		var pp = nodes[id].pos
@@ -889,6 +908,10 @@ func _dev_unlock_all() -> void:
 		if not Game.ptree.has(ck): Game.ptree[ck] = {}
 		for node in Game.tree_nodes(ck):
 			if node != "root": Game.ptree[ck][node] = true
+	# Element-Tree ebenfalls voll
+	if not Game.ptree.has("element"): Game.ptree["element"] = {}
+	for eid in BAL.ELEMENT_TREE:
+		if eid != "root": Game.ptree["element"][eid] = true
 	refresh_seeds(); _build_overlay_content("dev")
 
 func _dev_seen_all() -> void:

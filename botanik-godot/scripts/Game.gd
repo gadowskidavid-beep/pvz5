@@ -169,9 +169,10 @@ func buy_lure() -> bool:
 	return true
 # ---- Pflanzen-Skill-Tree Helfer (einmalige Knoten mit Pfaden) ----
 func tree_nodes(ck: String) -> Dictionary:
+	if ck == "element": return BAL.ELEMENT_TREE
 	return BAL.PLANT_TREES.get(ck, {}).get("nodes", {})
 func pt_owned(ck: String, node: String) -> bool:
-	if node == "root": return has(ck)
+	if node == "root": return ck == "element" or has(ck)
 	return ptree.get(ck, {}).has(node)
 func pt_node_cost(ck: String, node: String) -> int:
 	return int(tree_nodes(ck).get(node, {}).get("cost", 0))
@@ -181,7 +182,38 @@ func pt_can(ck: String, node: String) -> bool:
 	if pt_owned(ck, node): return false
 	if not tree_nodes(ck).has(node): return false
 	var r := pt_req(ck, node)
-	return r == "" or pt_owned(ck, r)
+	if not (r == "" or pt_owned(ck, r)): return false
+	# Element-Gate: Mutations-Knoten der Pflanzen brauchen erst den Element-Tree
+	if ck != "element":
+		var eff = tree_nodes(ck)[node].get("eff", {})
+		for kind in ["burn", "slow", "poison", "chain"]:
+			if eff.get(kind, false) and not elem_unlocked(kind): return false
+	return true
+
+# ---- Element-Tree (gemeinsam, gated + boostet Element-Effekte) ----
+func elem_unlocked(kind: String) -> bool:
+	if kind == "burn": return pt_owned("element", "feuer1")
+	if kind == "slow": return pt_owned("element", "eis1")
+	if kind == "poison": return pt_owned("element", "untod1")
+	if kind == "chain": return pt_owned("element", "blitz1")
+	return true
+func elem_missing(eff: Dictionary) -> String:
+	if eff.get("burn", false) and not elem_unlocked("burn"): return "Feuer"
+	if eff.get("slow", false) and not elem_unlocked("slow"): return "Eis"
+	if eff.get("poison", false) and not elem_unlocked("poison"): return "Untod"
+	if eff.get("chain", false) and not elem_unlocked("chain"): return "Blitz"
+	return ""
+func elem_boost(kind: String) -> float:
+	var pre := ""
+	if kind == "burn": pre = "feuer"
+	elif kind == "slow": pre = "eis"
+	elif kind == "poison": pre = "untod"
+	elif kind == "chain": pre = "blitz"
+	if pre == "": return 1.0
+	var n := 0
+	for id in ptree.get("element", {}):
+		if str(id).begins_with(pre): n += 1
+	return 1.0 + 0.35 * n
 func buy_pt(ck: String, node: String) -> bool:
 	if not pt_can(ck, node): return false
 	var c := pt_node_cost(ck, node)
