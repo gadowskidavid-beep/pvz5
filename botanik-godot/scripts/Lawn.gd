@@ -15,6 +15,7 @@ var to_spawn := 0
 var spawn_timer := 0.0
 var sky_timer := 5.0
 var idle_timer := 6.0
+var hazard_timer := 8.0
 var msg := ""
 var msg_t := 0.0
 
@@ -23,10 +24,7 @@ func _ready() -> void:
 	reset_run()
 
 func world_of(w: int) -> Dictionary:
-	if w >= 25: return {"name":"Teich","night":false,"pond":true,"g1":Color(0.14,0.31,0.39),"g2":Color(0.17,0.37,0.44)}
-	if w >= 20: return {"name":"Tag","night":false,"pond":false,"g1":Color(0.23,0.42,0.25),"g2":Color(0.27,0.49,0.29)}
-	if w >= 10: return {"name":"Nacht","night":true,"pond":false,"g1":Color(0.10,0.13,0.20),"g2":Color(0.12,0.17,0.24)}
-	return {"name":"Tag","night":false,"pond":false,"g1":Color(0.23,0.42,0.25),"g2":Color(0.27,0.49,0.29)}
+	return BAL.act_of(w)
 
 func reset_run() -> void:
 	Game.rebirth()
@@ -35,19 +33,34 @@ func reset_run() -> void:
 	mowers.clear()
 	for r in range(rows):
 		mowers.append({"row": r, "x": float(Game.LAWN_X - 30), "active": false, "used": false})
-	sky_timer = 5.0; to_spawn = 0; idle_timer = 6.0; msg = "Bereit!"; msg_t = 2.0
+	sky_timer = 5.0; to_spawn = 0; idle_timer = 6.0; hazard_timer = 9.0; msg = "Bereit!"; msg_t = 2.0
+
+# Reihen nachziehen, wenn neue freigeschaltet wurden (mid-run kaufbar)
+func _sync_rows() -> void:
+	var want := Game.lanes_count()
+	if want > rows:
+		for r in range(rows, want):
+			mowers.append({"row": r, "x": float(Game.LAWN_X - 30), "active": false, "used": false})
+		rows = want
 
 func start_wave() -> void:
 	if Game.phase != "prep": return
 	Game.wave += 1
 	Game.phase = "fight"
-	to_spawn = 3 + int(Game.wave * 1.6) + int(Game.wave / 6.0) * Game.lanes_count()
+	_sync_rows()
+	to_spawn = BAL.WAVE_BASE + int(Game.wave * BAL.WAVE_PER) + int(Game.wave / 6.0) * Game.lanes_count()
 	spawn_timer = 0.5
 	_spawn("flag")
 	to_spawn = max(0, to_spawn - 1)
-	if Game.wave == 100: _spawn("megaboss")
-	elif Game.wave == 9: _spawn("miniboss")
-	elif Game.wave % 15 == 0: _spawn("boss")
+	if BAL.is_boss_wave(Game.wave):
+		var bk := BAL.boss_key(Game.wave)
+		_spawn(bk)
+		to_spawn += int(Game.ZTYPES[bk].get("summon", 0))
+		var wo := world_of(Game.wave)
+		msg = "%s  —  BOSS: %s!" % [wo.name, Game.ZTYPES[bk].n]; msg_t = 3.0
+		return
+	elif Game.wave == BAL.MINIBOSS_WAVE:
+		_spawn("miniboss")
 	msg = "Welle %d startet!" % Game.wave; msg_t = 1.6
 
 func _end_wave() -> void:
@@ -70,27 +83,36 @@ func _spawn(kind: String) -> void:
 	var zhp := 1.0 + 0.15 * int(Game.zlab.str) + 0.13 * int(Game.zlab.arm)
 	var zspd := 1.0 + 0.08 * int(Game.zlab.spd)
 	var zdmg := 1.0 + 0.06 * int(Game.zlab.str)
-	var hp_mul := (1.0 + Game.wave * 0.09 + pow(Game.wave, 1.5) * 0.011) * zhp
+	var hp_mul := (1.0 + Game.wave * BAL.Z_HP_PER_WAVE + pow(Game.wave, BAL.Z_HP_POW) * BAL.Z_HP_POW_MUL) * zhp
 	var hp := float(b.hp) * hp_mul
 	zombies.append({
 		"kind": kind, "row": row, "x": float(Game.LAWN_X + Game.COLS * Game.CELL + 20),
 		"y": Game.LAWN_Y + row * Game.CELL + Game.CELL / 2.0,
-		"hp": hp, "maxhp": hp, "speed": float(b.speed) * (1.0 + Game.wave * 0.012) * zspd,
+		"hp": hp, "maxhp": hp, "speed": float(b.speed) * (1.0 + Game.wave * BAL.Z_SPD_PER_WAVE) * zspd,
 		"dmg": float(b.dmg) * zdmg, "col": b.col,
 		"boss": b.get("boss", false), "final": b.get("final", false), "vault": b.get("vault", false),
+		"smash": b.get("smash", false), "carrier": b.get("carrier", false),
 		"jumped": false, "fp": int(b.fp), "brain": int(b.get("brain", 0)),
 		"slow": 0.0, "burn": 0.0, "poison": 0.0, "dropped": false
 	})
 
 func _spawn_one() -> void:
-	var r := rng.randf()
-	var w := Game.wave
-	var k := "basic"
-	if w >= 2 and r > 0.62: k = "cone"
-	if w >= 4 and r > 0.82: k = "vaulter"
-	if w >= 6 and r > 0.90: k = "bucket"
-	if w >= 12 and r > 0.5: k = ("bucket" if r > 0.8 else "cone")
+	var act := world_of(Game.wave)
+	var k := _weighted(act.spawn)
+	# Gehirn-Traeger tauchen selten zusaetzlich auf (nur sie + Bosse droppen Gehirne)
+	if Game.wave >= BAL.BRAIN_MIN_WAVE and k != "brainz" and rng.randf() < BAL.BRAIN_CHANCE:
+		k = "brainz"
 	_spawn(k)
+
+func _weighted(table) -> String:
+	var total := 0
+	for e in table: total += int(e[1])
+	if total <= 0: return "basic"
+	var r := rng.randi() % total
+	for e in table:
+		r -= int(e[1])
+		if r < 0: return str(e[0])
+	return str(table[0][0])
 
 func item(name: String) -> void:
 	if name == "isun": Game.sun += 250
@@ -128,6 +150,16 @@ func _update(dt: float) -> void:
 		if idle_timer <= 0 and zombies.size() < Game.idle_cap():
 			idle_timer = rng.randf_range(5.0, 9.0)
 			_spawn("basic")
+	# Umwelt-Zerstoerung (Dachterrasse/Finstere Zone): beschaedigt zufaellige Pflanzen
+	if wo.get("hazard", false) and not plants.is_empty():
+		hazard_timer -= dt
+		if hazard_timer <= 0:
+			hazard_timer = rng.randf_range(BAL.HAZARD_MIN, BAL.HAZARD_MAX)
+			var ph = plants[rng.randi() % plants.size()]
+			ph.hp -= BAL.HAZARD_DMG
+			fx.append({"t": "boom", "x": ph.x, "y": ph.y, "life": 0.3})
+			if ph.hp <= 0: plants.erase(ph)
+			msg = "Umwelt-Schaden!"; msg_t = 1.0
 	# Pflanzen
 	for p in plants:
 		var s = p.s
@@ -181,6 +213,11 @@ func _update(dt: float) -> void:
 				z.hp -= float(p.s.dmg) * dt * 2.0
 		if tgt != null and z.vault and not z.jumped:
 			z.x = tgt.x - Game.CELL * 0.55; z.jumped = true
+		elif tgt != null and z.smash:
+			# Smasher/Boss zerschmettert die Pflanze sofort -> Meta muss sich anpassen
+			var px = tgt.x; var py = tgt.y
+			plants.erase(tgt)
+			fx.append({"t": "boom", "x": px, "y": py, "life": 0.28})
 		elif tgt != null:
 			tgt.hp -= z.dmg * dt
 			if tgt.hp <= 0: plants.erase(tgt)
@@ -287,6 +324,10 @@ func _kill(z) -> void:
 		Game.brains += b; Game.save_game()
 		fx.append({"t": "boom", "x": z.x, "y": z.y, "life": 0.4})
 		msg = "Boss besiegt! +%d Gehirne" % b; msg_t = 2.5
+	elif z.get("carrier", false) and int(z.get("brain", 0)) > 0:
+		var bc := int(max(1, round(z.brain * Game.brain_mul() * rew)))
+		Game.brains += bc; Game.save_game()
+		msg = "Gehirn erbeutet! +%d" % bc; msg_t = 1.5
 	Game.fp += int(max(1, round(z.fp * Game.fp_mul() * rew)))
 	Game.coins += int(max(1, round((1 + Game.wave * 0.08 + (8 if z.boss else 0)) * Game.coin_mul() * rew)))
 
@@ -356,6 +397,7 @@ func _draw() -> void:
 			else: g = (wo.g1 if (r + c) % 2 == 0 else wo.g2)
 			draw_rect(Rect2(Game.LAWN_X + c * Game.CELL, Game.LAWN_Y + r * Game.CELL, Game.CELL, Game.CELL), g)
 	if wo.night: draw_rect(Rect2(Game.LAWN_X, Game.LAWN_Y, Game.COLS * Game.CELL, rows * Game.CELL), Color(0.08,0.12,0.25,0.30))
+	if wo.get("roof", false): draw_rect(Rect2(Game.LAWN_X, Game.LAWN_Y, Game.COLS * Game.CELL, rows * Game.CELL), Color(0.5,0.35,0.18,0.14))
 	draw_rect(Rect2(Game.LAWN_X - 14, Game.LAWN_Y, 9, rows * Game.CELL), Color(0.42,0.32,0.62))
 	# Rasenmäher
 	for m in mowers:

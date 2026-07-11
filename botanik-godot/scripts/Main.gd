@@ -111,7 +111,7 @@ func _build_topbar() -> void:
 	wave_lbl.text = "WELLE 0 / 100"
 	wave_lbl.modulate = Color(0.98, 0.95, 0.7)
 	wave_lbl.add_theme_font_size_override("font_size", 24)
-	wave_lbl.position = Vector2(SCREEN_W - 220, 16)
+	wave_lbl.position = Vector2(SCREEN_W - 400, 16)
 	root.add_child(wave_lbl)
 	status_lbl = Label.new()
 	status_lbl.modulate = Color(0.8, 0.95, 0.8)
@@ -203,7 +203,8 @@ func refresh_top() -> void:
 	fp_lbl.text = "FP: %d" % Game.fp
 	coin_lbl.text = "Muenzen: %d" % Game.coins
 	brain_lbl.text = "Gehirne: %d" % Game.brains
-	wave_lbl.text = "WELLE %d / 100" % Game.wave
+	var wn: String = str(lawn.world_of(Game.wave).name)
+	wave_lbl.text = "WELLE %d / 100  —  %s" % [Game.wave, wn]
 	var sel_name: String = "Faust"
 	if Game.shovel:
 		sel_name = "Schaufel"

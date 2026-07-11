@@ -92,9 +92,13 @@ var ZTYPES := {
 	"cone":     {"n":"Hütchen-Zombie","hp":300,"speed":14,"dmg":40,"fp":2,"col":Color(0.6,0.5,0.4)},
 	"vaulter":  {"n":"Stangenspringer","hp":210,"speed":21,"dmg":40,"fp":3,"vault":true,"col":Color(0.5,0.6,0.55)},
 	"bucket":   {"n":"Eimer-Zombie","hp":560,"speed":12,"dmg":45,"fp":3,"col":Color(0.6,0.62,0.66)},
+	"brainz":   {"n":"Hirn-Träger","hp":240,"speed":18,"dmg":38,"fp":2,"brain":1,"carrier":true,"col":Color(0.62,0.42,0.72)},
+	"brute":    {"n":"Grobian","hp":460,"speed":12,"dmg":55,"fp":3,"smash":true,"col":Color(0.52,0.42,0.5)},
 	"miniboss": {"n":"Mini-Boss","hp":1500,"speed":11,"dmg":80,"fp":6,"boss":true,"brain":3,"col":Color(0.7,0.4,0.5)},
-	"boss":     {"n":"Gargantuar","hp":5000,"speed":9,"dmg":120,"fp":12,"boss":true,"brain":6,"col":Color(0.7,0.3,0.35)},
-	"megaboss": {"n":"Ober-Gargantuar","hp":26000,"speed":7,"dmg":220,"fp":60,"boss":true,"brain":35,"final":true,"col":Color(0.8,0.25,0.55)},
+	"boss_a":   {"n":"Garten-Gargantuar","hp":1200,"speed":9,"dmg":120,"fp":14,"boss":true,"brain":6,"smash":true,"col":Color(0.5,0.7,0.35)},
+	"boss_b":   {"n":"Sumpf-Koloss","hp":1400,"speed":11,"dmg":130,"fp":18,"boss":true,"brain":10,"summon":4,"col":Color(0.3,0.55,0.6)},
+	"boss_c":   {"n":"Dach-Zerstörer","hp":1700,"speed":10,"dmg":150,"fp":24,"boss":true,"brain":16,"smash":true,"col":Color(0.72,0.45,0.3)},
+	"megaboss": {"n":"Ober-Gargantuar","hp":2600,"speed":8,"dmg":220,"fp":60,"boss":true,"brain":35,"final":true,"smash":true,"summon":6,"col":Color(0.85,0.2,0.6)},
 }
 
 # ================================================================
