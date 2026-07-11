@@ -91,7 +91,8 @@ func _spawn(kind: String) -> void:
 		"boss": b.get("boss", false), "final": b.get("final", false), "vault": b.get("vault", false),
 		"smash": b.get("smash", false), "carrier": b.get("carrier", false),
 		"jumped": false, "fp": int(b.fp), "brain": int(b.get("brain", 0)),
-		"slow": 0.0, "burn": 0.0, "poison": 0.0, "dropped": false, "switched": false
+		"slow": 0.0, "burn": 0.0, "poison": 0.0, "dropped": false, "switched": false,
+		"element": str(b.get("element", "")), "ability_t": 0.0
 	})
 
 func _spawn_one() -> void:
@@ -170,6 +171,10 @@ func _update(dt: float) -> void:
 		var s = p.s
 		if float(s.get("regen", 0.0)) > 0.0 and p.hp < p.maxhp:
 			p.hp = min(p.maxhp, p.hp + float(s.regen) * dt)
+		# Vom Eisboss eingefroren: Pflanze macht nichts, bis sie auftaut
+		if float(p.get("frozen", 0.0)) > 0.0:
+			p["frozen"] = float(p.get("frozen", 0.0)) - dt
+			continue
 		# Nacht-Pilze wachsen bis zum Ablauf: staerker mit der Zeit, dann verschwinden sie
 		if str(Game.CHASSIS[p.ck].get("env", "any")) == "night":
 			p["age"] = float(p.get("age", 0.0)) + dt
@@ -192,6 +197,13 @@ func _update(dt: float) -> void:
 				p.necro_t = 0.0
 				var rev = _necro_revive()
 				if rev != null: revived.append(rev)
+		# Cattail/Katze (Blitzpad): zielt automatisch auf Zombies auf ALLEN Lanes
+		if float(s.get("aimbot", 0.0)) > 0.0:
+			p["aim_t"] = float(p.get("aim_t", 0.0)) + dt
+			var aim_iv := 1.0 if float(s.get("aimbot", 0.0)) >= 2.0 else 1.5
+			if p.aim_t >= aim_iv:
+				p.aim_t = 0.0
+				_cattail_fire(p)
 		if p.arch == "bomb":
 			p.fuse -= dt
 			if p.fuse <= 0 and not p.done: _bomb(p); p.done = true
@@ -241,6 +253,12 @@ func _update(dt: float) -> void:
 		if z.poison > 0: z.hp -= 9.0 * dt; z.poison -= dt
 		if z.slow > 0: z.slow -= dt
 		if z.hp <= 0: _kill(z); zombies.remove_at(i); continue
+		# Element-Boss-Faehigkeit (feuer/eis/blitz/untot)
+		if str(z.get("element", "")) != "":
+			z["ability_t"] = float(z.get("ability_t", 0.0)) + dt
+			if z.ability_t >= 6.0:
+				z.ability_t = 0.0
+				_boss_ability(z)
 		var sl := 0.5 if z.slow > 0 else 1.0
 		var tgt = null
 		for p in plants:
@@ -435,6 +453,50 @@ func _zap_random(p) -> void:
 	t.slow = max(t.slow, 0.6)
 	fx.append({"t": "bolt", "x": p.x, "y": p.y, "x2": t.x, "y2": t.y, "life": 0.2})
 
+# ---- Cattail / Katze (Blitzpad): trifft Zombies auf ALLEN Lanes ----
+func _cattail_fire(p) -> void:
+	var best = null
+	var bd := 1.0e9
+	for z in zombies:
+		if z.hp <= 0: continue
+		var d: float = Vector2(z.x, z.y).distance_to(Vector2(p.x, p.y))
+		if d < bd: bd = d; best = z
+	if best == null: return
+	var dmg := 40.0 * float(p.s.get("aimbot", 1.0))
+	best.hp -= dmg
+	_apply_fx(best, p.s.effects, dmg)
+	fx.append({"t": "bolt", "x": p.x, "y": p.y, "x2": best.x, "y2": best.y, "life": 0.22})
+
+# ---- Element-Boss-Faehigkeiten ----
+func _boss_ability(z) -> void:
+	var el := str(z.get("element", ""))
+	if el == "feuer":
+		# Flammensturm: verbrennt eine zufaellige Pflanze
+		if not plants.is_empty():
+			var pf = plants[rng.randi() % plants.size()]
+			pf.hp -= 140.0
+			fx.append({"t": "boom", "x": pf.x, "y": pf.y, "life": 0.4})
+			if pf.hp <= 0: _plant_dies(pf)
+		msg = "FEUERBOSS: Flammensturm!"; msg_t = 1.4
+	elif el == "eis":
+		# Vereisung: friert alle Pflanzen einer Reihe kurz ein
+		var lane := rng.randi() % rows
+		for pe in plants:
+			if pe.row == lane: pe["frozen"] = 4.0
+		msg = "EISBOSS: Reihe %d vereist!" % (lane + 1); msg_t = 1.4
+	elif el == "blitz":
+		# Einschlag: Blitz zerstoert/schaedigt eine zufaellige Pflanze
+		if not plants.is_empty():
+			var pb = plants[rng.randi() % plants.size()]
+			fx.append({"t": "bolt", "x": z.x, "y": z.y, "x2": pb.x, "y2": pb.y, "life": 0.28})
+			pb.hp -= 200.0
+			if pb.hp <= 0: _plant_dies(pb)
+		msg = "BLITZBOSS: Einschlag!"; msg_t = 1.4
+	elif el == "untot":
+		# Auferstehung: beschwoert zusaetzliche Zombies
+		to_spawn += 2
+		msg = "UNTOTER UEBERLORD: Auferstehung!"; msg_t = 1.4
+
 func _mow(row: int) -> bool:
 	for m in mowers:
 		if m.row == row and not m.used:
@@ -534,6 +596,7 @@ func _draw() -> void:
 	# Pflanzen
 	for p in plants:
 		var col: Color = Game.CHASSIS[p.ck].col
+		if float(p.get("frozen", 0.0)) > 0.0: col = col.lerp(Color(0.55, 0.8, 1.0), 0.55)
 		# Nacht-Pilze pulsieren/wachsen sichtbar mit ihrer Staerke
 		var pr := 28.0
 		if p.has("gm"): pr = 24.0 + 6.0 * (float(p.gm) - 1.0) / max(0.01, BAL.SHROOM_GROWTH_MAX - 1.0)

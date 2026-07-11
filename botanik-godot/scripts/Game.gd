@@ -42,7 +42,7 @@ var EQUIP := {
 	"f_mowerfix":   {"n":"Mäher-Werkstatt","fp":26,"req":"","d":"Mäher werden zwischen Wellen repariert"},
 	"e_clickcoin":  {"n":"Klick-Gold","fp":10,"req":"u_almanac","d":"Zombies anklicken gibt Münzen"},
 }
-var EQ_ORDER := ["u_almanac","u_shovel","u_zombiebook","f_lane2","f_lane3","f_mowerfix","e_clickcoin"]
+var EQ_ORDER := ["u_almanac","u_shovel","u_zombiebook","f_mowerfix","e_clickcoin"]   # f_lane2/f_lane3 entfernt: Rasen ist fest 5 Reihen
 
 # ---- IN-RUN LADEN (Münzen) ----
 var SHOP_ITEMS := {
@@ -71,7 +71,7 @@ var PRESTIGE := {
 	"hp":    {"n":"Zäh-Zellen","base":3,"g":1.45,"max":60,"d":"+8% Pflanzen-HP"},
 	"brain": {"n":"Gehirn-Gier","base":4,"g":1.55,"max":40,"d":"+15% Gehirne von Bossen"},
 }
-var PRES_ORDER := ["startpea","sunbloom","lane","sun","srate","dmg","hp","brain"]
+var PRES_ORDER := ["startpea","sunbloom","sun","srate","dmg","hp","brain"]   # "lane" entfernt: Rasen ist fest 5 Reihen
 
 # ---- ZOMBIES ----
 var ZTYPES := {
@@ -83,10 +83,10 @@ var ZTYPES := {
 	"brainz":   {"n":"Hirn-Träger","hp":240,"speed":18,"dmg":38,"fp":2,"brain":1,"carrier":true,"col":Color(0.62,0.42,0.72)},
 	"brute":    {"n":"Grobian","hp":460,"speed":12,"dmg":55,"fp":3,"smash":true,"col":Color(0.52,0.42,0.5)},
 	"miniboss": {"n":"Mini-Boss","hp":1500,"speed":11,"dmg":80,"fp":6,"boss":true,"brain":3,"col":Color(0.7,0.4,0.5)},
-	"boss_a":   {"n":"Garten-Gargantuar","hp":1200,"speed":9,"dmg":120,"fp":14,"boss":true,"brain":6,"smash":true,"col":Color(0.5,0.7,0.35)},
-	"boss_b":   {"n":"Sumpf-Koloss","hp":1400,"speed":11,"dmg":130,"fp":18,"boss":true,"brain":10,"summon":4,"col":Color(0.3,0.55,0.6)},
-	"boss_c":   {"n":"Dach-Zerstörer","hp":1700,"speed":10,"dmg":150,"fp":24,"boss":true,"brain":16,"smash":true,"col":Color(0.72,0.45,0.3)},
-	"megaboss": {"n":"Ober-Gargantuar","hp":2600,"speed":8,"dmg":220,"fp":60,"boss":true,"brain":35,"final":true,"smash":true,"summon":6,"col":Color(0.85,0.2,0.6)},
+	"boss_a":   {"n":"Flammen-Gargantuar","hp":1300,"speed":9,"dmg":120,"fp":14,"boss":true,"brain":6,"smash":true,"element":"feuer","col":Color(0.95,0.4,0.2)},
+	"boss_b":   {"n":"Frost-Koloss","hp":1600,"speed":10,"dmg":130,"fp":18,"boss":true,"brain":10,"element":"eis","col":Color(0.4,0.68,1.0)},
+	"boss_c":   {"n":"Gewitter-Zerstörer","hp":1800,"speed":10,"dmg":150,"fp":24,"boss":true,"brain":16,"element":"blitz","col":Color(1.0,0.85,0.3)},
+	"megaboss": {"n":"Untoter Überlord","hp":2800,"speed":8,"dmg":220,"fp":60,"boss":true,"brain":35,"final":true,"smash":true,"summon":6,"element":"untot","col":Color(0.72,0.35,0.9)},
 }
 
 # ================================================================
@@ -238,7 +238,7 @@ func plant_bonus(slot: int) -> Dictionary:
 			else: b[key] = float(b[key]) + float(eff[key])
 	return b
 func _zero_bonus() -> Dictionary:
-	return {"dmg":0.0,"rate":0.0,"hp":0.0,"amount":0.0,"pierce":0.0,"splash":0.0,"range":0.0,"radius":0.0,"regen":0.0,"thorns":0.0,"faster":0.0,"extra_lanes":0.0,"lane_switch":0.0,"contact_dmg":0.0,"tall":0.0,"chill":0.0,"lightning_rod":0.0,"necro":0.0,"fire_death":0.0,"zap":0.0,"burn":false,"slow":false,"poison":false,"chain":false,"twin":false}
+	return {"dmg":0.0,"rate":0.0,"hp":0.0,"amount":0.0,"pierce":0.0,"splash":0.0,"range":0.0,"radius":0.0,"regen":0.0,"thorns":0.0,"faster":0.0,"extra_lanes":0.0,"lane_switch":0.0,"contact_dmg":0.0,"tall":0.0,"chill":0.0,"lightning_rod":0.0,"necro":0.0,"fire_death":0.0,"zap":0.0,"aimbot":0.0,"burn":false,"slow":false,"poison":false,"chain":false,"twin":false}
 
 func equip_req_ok(k: String) -> bool:
 	var r: String = EQUIP[k].req
@@ -302,6 +302,7 @@ func _compute(ck: String, b: Dictionary) -> Dictionary:
 		"necro": float(b.necro),
 		"fire_death": float(b.fire_death),
 		"zap": float(b.zap),
+		"aimbot": float(b.aimbot),
 	}
 	# Pflanzen-eigener Skill-Baum (einmalige Knoten) + Prestige + Run-Shop
 	s.dmg = round(s.dmg * (1.0 + b.dmg) * pres_dmg_mul() * run_dmg_mul() * em)
