@@ -46,6 +46,8 @@ var _death_open := false
 var _tree_sel := "seed"   # aktueller Tab: "seed" | "element" | "spiel" | "zombies"
 var _tree_px := {}
 var _tree_center := Vector2.ZERO   # Mitte der Baum-Leinwand (fuer Themen-Hintergrund)
+var _main_center := Vector2.ZERO   # Mitte des Sonnen-Baums (Labor)
+var _main_plant_px := {}           # ck -> Vector2 (Strahl-Endpunkte)
 var _tree_w := 0.0
 var _tree_h := 0.0
 var _tree_mode := "slot"  # "slot" | "element" | "none"  (Datenquelle der Leinwand)
@@ -1161,23 +1163,9 @@ func _build_shop(vb) -> void:
 
 # ---- TAB "Spiel": Pflanzen freischalten + Ausruestung + Oekonomie ----
 func _build_general(vb) -> void:
-	_header(vb, "HAUPT-LABOR", Color(0.7, 0.85, 1))
-	# ---- Garage (Sonne) — schaltet die Fokus-Baeume frei ----
-	_header(vb, "Garage / Labor  (Sonne)  —  schaltet die Fokus-Baeume der Pflanzen frei", Color(1, 0.85, 0.4))
-	var gg := _grid(vb, 2)
-	if Game.garage:
-		_card(gg, "* Garage offen", "Fokus-Baeume (Elemente/Mutationen) nutzbar", "", false, Callable())
-	else:
-		_card(gg, "Garage aufschliessen", "Danach kannst du jede Pflanze elementar skillen", "Sonne %d" % Game.GARAGE_COST, int(Game.sun) >= Game.GARAGE_COST, _buy_garage)
-	# ---- Pflanzen freischalten (FP) ----
-	_header(vb, "Pflanzen freischalten (FP)", Color(0.6, 0.9, 0.6))
-	var gp := _grid(vb, 4)
-	for ck in Game.CH_ORDER:
-		if Game.plant_unlocked(ck):
-			_card(gp, "* " + Game.CHASSIS[ck].n, Game.CHASSIS[ck].d, "", false, Callable())
-		else:
-			var uc := Game.plant_unlock_cost(ck)
-			_card(gp, Game.CHASSIS[ck].n, Game.CHASSIS[ck].d, "FP %d" % uc, Game.fp >= uc, _unlock_plant.bind(ck))
+	_header(vb, "HAUPT-LABOR  —  Sonnen-Baum", Color(1, 0.85, 0.4))
+	_header(vb, "Mitte = Garage (Sonne) · Strahlen = Pflanzen (FP) · Mausrad zoomt, Ziehen schaut um", Color(0.66, 0.78, 0.68))
+	_build_sun_tree(vb)
 	_header(vb, "Ausruestung (FP)", Color(0.55, 0.7, 1))
 	var g3 := _grid(vb, 3)
 	for k in Game.EQ_ORDER:
@@ -1196,6 +1184,101 @@ func _build_general(vb) -> void:
 		var c_r := Game.res_cost(k)
 		var eff := ("+%d%%" % int(r.per * 100 * lv_r)) if r.kind == "pct" else ("+%d" % int(r.per * lv_r))
 		_card(g1, "%s  St.%d" % [r.n, lv_r], "%s  (%s)" % [r.d, eff], "FP %d" % c_r, Game.fp >= c_r, _buy_res.bind(k))
+
+# ---- Sonnen-Baum: Garage in der Mitte, Pflanzen als Strahlen ----
+func _build_sun_tree(holder) -> void:
+	var z := _tree_zoom
+	var w := 720.0 * z
+	var h := 600.0 * z
+	var canvas := Control.new()
+	canvas.custom_minimum_size = Vector2(w, h)
+	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_main_center = Vector2(w * 0.5, h * 0.5)
+	_main_plant_px = {}
+	for i in range(Game.CH_ORDER.size()):
+		var ck: String = Game.CH_ORDER[i]
+		var ang := deg_to_rad(-90.0 + i * 45.0)
+		_main_plant_px[ck] = _main_center + Vector2(cos(ang), sin(ang)) * (215.0 * z)
+	canvas.draw.connect(_draw_sun_tree.bind(canvas))
+	holder.add_child(canvas)
+	# Mitte: Garage (die Sonne)
+	var gtitle: String = "GARAGE OFFEN" if Game.garage else "GARAGE"
+	var gprice: String = "" if Game.garage else "Sonne %d" % Game.GARAGE_COST
+	_main_node(canvas, _main_center, gtitle, gprice, int(Game.sun) >= Game.GARAGE_COST, Game.garage, _buy_garage, true)
+	# Pflanzen als Strahlen
+	for ck in Game.CH_ORDER:
+		var owned: bool = Game.plant_unlocked(ck)
+		var uc := Game.plant_unlock_cost(ck)
+		var pr: String = "" if owned else "FP %d" % uc
+		_main_node(canvas, _main_plant_px[ck], Game.CHASSIS[ck].n, pr, Game.fp >= uc, owned, _unlock_plant.bind(ck), false)
+	canvas.queue_redraw()
+
+func _draw_sun_tree(canvas) -> void:
+	var ctr := _main_center
+	var z := _tree_zoom
+	# Strahlen zu den Pflanzen
+	for ck in _main_plant_px:
+		var to: Vector2 = _main_plant_px[ck]
+		var owned: bool = Game.plant_unlocked(ck)
+		var c := Color(1, 0.85, 0.3, 0.85) if owned else Color(1, 0.85, 0.3, 0.28)
+		canvas.draw_line(ctr, to, c, (4.0 if owned else 2.0) * z)
+	# Sonnenkoerper + Zacken (hinter dem Garage-Knopf)
+	canvas.draw_circle(ctr, 70 * z, Color(1, 0.8, 0.2, 0.22))
+	for i in range(16):
+		var a := deg_to_rad(i * 22.5)
+		var p1 := ctr + Vector2(cos(a), sin(a)) * 70 * z
+		var p2 := ctr + Vector2(cos(a), sin(a)) * 96 * z
+		canvas.draw_line(p1, p2, Color(1, 0.85, 0.35, 0.55), 3 * z)
+
+func _main_node(canvas, center: Vector2, title: String, price: String, enabled: bool, owned: bool, cb: Callable, is_sun: bool) -> void:
+	var z := _tree_zoom
+	var w := (150.0 if not is_sun else 122.0) * z
+	var h := (52.0 if not is_sun else 122.0) * z
+	var holder := Control.new()
+	holder.size = Vector2(w, h)
+	holder.position = center - Vector2(w / 2.0, h / 2.0)
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(holder)
+	var bg := Color(0.16, 0.29, 0.23)
+	var bd := COL_ACCENT
+	if is_sun:
+		bg = Color(0.5, 0.4, 0.08); bd = Color(1, 0.85, 0.3)
+	elif owned:
+		bg = Color(0.18, 0.4, 0.24); bd = Color(0.5, 0.95, 0.6)
+	elif not enabled:
+		bd = Color(0.42, 0.44, 0.48)
+	var rad := int((60 if is_sun else 12) * z)
+	var btn := Button.new()
+	btn.set_anchors_preset(Control.PRESET_FULL_RECT)
+	btn.add_theme_stylebox_override("normal", _sb(bg, bd, 2, rad, 6))
+	btn.add_theme_stylebox_override("hover", _sb(bg.lightened(0.12), bd, 2, rad, 6))
+	btn.add_theme_stylebox_override("pressed", _sb(bg, bd, 2, rad, 6))
+	btn.add_theme_stylebox_override("disabled", _sb(bg.darkened(0.15), bd.darkened(0.3), 2, rad, 6))
+	btn.tooltip_text = title
+	btn.disabled = owned or not enabled
+	if cb.is_valid() and enabled and not owned: btn.pressed.connect(cb)
+	holder.add_child(btn)
+	var box := VBoxContainer.new()
+	box.set_anchors_preset(Control.PRESET_FULL_RECT)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.alignment = BoxContainer.ALIGNMENT_CENTER
+	var t := Label.new(); t.text = title
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	t.add_theme_font_size_override("font_size", int(max(9, 12 * z)))
+	t.modulate = Color(1, 0.95, 0.7) if is_sun else Color(0.96, 0.99, 0.96)
+	box.add_child(t)
+	if price != "":
+		var pl := Label.new(); pl.text = price
+		pl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; pl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pl.add_theme_font_size_override("font_size", int(max(8, 11 * z)))
+		pl.modulate = Color(1, 0.85, 0.4) if enabled else Color(0.82, 0.62, 0.5)
+		box.add_child(pl)
+	elif owned and not is_sun:
+		var pl2 := Label.new(); pl2.text = "frei"
+		pl2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; pl2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pl2.add_theme_font_size_override("font_size", int(max(8, 11 * z))); pl2.modulate = Color(0.6, 0.95, 0.6)
+		box.add_child(pl2)
+	holder.add_child(box)
 
 # ---- TAB "Zombies": Lockstoff ----
 func _build_ztab(vb) -> void:
