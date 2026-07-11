@@ -347,9 +347,15 @@ func _apply_fx(z, effects, dmg) -> void:
 		elif e == "chain": _chain(z, dmg)
 
 func _chain(z, dmg) -> void:
+	# Kettenblitz springt nur auf die Nachbar-Tiles des getroffenen Zombies
+	# (angrenzende Lanes = row +/-1 ODER dieselbe Lane dahinter), in Reichweite.
+	var reach := 1.6 * Game.CELL
 	var others := []
 	for o in zombies:
-		if o != z and o.hp > 0: others.append(o)
+		if o == z or o.hp <= 0: continue
+		if abs(o.row - z.row) > 1: continue                 # nur direkt angrenzende Lanes
+		if Vector2(o.x, o.y).distance_to(Vector2(z.x, z.y)) > reach: continue
+		others.append(o)
 	others.sort_custom(func(a, b): return Vector2(a.x,a.y).distance_to(Vector2(z.x,z.y)) < Vector2(b.x,b.y).distance_to(Vector2(z.x,z.y)))
 	for i in range(min(2, others.size())):
 		others[i].hp -= dmg * 0.5
