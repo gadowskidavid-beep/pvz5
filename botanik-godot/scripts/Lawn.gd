@@ -153,10 +153,15 @@ func _update(dt: float) -> void:
 		if hazard_timer <= 0:
 			hazard_timer = rng.randf_range(BAL.HAZARD_MIN, BAL.HAZARD_MAX)
 			var ph = plants[rng.randi() % plants.size()]
-			ph.hp -= BAL.HAZARD_DMG
-			fx.append({"t": "boom", "x": ph.x, "y": ph.y, "life": 0.3})
-			if ph.hp <= 0: plants.erase(ph)
-			msg = "Umwelt-Schaden!"; msg_t = 1.0
+			if float(ph.s.get("lightning_rod", 0.0)) > 0.0:
+				# Stahlnuss = Blitzableiter: leitet den Umwelt-Blitz harmlos ab
+				fx.append({"t": "boom", "x": ph.x, "y": ph.y, "life": 0.2})
+				msg = "Blitz abgeleitet!"; msg_t = 1.0
+			else:
+				ph.hp -= BAL.HAZARD_DMG
+				fx.append({"t": "boom", "x": ph.x, "y": ph.y, "life": 0.3})
+				if ph.hp <= 0: plants.erase(ph)
+				msg = "Umwelt-Schaden!"; msg_t = 1.0
 	# Pflanzen
 	for p in plants:
 		var s = p.s
@@ -216,7 +221,7 @@ func _update(dt: float) -> void:
 			if p.arch == "spike" and p.row == z.row and abs(z.x - p.x) < Game.CELL * 0.5:
 				z.hp -= float(p.s.dmg) * dt * 2.0
 				_apply_fx(z, p.s.effects, float(p.s.dmg))
-		if tgt != null and z.vault and not z.jumped:
+		if tgt != null and z.vault and not z.jumped and float(tgt.s.get("tall", 0.0)) <= 0.0:
 			z.x = tgt.x - Game.CELL * 0.55; z.jumped = true
 		elif tgt != null and z.smash:
 			# Smasher/Boss zerschmettert die Pflanze sofort -> Meta muss sich anpassen
@@ -243,6 +248,17 @@ func _update(dt: float) -> void:
 			tgt.hp -= z.dmg * dt
 			if float(tgt.s.get("thorns", 0.0)) > 0.0:
 				z.hp -= z.dmg * float(tgt.s.thorns) * dt
+			# Feuernuss: Kontakt-Feuerschaden + entzuenden
+			var cdmg := float(tgt.s.get("contact_dmg", 0.0))
+			if cdmg > 0.0:
+				z.hp -= cdmg * dt
+				z.burn = max(z.burn, 1.4)
+			# Stahlnuss: zappt knabbernde Zombies
+			if float(tgt.s.get("lightning_rod", 0.0)) > 0.0:
+				z.hp -= 22.0 * dt
+			# Eisnuss: verlangsamt Angreifer
+			if float(tgt.s.get("chill", 0.0)) > 0.0:
+				z.slow = max(z.slow, 1.5)
 			if tgt.hp <= 0: plants.erase(tgt)
 		else:
 			z.x -= z.speed * sl * dt
