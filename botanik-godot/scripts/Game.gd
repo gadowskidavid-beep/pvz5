@@ -150,7 +150,7 @@ func field_lanes() -> int:
 func lanes_count() -> int:
 	# Immer 5 Rasen-Reihen (klassisches PvZ-Layout)
 	return 5
-func start_sun() -> int: return 25 * pres_lvl("sun")   # Frischstart = 0 Sonne (Himmel liefert nach)
+func start_sun() -> int: return 50 + 25 * pres_lvl("sun")   # genug fuer die erste Sonnenblume
 
 # ---- Fortschritt: Pflanzen mit FP freischalten, Garage mit Sonne ----
 const PLANT_UNLOCK := {"pea":8,"sonne":12,"wall":22,"lilypad":26,"frostbluete":40,"sonnenpilz":32,"pilz":48,"wasserpilz":58}
@@ -397,11 +397,13 @@ func rebirth() -> void:
 	garage = false
 	tutorial_done = false
 	shovel = false
-	place_slot = -1                                # nichts vorgewaehlt (Hammer/Faust)
 	edit_slot = 0
 	seeds = []
 	for i in range(max(3, unlocked_slots)):
-		seeds.append({"chain": "", "nodes": {}})   # kein Samen vorbelegt
+		seeds.append({"chain": "", "nodes": {}})
+	plants_unlocked["sonne"] = true                # Sonnenblume = freier Starter
+	seeds[0].chain = "sonne"                       # in Slot 1 vorbelegt
+	place_slot = 0                                 # direkt zum Setzen gewaehlt
 	if pres_lvl("startpea") > 0:
 		plants_unlocked["pea"] = true              # Prestige: Erbse gratis freigeschaltet
 	new_run()

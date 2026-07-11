@@ -37,22 +37,9 @@ func reset_run() -> void:
 	mowers.clear()
 	for r in range(rows):
 		mowers.append({"row": r, "x": float(Game.LAWN_X - 30), "active": false, "used": false})
-	sky_timer = 5.0; to_spawn = 0; idle_timer = 6.0; hazard_timer = 9.0; msg = "Bereit!"; msg_t = 2.0
+	sky_timer = 5.0; to_spawn = 0; idle_timer = 6.0; hazard_timer = 9.0
 	weather = "klar"; strike_t = 0.0
-	_maybe_tutorial()
-
-# Tutorial-Intro: die Rasenmaeher raeumen die erste Welle, danach startet das Idle
-func _maybe_tutorial() -> void:
-	if Game.tutorial_done: return
-	Game.tutorial_done = true
-	Game.wave = 1
-	Game.phase = "fight"
-	to_spawn = 0
-	for i in range(8):
-		_spawn("basic")
-	for m in mowers:
-		m.active = true               # alle Maeher losschicken (Intro-Sweep)
-	msg = "Die Rasenmaeher raeumen die erste Welle!"; msg_t = 3.5
+	msg = "Pflanze eine Sonnenblume, um die erste Welle zu starten!"; msg_t = 6.0
 
 # Reihen nachziehen, wenn neue freigeschaltet wurden (mid-run kaufbar)
 func _sync_rows() -> void:
@@ -84,8 +71,8 @@ func start_wave() -> void:
 	msg = "Welle %d startet!" % Game.wave; msg_t = 1.6
 
 func _roll_weather() -> void:
-	# Boss-Wellen behalten ihr thematisches Wetter dem Boss ueberlassen -> klar
-	if BAL.is_boss_wave(Game.wave):
+	# Erste Welle & Boss-Wellen bleiben klar
+	if Game.wave <= 1 or BAL.is_boss_wave(Game.wave):
 		weather = "klar"; strike_t = 2.0; return
 	var r := rng.randf()
 	if r < 0.45: weather = "klar"
@@ -124,8 +111,8 @@ func _end_wave() -> void:
 		return
 	Game.phase = "prep"
 	Game.fp += Game.wave
-	# Nach dem Tutorial (Welle 1) die Maeher wieder herstellen -> Spieler startet mit vollen Maehern
-	if Game.wave == 1 or Game.mower_fix():
+	# Maeher werden NUR mit der Werkstatt-Skill repariert (sonst bleiben verbrauchte Maeher weg)
+	if Game.mower_fix():
 		for m in mowers: m.used = false; m.active = false; m.x = float(Game.LAWN_X - 30)
 	msg = "Welle %d geschafft! +%d FP" % [Game.wave, Game.wave]; msg_t = 2.0
 
@@ -658,6 +645,9 @@ func _place(col: int, row: int) -> void:
 	var x = Game.LAWN_X + col * Game.CELL + Game.CELL / 2.0
 	var y = Game.LAWN_Y + row * Game.CELL + Game.CELL / 2.0
 	plants.append({"ck": ck, "arch": s.arch, "row": row, "col": col, "x": x, "y": y, "hp": float(s.hp), "maxhp": float(s.hp), "s": s, "t": 0.0, "fuse": (0.7 if s.arch == "bomb" else 0.0), "done": false})
+	# Intuitiver Start: die allererste gesetzte Pflanze startet Welle 1
+	if Game.wave == 0 and Game.phase == "prep":
+		start_wave()
 
 # ---- Zeichnen ----
 func _draw() -> void:
