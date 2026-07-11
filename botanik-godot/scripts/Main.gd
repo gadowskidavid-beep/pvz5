@@ -45,6 +45,9 @@ var _death_open := false
 # Skill-Tree Zustand
 var _tree_sel := "seed"   # aktueller Tab: "seed" | "element" | "spiel" | "zombies"
 var _tree_px := {}
+var _tree_center := Vector2.ZERO   # Mitte der Baum-Leinwand (fuer Themen-Hintergrund)
+var _tree_w := 0.0
+var _tree_h := 0.0
 var _tree_mode := "slot"  # "slot" | "element" | "none"  (Datenquelle der Leinwand)
 var _tree_ref := 0        # Slot-Index bei mode "slot"
 var _tree_zoom := 1.0     # Zoom-Faktor fuer den Skill-Baum
@@ -610,6 +613,9 @@ func _build_tree_canvas(parent) -> void:
 	for id in nodes:
 		var pp = nodes[id].pos
 		_tree_px[id] = Vector2(ox + pp.x * sx, oy - pp.y * sy)
+	_tree_center = Vector2(ox, oy)
+	_tree_w = width
+	_tree_h = height
 	var canvas := Control.new()
 	canvas.custom_minimum_size = Vector2(width, height)
 	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -638,7 +644,21 @@ func _build_tree_canvas(parent) -> void:
 			elif can: state = "legend_lock" if rare else "need"
 			else: state = "legend_lock" if rare else "lock"
 			_tree_node(canvas, center, str(nd.n), str(nd.d), cost, not owned, state, selected, ecol, _select_node.bind(id))
+	# Grosse Element-Ueberschriften an den Armspitzen (wie im Referenzbild)
+	_dir_label(canvas, "GEWITTER", Color(1, 0.9, 0.4), Vector2(ox - 44 * z, oy - maxr * sy - 26 * z))
+	_dir_label(canvas, "UNTOD", Color(0.82, 0.55, 1), Vector2(ox - 30 * z, oy - minr * sy + 12 * z))
+	_dir_label(canvas, "FEUER", Color(1, 0.5, 0.3), Vector2(ox + maxc * sx + 12 * z, oy - 8))
+	_dir_label(canvas, "FROST", Color(0.55, 0.82, 1), Vector2(ox + minc * sx - 78 * z, oy - 8))
 	canvas.queue_redraw()
+
+func _dir_label(canvas, text: String, col: Color, pos: Vector2) -> void:
+	var l := Label.new()
+	l.text = text
+	l.modulate = col
+	l.add_theme_font_size_override("font_size", int(max(12, 18 * _tree_zoom)))
+	l.position = pos
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(l)
 
 func _elem_color(id: String) -> Color:
 	var p := id.substr(0, 1)
@@ -709,6 +729,16 @@ func _style_tree_node(b: Button, state: String, selected: bool, ecol: Color) -> 
 		b.add_theme_stylebox_override(st, _sb(bg, bd, bw, 9, 6))
 
 func _draw_tree(canvas) -> void:
+	# ---- Themen-Hintergrund: 4 Quadranten + Deko ----
+	var w := _tree_w
+	var h := _tree_h
+	var ctr := _tree_center
+	if w > 1.0:
+		canvas.draw_colored_polygon(PackedVector2Array([ctr, Vector2(0, 0), Vector2(w, 0)]), Color(1, 0.85, 0.25, 0.10))      # oben: Gewitter (gelb)
+		canvas.draw_colored_polygon(PackedVector2Array([ctr, Vector2(0, h), Vector2(w, h)]), Color(0.55, 0.3, 0.75, 0.13))    # unten: Untod (lila)
+		canvas.draw_colored_polygon(PackedVector2Array([ctr, Vector2(0, 0), Vector2(0, h)]), Color(0.3, 0.55, 1.0, 0.11))     # links: Frost (blau)
+		canvas.draw_colored_polygon(PackedVector2Array([ctr, Vector2(w, 0), Vector2(w, h)]), Color(1.0, 0.35, 0.12, 0.12))    # rechts: Feuer (rot)
+		_draw_theme_decor(canvas, w, h)
 	var nodes := _n_nodes()
 	for id in nodes:
 		var req := str(nodes[id].get("req", ""))
@@ -722,6 +752,35 @@ func _draw_tree(canvas) -> void:
 			canvas.draw_line(a, bp, Color(ec.r, ec.g, ec.b, 0.7), 4.0 * _tree_zoom)
 		else:
 			canvas.draw_dashed_line(a, bp, ec.darkened(0.45), 3.0 * _tree_zoom, 9.0)
+
+func _draw_theme_decor(canvas, w: float, h: float) -> void:
+	var cx := w / 2.0
+	# BLITZ oben — Zickzack-Blitze
+	for k in range(2):
+		var bx := cx - 40 + k * 80
+		var yb := 14.0
+		var pts := PackedVector2Array([Vector2(bx, yb), Vector2(bx + 16, yb + 20), Vector2(bx + 4, yb + 24), Vector2(bx + 22, yb + 46)])
+		for i in range(pts.size() - 1):
+			canvas.draw_line(pts[i], pts[i + 1], Color(1, 0.92, 0.35, 0.45), 3.0)
+	# FEUER rechts — Flammen (Dreiecke)
+	for i in range(5):
+		var fx := w - 26.0
+		var fy := h * 0.22 + i * h * 0.13
+		canvas.draw_colored_polygon(PackedVector2Array([Vector2(fx + 10, fy + 20), Vector2(fx - 12, fy + 20), Vector2(fx - 1, fy)]), Color(1, 0.4, 0.12, 0.5))
+		canvas.draw_colored_polygon(PackedVector2Array([Vector2(fx + 6, fy + 20), Vector2(fx - 8, fy + 20), Vector2(fx - 1, fy + 7)]), Color(1, 0.8, 0.25, 0.55))
+	# FROST links — Eiskristalle (Rauten)
+	for i in range(5):
+		var ix := 24.0
+		var iy := h * 0.22 + i * h * 0.13
+		canvas.draw_colored_polygon(PackedVector2Array([Vector2(ix, iy - 10), Vector2(ix + 8, iy), Vector2(ix, iy + 10), Vector2(ix - 8, iy)]), Color(0.6, 0.85, 1, 0.5))
+		canvas.draw_line(Vector2(ix - 10, iy), Vector2(ix + 10, iy), Color(0.7, 0.9, 1, 0.4), 2.0)
+	# UNTOD unten — Grabsteine + Kreuz
+	for i in range(3):
+		var gx := cx - 70 + i * 70
+		var gy := h - 34
+		canvas.draw_rect(Rect2(gx - 13, gy, 26, 28), Color(0.38, 0.42, 0.4, 0.5))
+		canvas.draw_rect(Rect2(gx - 2, gy + 4, 4, 15), Color(0.18, 0.22, 0.2, 0.7))
+		canvas.draw_rect(Rect2(gx - 7, gy + 8, 14, 4), Color(0.18, 0.22, 0.2, 0.7))
 
 # ================= PAUSIERENDE OVERLAYS =================
 func _make_overlay(n: String) -> void:
