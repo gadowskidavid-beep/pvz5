@@ -11,17 +11,18 @@ const LAWN_X := 150
 const LAWN_Y := 96
 
 # ---- CHASSIS (Pflanzen) ----
+# ---- CHASSIS = die 8 CHAINS (env: day/night/water/any) ----
 var CHASSIS := {
-	"sonne":   {"n":"Sonnenblume","arch":"sun","fp":0,"req":"","col":Color(1,0.83,0.2),"cost":50,"hp":60,"cd":5,"amount":25,"interval":8.0,"d":"Produziert Sonne."},
-	"pea":     {"n":"Erbsenschütze","arch":"shooter","fp":10,"req":"","col":Color(0.35,0.85,0.4),"cost":100,"hp":60,"cd":5,"dmg":22,"rate":1.4,"speed":340.0,"d":"Schießt Erbsen."},
-	"wall":    {"n":"Wal-Nuss","arch":"wall","fp":18,"req":"pea","col":Color(0.62,0.44,0.26),"cost":50,"hp":340,"cd":14,"d":"Zäher Blocker."},
-	"werfer":  {"n":"Kohl-Werfer","arch":"lobber","fp":40,"req":"pea","col":Color(0.5,0.75,0.3),"cost":150,"hp":60,"cd":6,"dmg":42,"rate":0.7,"splash":0.9,"d":"Bogenwurf, Fläche."},
-	"stachel": {"n":"Stachel","arch":"spike","fp":35,"req":"wall","col":Color(0.55,0.7,0.35),"cost":100,"hp":120,"cd":6,"dmg":16,"d":"Bodendornen."},
-	"nebler":  {"n":"Nebler","arch":"fume","fp":60,"req":"werfer","col":Color(0.75,0.6,0.85),"cost":125,"hp":60,"cd":5,"dmg":15,"rate":1.6,"range":2.6,"d":"Nebel, trifft mehrere."},
-	"bombe":   {"n":"Bombe","arch":"bomb","fp":80,"req":"stachel","col":Color(0.5,0.28,0.16),"cost":150,"hp":1,"cd":30,"dmg":200,"radius":1.4,"d":"Einmal-Explosion."},
-	"beam":    {"n":"Mais-Beam","arch":"beam","fp":120,"req":"nebler","col":Color(0.95,0.82,0.3),"cost":225,"hp":60,"cd":8,"dmg":38,"rate":0.9,"d":"Strahl durch die Reihe."},
+	"sonne":       {"n":"Sonnenblume","arch":"sun","env":"day","fp":0,"req":"","col":Color(1,0.83,0.2),"cost":50,"hp":60,"cd":5,"amount":25,"interval":8.0,"d":"Tag · Oekonomie: produziert Sonne."},
+	"pea":         {"n":"Schütze","arch":"shooter","env":"day","fp":10,"req":"","col":Color(0.35,0.85,0.4),"cost":100,"hp":60,"cd":5,"dmg":22,"rate":1.4,"speed":340.0,"d":"Tag · Schaden/DPS: schießt Erbsen."},
+	"wall":        {"n":"Panzer-Nuss","arch":"wall","env":"any","fp":18,"req":"pea","col":Color(0.62,0.44,0.26),"cost":50,"hp":340,"cd":14,"d":"Ueberall · Verteidigung: zaeher Blocker."},
+	"pilz":        {"n":"Pilz","arch":"fume","env":"night","fp":36,"req":"","col":Color(0.72,0.55,0.85),"cost":100,"hp":60,"cd":5,"dmg":16,"rate":1.6,"range":2.6,"d":"Nacht · Gift & Sporen-Flaeche. Stark bei Nacht, schwach am Tag."},
+	"sonnenpilz":  {"n":"Sonnenpilz","arch":"sun","env":"night","fp":20,"req":"sonne","col":Color(0.8,0.72,0.5),"cost":25,"hp":60,"cd":5,"amount":15,"interval":7.0,"d":"Nacht · Billige Sonne, produziert auch nachts."},
+	"lilypad":     {"n":"Lilypad","arch":"wall","env":"water","fp":16,"req":"","col":Color(0.4,0.72,0.5),"cost":25,"hp":180,"cd":8,"d":"Wasser · Plattform/Utility: zaehes Blatt."},
+	"wasserpilz":  {"n":"Wasserpilz","arch":"lobber","env":"water","fp":44,"req":"lilypad","col":Color(0.4,0.72,0.85),"cost":150,"hp":60,"cd":6,"dmg":40,"rate":0.8,"splash":0.9,"d":"Wasser · Wellen-Flaechenschaden."},
+	"frostbluete": {"n":"Frostblüte","arch":"shooter","env":"any","fp":34,"req":"pea","col":Color(0.6,0.85,1),"cost":150,"hp":60,"cd":6,"dmg":18,"rate":1.2,"speed":320.0,"d":"Ueberall · Kontrolle: verlangsamt & friert ein."},
 }
-var CH_ORDER := ["sonne","pea","wall","werfer","stachel","nebler","bombe","beam"]
+var CH_ORDER := ["sonne","pea","wall","pilz","sonnenpilz","lilypad","wasserpilz","frostbluete"]
 
 # ---- ALLGEMEINE UPGRADES (FP) — Oekonomie/Klick (vorlaeufig; wird spaeter der Sonnen-Tree) ----
 var RESEARCH := {
@@ -209,17 +210,27 @@ func equip_req_ok(k: String) -> bool:
 func pass_cost(k: String) -> int:
 	return int(SHOP_PASS[k].base) * (int(run_shop.get(k, 0)) + 1)
 
+# Umgebungs-Multiplikator: Nacht-Pflanzen stark bei Nacht, Tag-Pflanzen schwaecher nachts
+func env_mul(ck: String) -> float:
+	var env: String = str(CHASSIS[ck].get("env", "any"))
+	var night: bool = bool(BAL.act_of(wave).get("night", false))
+	if env == "night": return 1.35 if night else 0.70
+	if env == "day": return 0.85 if night else 1.0
+	return 1.0
+
 func compute_chassis_stats(ck: String) -> Dictionary:
 	var c = CHASSIS[ck]
 	var arch: String = c.arch
 	var attacker := ["shooter","beam","fume","lobber","spike","bomb"].has(arch)
 	var b := plant_bonus(ck)
+	var em := env_mul(ck)
 	var eff_list := []
 	if attacker:
 		if b.burn: eff_list.append("burn")
 		if b.slow: eff_list.append("slow")
 		if b.poison: eff_list.append("poison")
 		if b.chain: eff_list.append("chain")
+		if ck == "frostbluete" and not eff_list.has("slow"): eff_list.append("slow")
 	var s := {
 		"arch": arch, "key": ck,
 		"cost": int(c.get("cost", 0)), "hp": float(c.get("hp", 60)), "cd": float(c.get("cd", 6)),
@@ -232,9 +243,9 @@ func compute_chassis_stats(ck: String) -> Dictionary:
 		"regen": float(b.regen),
 	}
 	# Pflanzen-eigener Skill-Baum (einmalige Knoten) + Prestige + Run-Shop
-	s.dmg = round(s.dmg * (1.0 + b.dmg) * pres_dmg_mul() * run_dmg_mul())
+	s.dmg = round(s.dmg * (1.0 + b.dmg) * pres_dmg_mul() * run_dmg_mul() * em)
 	s.hp = round(s.hp * (1.0 + b.hp) * pres_hp_mul())
-	s.amount = int(round(s.amount * (1.0 + b.amount) * run_sun_mul()))
+	s.amount = int(round(s.amount * (1.0 + b.amount) * run_sun_mul() * em))
 	if arch == "sun":
 		s.amount += 5 * pres_lvl("sunbloom")
 		if b.twin: s.amount *= 2

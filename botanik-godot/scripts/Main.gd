@@ -44,6 +44,7 @@ var _death_open := false
 var _tree_sel := "sonne"
 var _tree_px := {}
 var _tree_ck := ""
+var _tree_zoom := 1.0     # Zoom-Faktor fuer den Skill-Baum (rauszoomen = mehr sehen)
 var info_ck := ""
 var info_node := ""
 
@@ -307,6 +308,9 @@ func _build_drawer() -> void:
 	hrow.add_child(closeb)
 	var ttl := Label.new(); ttl.text = "Skill Trees"; ttl.add_theme_font_size_override("font_size", 22); ttl.modulate = COL_ACCENT
 	hrow.add_child(ttl)
+	var zo := Button.new(); zo.text = "  -  "; zo.tooltip_text = "Rauszoomen"; zo.pressed.connect(_zoom_out); hrow.add_child(zo)
+	var zlbl := Label.new(); zlbl.text = "Zoom"; zlbl.modulate = Color(0.7, 0.8, 0.72); hrow.add_child(zlbl)
+	var zi := Button.new(); zi.text = "  +  "; zi.tooltip_text = "Reinzoomen"; zi.pressed.connect(_zoom_in); hrow.add_child(zi)
 	var hsp := Control.new(); hsp.size_flags_horizontal = Control.SIZE_EXPAND_FILL; hrow.add_child(hsp)
 	d_fp = Label.new(); d_fp.text = "0 FP"; d_fp.modulate = COL_CYAN; d_fp.add_theme_font_size_override("font_size", 18)
 	hrow.add_child(d_fp)
@@ -402,6 +406,14 @@ func _pick_tree(key: String) -> void:
 	info_ck = ""; info_node = ""
 	_rebuild_drawer()
 
+func _zoom_out() -> void:
+	_tree_zoom = max(0.45, _tree_zoom - 0.15)
+	_rebuild_drawer()
+
+func _zoom_in() -> void:
+	_tree_zoom = min(1.15, _tree_zoom + 0.15)
+	_rebuild_drawer()
+
 func _select_node(ck: String, id: String) -> void:
 	info_ck = ck; info_node = id
 	_rebuild_info()
@@ -466,12 +478,13 @@ func _build_tree_canvas(parent, ck: String) -> void:
 	for id in nodes:
 		var p = nodes[id].pos
 		minc = min(minc, p.x); maxc = max(maxc, p.x); maxr = max(maxr, p.y)
-	var sx := 190.0
-	var sy := 122.0
-	var width := (maxc - minc) * sx + 340.0
-	var height := maxr * sy + 200.0
-	var ox := -minc * sx + 170.0
-	var oy := height - 96.0
+	var z := _tree_zoom
+	var sx := 190.0 * z
+	var sy := 122.0 * z
+	var width := (maxc - minc) * sx + 340.0 * z
+	var height := maxr * sy + 200.0 * z
+	var ox := -minc * sx + 170.0 * z
+	var oy := height - 96.0 * z
 	_tree_px = {}
 	for id in nodes:
 		var pp = nodes[id].pos
@@ -484,8 +497,8 @@ func _build_tree_canvas(parent, ck: String) -> void:
 	parent.add_child(canvas)
 	for br in tree.get("branches", []):
 		var lb := Label.new(); lb.text = "Ast: " + str(br[1]); lb.modulate = Color(0.55, 0.62, 0.58)
-		lb.add_theme_font_size_override("font_size", 12)
-		lb.position = Vector2(ox + float(br[0]) * sx - 34, oy + 46)
+		lb.add_theme_font_size_override("font_size", int(max(9, 12 * z)))
+		lb.position = Vector2(ox + float(br[0]) * sx - 34 * z, oy + 46 * z)
 		canvas.add_child(lb)
 	for id in nodes:
 		var nd = nodes[id]
@@ -507,8 +520,9 @@ func _build_tree_canvas(parent, ck: String) -> void:
 	canvas.queue_redraw()
 
 func _tree_node(canvas, center: Vector2, title: String, subtitle: String, cost: int, show_cost: bool, state: String, selected: bool, cb: Callable) -> void:
-	var w := 160.0
-	var h := 60.0
+	var z := _tree_zoom
+	var w := 160.0 * z
+	var h := 60.0 * z
 	var holder := Control.new()
 	holder.size = Vector2(w, h)
 	holder.position = center - Vector2(w / 2.0, h / 2.0)
@@ -528,14 +542,14 @@ func _tree_node(canvas, center: Vector2, title: String, subtitle: String, cost: 
 	box.add_theme_constant_override("separation", 1)
 	var t := Label.new(); t.text = title
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; t.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	t.add_theme_font_size_override("font_size", 13); t.modulate = Color(0.96, 0.99, 0.96)
+	t.add_theme_font_size_override("font_size", int(max(9, 13 * z))); t.modulate = Color(0.96, 0.99, 0.96)
 	box.add_child(t)
 	holder.add_child(box)
 	if show_cost:
 		var pill := Label.new(); pill.text = "%d FP" % cost
-		pill.add_theme_font_size_override("font_size", 12); pill.modulate = Color(1, 0.96, 0.82)
+		pill.add_theme_font_size_override("font_size", int(max(8, 12 * z))); pill.modulate = Color(1, 0.96, 0.82)
 		pill.add_theme_stylebox_override("normal", _sb(_pill_bg(state), _pill_bd(state), 1, 9, 4))
-		pill.position = Vector2(w / 2.0 - 30, -22)
+		pill.position = Vector2(w / 2.0 - 30 * z, -22 * z)
 		pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		holder.add_child(pill)
 
@@ -574,11 +588,11 @@ func _draw_tree(canvas) -> void:
 		var a: Vector2 = _tree_px[req]
 		var bp: Vector2 = _tree_px[id]
 		if Game.pt_owned(_tree_ck, id):
-			canvas.draw_line(a, bp, Color(0.42, 0.9, 0.55, 0.9), 5.0)
+			canvas.draw_line(a, bp, Color(0.42, 0.9, 0.55, 0.9), 5.0 * _tree_zoom)
 		elif Game.pt_can(_tree_ck, id):
-			canvas.draw_line(a, bp, Color(1, 0.82, 0.4, 0.8), 4.0)
+			canvas.draw_line(a, bp, Color(1, 0.82, 0.4, 0.8), 4.0 * _tree_zoom)
 		else:
-			canvas.draw_dashed_line(a, bp, Color(0.5, 0.55, 0.6, 0.5), 3.0, 9.0)
+			canvas.draw_dashed_line(a, bp, Color(0.5, 0.55, 0.6, 0.5), 3.0 * _tree_zoom, 9.0)
 
 # ================= PAUSIERENDE OVERLAYS =================
 func _make_overlay(n: String) -> void:
