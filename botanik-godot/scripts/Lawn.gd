@@ -90,7 +90,7 @@ func _spawn(kind: String) -> void:
 		"boss": b.get("boss", false), "final": b.get("final", false), "vault": b.get("vault", false),
 		"smash": b.get("smash", false), "carrier": b.get("carrier", false),
 		"jumped": false, "fp": int(b.fp), "brain": int(b.get("brain", 0)),
-		"slow": 0.0, "burn": 0.0, "poison": 0.0, "dropped": false
+		"slow": 0.0, "burn": 0.0, "poison": 0.0, "dropped": false, "switched": false
 	})
 
 func _spawn_one() -> void:
@@ -223,6 +223,22 @@ func _update(dt: float) -> void:
 			var px = tgt.x; var py = tgt.y
 			plants.erase(tgt)
 			fx.append({"t": "boom", "x": px, "y": py, "life": 0.28})
+		elif tgt != null and float(tgt.s.get("lane_switch", 0.0)) > 0.0 and not z.switched and not z.boss and not z.final:
+			# Untote Nuss: schmeckt so ekelhaft, dass der Zombie angewidert die Lane wechselt
+			var opts := []
+			if z.row - 1 >= 0: opts.append(z.row - 1)
+			if z.row + 1 < rows: opts.append(z.row + 1)
+			if opts.size() > 0:
+				var nr: int = opts[rng.randi() % opts.size()]
+				z.row = nr
+				z.y = Game.LAWN_Y + nr * Game.CELL + Game.CELL / 2.0
+				z.x += Game.CELL * 0.35            # etwas zurueckgeschreckt
+				z.switched = true
+				fx.append({"t": "boom", "x": z.x, "y": z.y, "life": 0.22})
+			else:
+				# keine Nachbar-Lane frei -> normal fressen
+				tgt.hp -= z.dmg * dt
+				if tgt.hp <= 0: plants.erase(tgt)
 		elif tgt != null:
 			tgt.hp -= z.dmg * dt
 			if float(tgt.s.get("thorns", 0.0)) > 0.0:

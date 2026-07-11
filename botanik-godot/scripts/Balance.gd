@@ -203,7 +203,7 @@ const PLANT_TREES := {
 		"b3": {"n":"Panzerung II","d":"+35% HP","cost":24,"req":"b2","pos":Vector2(0,3),"eff":{"hp":0.35}},
 		"b4": {"n":"Blitz-Bunker","d":"+50% HP · Dornen 50%","cost":48,"req":"b3","pos":Vector2(0,4),"eff":{"thorns":0.5,"hp":0.5},"rare":true},
 		"u1": {"n":"Panzerung I","d":"+30% HP","cost":8,"req":"root","pos":Vector2(0,-1),"eff":{"hp":0.3}},
-		"u2": {"n":"Untote Nuss","d":"+5 HP/s","cost":18,"req":"u1","pos":Vector2(0,-2),"eff":{"regen":5.0}},
+		"u2": {"n":"Untote Nuss","d":"Ekelhaft: Zombies wechseln beim Fressen die Lane · +5 HP/s","cost":18,"req":"u1","pos":Vector2(0,-2),"eff":{"regen":5.0,"lane_switch":1.0}},
 		"u3": {"n":"Panzerung II","d":"+35% HP","cost":24,"req":"u2","pos":Vector2(0,-3),"eff":{"hp":0.35}},
 		"u4": {"n":"Grab-Nuss","d":"+50% HP · +8 HP/s","cost":48,"req":"u3","pos":Vector2(0,-4),"eff":{"regen":8.0,"hp":0.5},"rare":true},
 	}},
