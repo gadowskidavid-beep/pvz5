@@ -726,20 +726,34 @@ func _style_tree_node(b: Button, state: String, selected: bool, ecol: Color) -> 
 	var bw := 3 if state.begins_with("legend") else 2
 	if selected: bd = Color(1, 1, 1); bw = 3
 	for st in ["normal", "hover", "pressed", "disabled"]:
-		b.add_theme_stylebox_override(st, _sb(bg, bd, bw, 9, 6))
+		b.add_theme_stylebox_override(st, _sb(bg, bd, bw, 16, 6))
 
 func _draw_tree(canvas) -> void:
 	# ---- Themen-Hintergrund: 4 Quadranten + Deko ----
 	var w := _tree_w
 	var h := _tree_h
 	var ctr := _tree_center
+	var z := _tree_zoom
 	if w > 1.0:
 		canvas.draw_colored_polygon(PackedVector2Array([ctr, Vector2(0, 0), Vector2(w, 0)]), Color(1, 0.85, 0.25, 0.10))      # oben: Gewitter (gelb)
 		canvas.draw_colored_polygon(PackedVector2Array([ctr, Vector2(0, h), Vector2(w, h)]), Color(0.55, 0.3, 0.75, 0.13))    # unten: Untod (lila)
 		canvas.draw_colored_polygon(PackedVector2Array([ctr, Vector2(0, 0), Vector2(0, h)]), Color(0.3, 0.55, 1.0, 0.11))     # links: Frost (blau)
 		canvas.draw_colored_polygon(PackedVector2Array([ctr, Vector2(w, 0), Vector2(w, h)]), Color(1.0, 0.35, 0.12, 0.12))    # rechts: Feuer (rot)
+		_draw_stars(canvas, w, h)
 		_draw_theme_decor(canvas, w, h)
+		# radialer Glow in der Mitte (Origin)
+		for gi in range(6):
+			canvas.draw_circle(ctr, (16.0 + gi * 15.0) * z, Color(0.45, 0.85, 0.5, 0.045))
 	var nodes := _n_nodes()
+	# Glow-Halos hinter den Knoten
+	for id in nodes:
+		if not _tree_px.has(id): continue
+		var ec2 := _elem_color(id)
+		var al := 0.06
+		if _n_owned(id): al = 0.26
+		elif _n_can(id): al = 0.15
+		canvas.draw_circle(_tree_px[id], 34.0 * z, Color(ec2.r, ec2.g, ec2.b, al))
+	# Verbindungslinien
 	for id in nodes:
 		var req := str(nodes[id].get("req", ""))
 		if req == "" or not _tree_px.has(id) or not _tree_px.has(req): continue
@@ -747,11 +761,20 @@ func _draw_tree(canvas) -> void:
 		var bp: Vector2 = _tree_px[id]
 		var ec := _elem_color(id)
 		if _n_owned(id):
-			canvas.draw_line(a, bp, Color(ec.r, ec.g, ec.b, 0.95), 5.0 * _tree_zoom)
+			canvas.draw_line(a, bp, Color(ec.r, ec.g, ec.b, 0.95), 5.0 * z)
 		elif _n_can(id):
-			canvas.draw_line(a, bp, Color(ec.r, ec.g, ec.b, 0.7), 4.0 * _tree_zoom)
+			canvas.draw_line(a, bp, Color(ec.r, ec.g, ec.b, 0.7), 4.0 * z)
 		else:
-			canvas.draw_dashed_line(a, bp, ec.darkened(0.45), 3.0 * _tree_zoom, 9.0)
+			canvas.draw_dashed_line(a, bp, ec.darkened(0.45), 3.0 * z, 9.0)
+
+func _draw_stars(canvas, w: float, h: float) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20240808   # fester Seed -> Sterne flackern nicht
+	for i in range(80):
+		var sx := rng.randf() * w
+		var sy := rng.randf() * h
+		var sr := rng.randf_range(0.6, 2.1)
+		canvas.draw_circle(Vector2(sx, sy), sr, Color(1, 1, 1, rng.randf_range(0.04, 0.18)))
 
 func _draw_theme_decor(canvas, w: float, h: float) -> void:
 	var cx := w / 2.0
