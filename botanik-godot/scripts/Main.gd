@@ -15,6 +15,7 @@ var wave_btn: Button
 var overlays := {}       # name -> {"panel":Panel, "content":VBoxContainer, "close":Button}
 var _nav_return := ""     # Overlay, zu dem "Zurueck" springt (sonst Spiel)
 var _death_open := false  # ist der Todes-Screen bereits offen?
+var _tree_sel := "sonne"  # welche Pflanze ist im Skill-Tree gewaehlt
 
 const SCREEN_W := 1152
 const SCREEN_H := 648
@@ -358,8 +359,11 @@ func _buy_chassis(key: String) -> void:
 	if Game.buy_chassis(key): _post_buy("lab")
 func _buy_equip(key: String) -> void:
 	if Game.buy_equip(key): _post_buy("lab")
-func _buy_mut(key: String) -> void:
-	if Game.buy_mut(key): _post_buy("lab")
+func _pick_tree(ck: String) -> void:
+	_tree_sel = ck
+	_build_overlay_content("lab")
+func _buy_pt(ck: String, node: String) -> void:
+	if Game.buy_pt(ck, node): _post_buy("lab")
 func _buy_lure() -> void:
 	if Game.buy_lure(): _post_buy("lab")
 func _buy_pres(key: String) -> void:
@@ -490,8 +494,11 @@ func _dev_god(pressed: bool) -> void:
 func _dev_unlock_all() -> void:
 	for k in Game.CH_ORDER: Game.unlocked[k] = true
 	for k in Game.EQ_ORDER: Game.unlocked[k] = true
-	for k in Game.MUT_ORDER: Game.unlocked[k] = true
-	Game.unlocked["u_shovel"] = true
+	# alle Pflanzen-Skill-Baeume maxen
+	for ck in Game.CH_ORDER:
+		if not Game.ptree.has(ck): Game.ptree[ck] = {}
+		for node in Game.nodes_for(ck):
+			Game.ptree[ck][node] = int(BAL.PT_NODES[node].max)
 	refresh_seeds(); _build_overlay_content("dev")
 
 func _dev_seen_all() -> void:
@@ -533,15 +540,33 @@ func _do_rebirth() -> void:
 # ---- LABOR ----
 func _build_lab(vb) -> void:
 	_big(vb, "LABOR", 28, COL_ACCENT)
-	_header(vb, "WISSENSCHAFT  —  Upgrades (unendlich levelbar)", COL_CYAN)
-	var g1 := _grid(vb, 3)
-	for k in Game.RES_ORDER:
-		var r = Game.RESEARCH[k]
-		var lv := Game.res_lvl(k)
-		var c := Game.res_cost(k)
-		var eff := ("+%d%%" % int(r.per * 100 * lv)) if r.kind == "pct" else ("+%d" % int(r.per * lv))
-		_card(g1, "%s  St.%d" % [r.n, lv], "%s  (%s)" % [r.d, eff], "FP %d" % c, Game.fp >= c, _buy_res.bind(k))
-	_header(vb, "PFLANZEN freischalten", Color(0.5, 0.9, 0.55))
+	# ===== PFLANZEN-SKILL-TREES (Herzstueck) =====
+	_header(vb, "PFLANZEN-SKILL-TREES  —  FP aus getoeteten Zombies", COL_CYAN)
+	var selrow := _grid(vb, 6)
+	for ck in Game.CH_ORDER:
+		if not Game.has(ck): continue
+		var pb := Button.new()
+		pb.text = Game.CHASSIS[ck].n
+		pb.custom_minimum_size = Vector2(150, 34)
+		if ck == _tree_sel: pb.add_theme_color_override("font_color", Color(1, 0.95, 0.5))
+		pb.pressed.connect(_pick_tree.bind(ck))
+		selrow.add_child(pb)
+	if not Game.has(_tree_sel): _tree_sel = "sonne"
+	var ck2: String = _tree_sel
+	_header(vb, "Baum:  %s   —   %s" % [Game.CHASSIS[ck2].n, Game.CHASSIS[ck2].d], Color(0.6, 0.95, 0.6))
+	var gt := _grid(vb, 3)
+	for node in Game.nodes_for(ck2):
+		var nd = BAL.PT_NODES[node]
+		var lv_t := Game.pt_lvl(ck2, node)
+		if Game.pt_max(ck2, node):
+			var done_txt: String = "freigeschaltet" if nd.kind == "unlock" else "MAX"
+			_card(gt, "%s  [%s]" % [nd.n, done_txt], nd.d, "", false, Callable())
+		else:
+			var c_t := Game.pt_cost(ck2, node)
+			var lvtxt: String = "noch nicht" if nd.kind == "unlock" else "St.%d/%d" % [lv_t, int(nd.max)]
+			_card(gt, "%s  %s" % [nd.n, lvtxt], nd.d, "FP %d" % c_t, Game.fp >= c_t, _buy_pt.bind(ck2, node))
+	# ===== PFLANZEN FREISCHALTEN =====
+	_header(vb, "PFLANZEN FREISCHALTEN  (neue Chassis)", Color(0.5, 0.9, 0.55))
 	var g2 := _grid(vb, 3)
 	for k in Game.CH_ORDER:
 		if k == "sonne": continue
@@ -552,7 +577,8 @@ func _build_lab(vb) -> void:
 			var ok_c := Game.chassis_req_ok(k)
 			var sub_c: String = ch.d if ok_c else ("Braucht: " + str(Game.CHASSIS[ch.req].n))
 			_card(g2, ch.n, sub_c, "FP %d" % int(ch.fp), ok_c and Game.fp >= int(ch.fp), _buy_chassis.bind(k))
-	_header(vb, "AUSRUESTUNG", Color(0.55, 0.7, 1))
+	# ===== AUSRUESTUNG =====
+	_header(vb, "AUSRUESTUNG  (Schaufel, Reihen, Almanach ...)", Color(0.55, 0.7, 1))
 	var g3 := _grid(vb, 3)
 	for k in Game.EQ_ORDER:
 		var e = Game.EQUIP[k]
@@ -562,15 +588,17 @@ func _build_lab(vb) -> void:
 			var ok_e := Game.equip_req_ok(k)
 			var sub_e: String = e.d if ok_e else ("Braucht: " + str(Game.EQUIP[e.req].n))
 			_card(g3, e.n, sub_e, "FP %d" % int(e.fp), ok_e and Game.fp >= int(e.fp), _buy_equip.bind(k))
-	_header(vb, "MUTATIONEN  (Feuer/Eis/Gift/Elektro fuer alle Angreifer)", Color(1, 0.6, 0.6))
-	var g4 := _grid(vb, 4)
-	for k in Game.MUT_ORDER:
-		var mu = Game.MUT[k]
-		if Game.has(k):
-			_card(g4, "* " + mu.n, mu.d, "", false, Callable())
-		else:
-			_card(g4, mu.n, mu.d, "FP %d" % int(mu.fp), Game.fp >= int(mu.fp), _buy_mut.bind(k))
-	_header(vb, "ZOMBIE-LABOR  (hoeheres Risiko = mehr Belohnung)", Color(1, 0.55, 0.55))
+	# ===== ALLGEMEIN (vorlaeufig -> spaeter Sonnen-Tree) =====
+	_header(vb, "ALLGEMEIN  (Oekonomie, vorlaeufig)", Color(0.8, 0.85, 0.6))
+	var g1 := _grid(vb, 3)
+	for k in Game.RES_ORDER:
+		var r = Game.RESEARCH[k]
+		var lv_r := Game.res_lvl(k)
+		var c_r := Game.res_cost(k)
+		var eff := ("+%d%%" % int(r.per * 100 * lv_r)) if r.kind == "pct" else ("+%d" % int(r.per * lv_r))
+		_card(g1, "%s  St.%d" % [r.n, lv_r], "%s  (%s)" % [r.d, eff], "FP %d" % c_r, Game.fp >= c_r, _buy_res.bind(k))
+	# ===== ZOMBIES (Lockstoff) =====
+	_header(vb, "ZOMBIES  —  Lockstoff (mehr Idle-Zombies zum Farmen)", Color(1, 0.55, 0.55))
 	var zc := VBoxContainer.new(); vb.add_child(zc)
 	var lure_hb := HBoxContainer.new(); lure_hb.add_theme_constant_override("separation", 8)
 	var lure_l := Label.new()
@@ -582,18 +610,6 @@ func _build_lab(vb) -> void:
 	else: lure_b.text = "FP %d" % Game.lure_cost(); lure_b.disabled = Game.fp < Game.lure_cost()
 	lure_b.pressed.connect(_buy_lure)
 	lure_hb.add_child(lure_b); zc.add_child(lure_hb)
-	for pair in [["str", "Staerke (HP + Schaden)"], ["arm", "Ruestung (Zaehigkeit)"], ["spd", "Geschwindigkeit"]]:
-		var key: String = pair[0]
-		var hb := HBoxContainer.new(); hb.add_theme_constant_override("separation", 8)
-		var l := Label.new(); l.text = "%s  —  St.%d/10" % [pair[1], int(Game.zlab.get(key, 0))]
-		l.custom_minimum_size = Vector2(360, 0)
-		var minus := Button.new(); minus.text = " - "; minus.pressed.connect(_zlab.bind(key, -1))
-		var plus := Button.new(); plus.text = " + "; plus.pressed.connect(_zlab.bind(key, 1))
-		hb.add_child(l); hb.add_child(minus); hb.add_child(plus); zc.add_child(hb)
-	var rl := Label.new()
-	rl.text = "Risiko-Stufe %d / 30   ->   +%d%% auf FP, Muenzen & Gehirne" % [Game.risk_level(), int((Game.reward_mul() - 1) * 100)]
-	rl.modulate = Color(1, 0.7, 0.4)
-	zc.add_child(rl)
 
 # ---- WIEDERGEBURT / PRESTIGE-BAUM ----
 func _build_prestige(vb) -> void:

@@ -23,17 +23,13 @@ var CHASSIS := {
 }
 var CH_ORDER := ["sonne","pea","wall","werfer","stachel","nebler","bombe","beam"]
 
-# ---- RESEARCH (geleverte Upgrades, FP) ----
+# ---- ALLGEMEINE UPGRADES (FP) — Oekonomie/Klick (vorlaeufig; wird spaeter der Sonnen-Tree) ----
 var RESEARCH := {
-	"r_dmg":   {"n":"Schaden","base":4,"g":1.30,"per":0.10,"kind":"pct","d":"+10% Pflanzen-Schaden"},
-	"r_rate":  {"n":"Feuerrate","base":6,"g":1.30,"per":0.07,"kind":"pct","d":"+7% Feuerrate"},
-	"r_click": {"n":"Klick-Kraft","base":5,"g":1.26,"per":6,"kind":"add","d":"+6 Klick-Schaden"},
-	"r_hp":    {"n":"Pflanzen-HP","base":7,"g":1.30,"per":0.10,"kind":"pct","d":"+10% HP"},
-	"r_sun":   {"n":"Sonnenausbeute","base":8,"g":1.30,"per":0.10,"kind":"pct","d":"+10% Sonne"},
+	"r_click": {"n":"Klick-Kraft","base":5,"g":1.26,"per":6,"kind":"add","d":"+6 Klick-Schaden (Faust)"},
 	"r_coin":  {"n":"Münzausbeute","base":9,"g":1.34,"per":0.12,"kind":"pct","d":"+12% Münzen"},
 	"r_fp":    {"n":"Forschungsdrang","base":14,"g":1.45,"per":0.10,"kind":"pct","d":"+10% FP von Zombies"},
 }
-var RES_ORDER := ["r_dmg","r_rate","r_click","r_hp","r_sun","r_coin","r_fp"]
+var RES_ORDER := ["r_click","r_coin","r_fp"]
 
 # ---- EQUIP (einmalig, FP) ----
 var EQUIP := {
@@ -46,15 +42,6 @@ var EQUIP := {
 	"e_clickcoin":  {"n":"Klick-Gold","fp":10,"req":"u_almanac","d":"Zombies anklicken gibt Münzen"},
 }
 var EQ_ORDER := ["u_almanac","u_shovel","u_zombiebook","f_lane2","f_lane3","f_mowerfix","e_clickcoin"]
-
-# ---- MUTATIONEN (einmalig, FP) — wirken auf alle Angriffs-Pflanzen ----
-var MUT := {
-	"m_fire":   {"n":"Feuer","fp":16,"eff":"burn","col":Color(1,0.5,0.2),"d":"Schüsse setzen Zombies in Brand"},
-	"m_ice":    {"n":"Eis","fp":16,"eff":"slow","col":Color(0.5,0.8,1),"d":"Schüsse verlangsamen"},
-	"m_poison": {"n":"Gift","fp":22,"eff":"poison","col":Color(0.6,0.9,0.3),"d":"Schüsse vergiften"},
-	"m_elec":   {"n":"Elektro","fp":30,"eff":"chain","col":Color(1,0.95,0.4),"d":"Blitz springt auf Nachbarn"},
-}
-var MUT_ORDER := ["m_fire","m_ice","m_poison","m_elec"]
 
 # ---- IN-RUN LADEN (Münzen) ----
 var SHOP_ITEMS := {
@@ -113,7 +100,8 @@ var zlab := {"str":0,"arm":0,"spd":0}
 # --- Skills (NICHT gespeichert, bleiben aber während der Sitzung) ---
 var fp := 0
 var research := {}
-var unlocked := {"sonne": true}   # chassis + equip + mutation ids
+var ptree := {}                   # Pflanzen-Skill-Trees: {plant_key: {node: level}}
+var unlocked := {"sonne": true}   # chassis + equip ids
 var run_shop := {}
 var lure := 0                     # Lockstoff-Stufe: Idle-Zombies zwischen Wellen
 var god := false                  # Dev: Rasen kann nicht verloren gehen
@@ -166,8 +154,8 @@ func coin_mul() -> float:
 func fp_mul() -> float: return res_mul("r_fp")
 func has_click_coin() -> bool: return has("e_clickcoin")
 func mower_fix() -> bool: return has("f_mowerfix")
-func risk_level() -> int: return int(zlab.str) + int(zlab.arm) + int(zlab.spd)
-func reward_mul() -> float: return 1.0 + 0.10 * risk_level()
+func risk_level() -> int: return 0
+func reward_mul() -> float: return 1.0   # Zombie-Risiko-Regler gestrichen
 func idle_cap() -> int: return 1 + lure          # max. Zombies zwischen den Wellen
 func lure_max() -> bool: return lure >= 5
 func lure_cost() -> int: return int(ceil(18 * pow(1.7, lure)))
@@ -177,10 +165,26 @@ func buy_lure() -> bool:
 	if fp < c: return false
 	fp -= c; lure += 1
 	return true
-func active_effects() -> Array:
+# ---- Pflanzen-Skill-Tree Helfer ----
+func pt(ck: String) -> Dictionary: return ptree.get(ck, {})
+func pt_lvl(ck: String, node: String) -> int: return int(pt(ck).get(node, 0))
+func pt_max(ck: String, node: String) -> bool: return pt_lvl(ck, node) >= int(BAL.PT_NODES[node].max)
+func pt_has(ck: String, node: String) -> bool: return pt_lvl(ck, node) > 0
+func pt_cost(ck: String, node: String) -> int:
+	var nd = BAL.PT_NODES[node]
+	return int(ceil(nd.base * pow(nd.g, pt_lvl(ck, node))))
+func pt_pct(ck: String, node: String) -> float:
+	return 1.0 + float(BAL.PT_NODES[node].per) * pt_lvl(ck, node)
+func pt_add(ck: String, node: String) -> float:
+	return float(BAL.PT_NODES[node].per) * pt_lvl(ck, node)
+func nodes_for(ck: String) -> Array:
+	return BAL.ARCH_TREE.get(CHASSIS[ck].arch, [])
+func plant_effects(ck: String) -> Array:
 	var a := []
-	for k in MUT_ORDER:
-		if has(k): a.append(MUT[k].eff)
+	if pt_has(ck, "e_fire"): a.append("burn")
+	if pt_has(ck, "e_ice"): a.append("slow")
+	if pt_has(ck, "e_poison"): a.append("poison")
+	if pt_has(ck, "e_elec"): a.append("chain")
 	return a
 func chassis_req_ok(ck: String) -> bool:
 	var r: String = CHASSIS[ck].req
@@ -194,20 +198,32 @@ func pass_cost(k: String) -> int:
 func compute_chassis_stats(ck: String) -> Dictionary:
 	var c = CHASSIS[ck]
 	var arch: String = c.arch
+	var attacker := ["shooter","beam","fume","lobber","spike","bomb"].has(arch)
 	var s := {
 		"arch": arch, "key": ck,
 		"cost": int(c.get("cost", 0)), "hp": float(c.get("hp", 60)), "cd": float(c.get("cd", 6)),
 		"dmg": float(c.get("dmg", 0)), "rate": float(c.get("rate", 0.0)), "speed": float(c.get("speed", 0.0)),
 		"splash": float(c.get("splash", 0.0)), "range": float(c.get("range", 0.0)),
 		"amount": int(c.get("amount", 0)), "interval": float(c.get("interval", 0.0)), "radius": float(c.get("radius", 0.0)),
-		"effects": (active_effects() if ["shooter","beam","fume","lobber"].has(arch) else []),
+		"effects": (plant_effects(ck) if attacker else []),
+		"pierce": int(pt_add(ck, "pierce")),
+		"thorns": float(BAL.PT_NODES["thorns"].per) * pt_lvl(ck, "thorns"),
+		"regen": pt_add(ck, "regen"),
 	}
-	s.dmg = round(s.dmg * res_mul("r_dmg") * pres_dmg_mul() * run_dmg_mul())
-	s.hp = round(s.hp * res_mul("r_hp") * pres_hp_mul())
-	s.amount = int(round(s.amount * res_mul("r_sun") * run_sun_mul()))
-	if arch == "sun": s.amount += 5 * pres_lvl("sunbloom")
-	s.rate = s.rate * res_mul("r_rate") * run_rate_mul()
+	# Pflanzen-eigener Skill-Tree + Prestige + Run-Shop
+	s.dmg = round(s.dmg * pt_pct(ck, "dmg") * pres_dmg_mul() * run_dmg_mul())
+	s.hp = round(s.hp * pt_pct(ck, "hp") * pres_hp_mul())
+	s.amount = int(round(s.amount * pt_pct(ck, "amount") * run_sun_mul()))
+	if arch == "sun":
+		s.amount += 5 * pres_lvl("sunbloom")
+		if pt_has(ck, "twin"): s.amount *= 2
+	s.rate = s.rate * pt_pct(ck, "rate") * run_rate_mul()
 	s.shot_int = (1.0 / s.rate) if s.rate > 0 else 0.0
+	s.interval = s.interval * clamp(1.0 - float(BAL.PT_NODES["faster"].per) * pt_lvl(ck, "faster"), 0.4, 1.0)
+	s.cd = s.cd * clamp(1.0 - float(BAL.PT_NODES["recharge"].per) * pt_lvl(ck, "recharge"), 0.4, 1.0)
+	s.splash = s.splash * pt_pct(ck, "splash")
+	s.range = s.range + pt_add(ck, "range")
+	s.radius = s.radius * pt_pct(ck, "radius")
 	s.cost = max(0, int(round(s.cost)))
 	return s
 
@@ -232,11 +248,13 @@ func buy_equip(k: String) -> bool:
 	if fp < c: return false
 	fp -= c; unlocked[k] = true
 	return true
-func buy_mut(k: String) -> bool:
-	if has(k): return false
-	var c := int(MUT[k].fp)
+func buy_pt(ck: String, node: String) -> bool:
+	if pt_max(ck, node): return false
+	var c := pt_cost(ck, node)
 	if fp < c: return false
-	fp -= c; unlocked[k] = true
+	fp -= c
+	if not ptree.has(ck): ptree[ck] = {}
+	ptree[ck][node] = pt_lvl(ck, node) + 1
 	return true
 func buy_prestige(k: String) -> bool:
 	if pres_max(k): return false
@@ -266,8 +284,9 @@ func new_run() -> void:
 
 # Wiedergeburt: ALLE Skills weg, Prestige (Gehirne) bleibt und schaltet Boni frei
 func rebirth() -> void:
-	fp = 0
+	fp = BAL.START_FP
 	research = {}
+	ptree = {}
 	run_shop = {}
 	lure = 0
 	unlocked = {"sonne": true}

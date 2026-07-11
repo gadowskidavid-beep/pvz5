@@ -88,3 +88,42 @@ static func is_boss_wave(w: int) -> bool:
 static func boss_key(w: int) -> String:
 	var idx := BOSS_WAVES.find(w)
 	return BOSS_KEYS[idx] if idx >= 0 else ""
+
+
+# ================================================================
+# PFLANZEN-SKILL-TREES  —  Herzstueck der Progression (Waehrung: FP)
+# PT_NODES: Knoten-Vorlagen.  ARCH_TREE: welche Knoten je Archetyp.
+# kind: "pct" (multiplikativ 1+per*lvl) | "add" (per*lvl) | "unlock" (max 1)
+# ================================================================
+const START_FP := 10          # Tutorial: genau genug fuer 1 Schuetzen
+
+const PT_NODES := {
+	"dmg":      {"n":"Schaden","base":4,"g":1.27,"per":0.12,"kind":"pct","max":40,"d":"+12% Schaden"},
+	"rate":     {"n":"Feuerrate","base":6,"g":1.28,"per":0.08,"kind":"pct","max":30,"d":"+8% Feuerrate"},
+	"hp":       {"n":"Zellwand","base":5,"g":1.26,"per":0.10,"kind":"pct","max":30,"d":"+10% HP"},
+	"pierce":   {"n":"Durchschuss","base":35,"g":2.0,"per":1,"kind":"add","max":4,"d":"Erbse durchdringt +1 Zombie"},
+	"splash":   {"n":"Wurfradius","base":24,"g":1.55,"per":0.18,"kind":"pct","max":8,"d":"+18% Splash-Radius"},
+	"range":    {"n":"Reichweite","base":22,"g":1.5,"per":0.30,"kind":"add","max":5,"d":"+0,3 Nebel-Reichweite"},
+	"amount":   {"n":"Sonnen-Ertrag","base":5,"g":1.30,"per":0.15,"kind":"pct","max":40,"d":"+15% Sonne je Ernte"},
+	"faster":   {"n":"Photosynthese","base":8,"g":1.32,"per":0.05,"kind":"pct","max":12,"d":"-5% Produktionszeit"},
+	"radius":   {"n":"Sprengkraft","base":26,"g":1.55,"per":0.15,"kind":"pct","max":8,"d":"+15% Explosionsradius"},
+	"recharge": {"n":"Nachladen","base":22,"g":1.5,"per":0.06,"kind":"pct","max":8,"d":"-6% Abklingzeit"},
+	"thorns":   {"n":"Dornenpanzer","base":30,"g":1.7,"per":0.15,"kind":"pct","max":5,"d":"Reflektiert 15% Schaden je Stufe"},
+	"regen":    {"n":"Regeneration","base":28,"g":1.6,"per":3.0,"kind":"add","max":6,"d":"+3 HP/s Selbstheilung"},
+	"e_fire":   {"n":"Feuer","base":40,"g":1.0,"per":0,"kind":"unlock","max":1,"d":"Treffer setzen Zombies in Brand"},
+	"e_ice":    {"n":"Eis","base":40,"g":1.0,"per":0,"kind":"unlock","max":1,"d":"Treffer verlangsamen Zombies"},
+	"e_poison": {"n":"Gift","base":55,"g":1.0,"per":0,"kind":"unlock","max":1,"d":"Treffer vergiften Zombies"},
+	"e_elec":   {"n":"Elektro","base":75,"g":1.0,"per":0,"kind":"unlock","max":1,"d":"Blitz springt auf Nachbar-Zombies"},
+	"twin":     {"n":"Zwillingsblüte","base":80,"g":1.0,"per":0,"kind":"unlock","max":1,"d":"Produziert doppelte Sonne"},
+}
+
+const ARCH_TREE := {
+	"sun":     ["amount", "faster", "hp", "twin"],
+	"shooter": ["dmg", "rate", "hp", "pierce", "e_fire", "e_ice", "e_poison", "e_elec"],
+	"lobber":  ["dmg", "rate", "splash", "hp", "e_fire", "e_poison"],
+	"fume":    ["dmg", "rate", "range", "hp", "e_poison", "e_ice"],
+	"beam":    ["dmg", "rate", "hp", "e_elec"],
+	"spike":   ["dmg", "hp", "e_poison"],
+	"wall":    ["hp", "thorns", "regen"],
+	"bomb":    ["dmg", "radius"],
+}

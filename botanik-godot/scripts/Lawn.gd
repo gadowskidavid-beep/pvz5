@@ -80,16 +80,13 @@ func _spawn(kind: String) -> void:
 	var b = Game.ZTYPES[kind]
 	Game.seen[kind] = true
 	var row := rng.randi() % rows
-	var zhp := 1.0 + 0.15 * int(Game.zlab.str) + 0.13 * int(Game.zlab.arm)
-	var zspd := 1.0 + 0.08 * int(Game.zlab.spd)
-	var zdmg := 1.0 + 0.06 * int(Game.zlab.str)
-	var hp_mul := (1.0 + Game.wave * BAL.Z_HP_PER_WAVE + pow(Game.wave, BAL.Z_HP_POW) * BAL.Z_HP_POW_MUL) * zhp
+	var hp_mul := 1.0 + Game.wave * BAL.Z_HP_PER_WAVE + pow(Game.wave, BAL.Z_HP_POW) * BAL.Z_HP_POW_MUL
 	var hp := float(b.hp) * hp_mul
 	zombies.append({
 		"kind": kind, "row": row, "x": float(Game.LAWN_X + Game.COLS * Game.CELL + 20),
 		"y": Game.LAWN_Y + row * Game.CELL + Game.CELL / 2.0,
-		"hp": hp, "maxhp": hp, "speed": float(b.speed) * (1.0 + Game.wave * BAL.Z_SPD_PER_WAVE) * zspd,
-		"dmg": float(b.dmg) * zdmg, "col": b.col,
+		"hp": hp, "maxhp": hp, "speed": float(b.speed) * (1.0 + Game.wave * BAL.Z_SPD_PER_WAVE),
+		"dmg": float(b.dmg), "col": b.col,
 		"boss": b.get("boss", false), "final": b.get("final", false), "vault": b.get("vault", false),
 		"smash": b.get("smash", false), "carrier": b.get("carrier", false),
 		"jumped": false, "fp": int(b.fp), "brain": int(b.get("brain", 0)),
@@ -134,7 +131,7 @@ func _update(dt: float) -> void:
 	if sky_timer <= 0:
 		sky_timer = (8.0 + rng.randf() * 4.0) * (1.7 if wo.night else 1.0)
 		var x := Game.LAWN_X + 40 + rng.randf() * (Game.COLS * Game.CELL - 80)
-		var val := int(round(25 * (0.5 if wo.night else 1.0) * Game.res_mul("r_sun")))
+		var val := int(round(25 * (0.5 if wo.night else 1.0)))
 		suns.append({"x": x, "y": float(Game.LAWN_Y - 10), "ty": Game.LAWN_Y + 50 + rng.randf() * (rows * Game.CELL - 120), "vy": 70.0, "value": val, "falling": true, "life": 12.0})
 	# Wellensteuerung
 	if Game.phase == "fight":
@@ -163,6 +160,8 @@ func _update(dt: float) -> void:
 	# Pflanzen
 	for p in plants:
 		var s = p.s
+		if float(s.get("regen", 0.0)) > 0.0 and p.hp < p.maxhp:
+			p.hp = min(p.maxhp, p.hp + float(s.regen) * dt)
 		if p.arch == "bomb":
 			p.fuse -= dt
 			if p.fuse <= 0 and not p.done: _bomb(p); p.done = true
@@ -190,9 +189,14 @@ func _update(dt: float) -> void:
 		if pe.x > Game.LAWN_X + Game.COLS * Game.CELL + 20: peas.remove_at(i); continue
 		var gone := false
 		for z in zombies:
-			if z.row == pe.row and z.hp > 0 and abs(z.x - pe.x) < 26:
+			if z.row == pe.row and z.hp > 0 and abs(z.x - pe.x) < 26 and not pe.hit.has(z):
 				z.hp -= pe.dmg; _apply_fx(z, pe.effects, pe.dmg)
-				peas.remove_at(i); gone = true; break
+				pe.hit.append(z)
+				if int(pe.pierce) > 0:
+					pe.pierce = int(pe.pierce) - 1
+				else:
+					peas.remove_at(i); gone = true
+				break
 		if gone: continue
 	# Zombies
 	for i in range(zombies.size() - 1, -1, -1):
@@ -211,6 +215,7 @@ func _update(dt: float) -> void:
 		for p in plants:
 			if p.arch == "spike" and p.row == z.row and abs(z.x - p.x) < Game.CELL * 0.5:
 				z.hp -= float(p.s.dmg) * dt * 2.0
+				_apply_fx(z, p.s.effects, float(p.s.dmg))
 		if tgt != null and z.vault and not z.jumped:
 			z.x = tgt.x - Game.CELL * 0.55; z.jumped = true
 		elif tgt != null and z.smash:
@@ -220,6 +225,8 @@ func _update(dt: float) -> void:
 			fx.append({"t": "boom", "x": px, "y": py, "life": 0.28})
 		elif tgt != null:
 			tgt.hp -= z.dmg * dt
+			if float(tgt.s.get("thorns", 0.0)) > 0.0:
+				z.hp -= z.dmg * float(tgt.s.thorns) * dt
 			if tgt.hp <= 0: plants.erase(tgt)
 		else:
 			z.x -= z.speed * sl * dt
@@ -255,7 +262,7 @@ func _lane_has(p) -> bool:
 
 func _shoot(p) -> void:
 	var s = p.s
-	peas.append({"row": p.row, "x": p.x + 20, "y": p.y - 6, "vx": s.speed if s.speed > 0 else 340.0, "dmg": s.dmg, "effects": s.effects, "lob": false})
+	peas.append({"row": p.row, "x": p.x + 20, "y": p.y - 6, "vx": s.speed if s.speed > 0 else 340.0, "dmg": s.dmg, "effects": s.effects, "lob": false, "pierce": int(s.get("pierce", 0)), "hit": []})
 
 func _beam(p) -> void:
 	var s = p.s
