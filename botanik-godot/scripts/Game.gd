@@ -141,7 +141,8 @@ func pres_cost(k: String) -> int:
 func field_lanes() -> int:
 	return (1 if has("f_lane2") else 0) + (1 if has("f_lane3") else 0)
 func lanes_count() -> int:
-	return min(5, 1 + pres_lvl("lane") + field_lanes())
+	# Immer 5 Rasen-Reihen (klassisches PvZ-Layout)
+	return 5
 func start_sun() -> int: return 50 + 25 * pres_lvl("sun")
 func sun_passive() -> float: return 0.15 * pres_lvl("srate")
 func brain_mul() -> float: return 1.0 + 0.15 * pres_lvl("brain")
