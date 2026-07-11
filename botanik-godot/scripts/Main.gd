@@ -901,3 +901,52 @@ func _build_shop(vb) -> void:
 		var p = Game.SHOP_PASS[k]
 		var c := Game.pass_cost(k)
 		_card(g2, "%s  St.%d" % [p.n, int(Game.run_shop.get(k, 0))], p.d, "Muenze %d" % c, Game.coins >= c, _buy_pass.bind(k))
+
+
+# ---- TAB "Spiel": Pflanzen freischalten + Ausruestung + Oekonomie ----
+func _build_general(vb) -> void:
+	_header(vb, "SPIEL & AUSRUESTUNG", Color(0.7, 0.85, 1))
+	_header(vb, "Pflanzen freischalten", Color(0.5, 0.9, 0.55))
+	var g2 := _grid(vb, 3)
+	for k in Game.CH_ORDER:
+		if k == "sonne": continue
+		var ch = Game.CHASSIS[k]
+		if Game.has(k):
+			_card(g2, "* " + ch.n, ch.d, "", false, Callable())
+		else:
+			var ok_c := Game.chassis_req_ok(k)
+			var sub_c: String = ch.d if ok_c else ("Braucht: " + str(Game.CHASSIS[ch.req].n))
+			_card(g2, ch.n, sub_c, "FP %d" % int(ch.fp), ok_c and Game.fp >= int(ch.fp), _buy_chassis.bind(k))
+	_header(vb, "Ausruestung", Color(0.55, 0.7, 1))
+	var g3 := _grid(vb, 3)
+	for k in Game.EQ_ORDER:
+		var e = Game.EQUIP[k]
+		if Game.has(k):
+			_card(g3, "* " + e.n, e.d, "", false, Callable())
+		else:
+			var ok_e := Game.equip_req_ok(k)
+			var sub_e: String = e.d if ok_e else ("Braucht: " + str(Game.EQUIP[e.req].n))
+			_card(g3, e.n, sub_e, "FP %d" % int(e.fp), ok_e and Game.fp >= int(e.fp), _buy_equip.bind(k))
+	_header(vb, "Oekonomie", Color(0.8, 0.85, 0.6))
+	var g1 := _grid(vb, 3)
+	for k in Game.RES_ORDER:
+		var r = Game.RESEARCH[k]
+		var lv_r := Game.res_lvl(k)
+		var c_r := Game.res_cost(k)
+		var eff := ("+%d%%" % int(r.per * 100 * lv_r)) if r.kind == "pct" else ("+%d" % int(r.per * lv_r))
+		_card(g1, "%s  St.%d" % [r.n, lv_r], "%s  (%s)" % [r.d, eff], "FP %d" % c_r, Game.fp >= c_r, _buy_res.bind(k))
+
+# ---- TAB "Zombies": Lockstoff ----
+func _build_ztab(vb) -> void:
+	_header(vb, "ZOMBIES  —  Lockstoff (mehr Idle-Zombies zwischen den Wellen zum Farmen)", Color(1, 0.55, 0.55))
+	var zc := VBoxContainer.new(); vb.add_child(zc)
+	var lure_hb := HBoxContainer.new(); lure_hb.add_theme_constant_override("separation", 8)
+	var lure_l := Label.new()
+	lure_l.text = "Lockstoff  —  Zombies zwischen Wellen: %d / 6" % Game.idle_cap()
+	lure_l.custom_minimum_size = Vector2(360, 0)
+	lure_hb.add_child(lure_l)
+	var lure_b := Button.new()
+	if Game.lure_max(): lure_b.text = "MAX"; lure_b.disabled = true
+	else: lure_b.text = "FP %d" % Game.lure_cost(); lure_b.disabled = Game.fp < Game.lure_cost()
+	lure_b.pressed.connect(_buy_lure)
+	lure_hb.add_child(lure_b); zc.add_child(lure_hb)
