@@ -14,7 +14,10 @@ var popups: Array = []      # schwebende Zahlen (+Sonne, Belohnungen)
 var _font: Font             # Fallback-Font fuer die schwebenden Zahlen
 var _tex_cache := {}        # geladene Sprite-Texturen (null = kein Sprite -> gezeichneter Fallback)
 var _frames_cache := {}     # animierte Frame-Listen je Ordner
+var _anim_cache := {}       # benannte Zustands-Animationen: "kind|state" -> [Texture2D]
 var _anim_clock := 0.0      # globale Animations-Uhr
+var _bg_checked := false    # Hintergrundbild schon gesucht?
+var _bg_cached: Texture2D = null
 var rng := RandomNumberGenerator.new()
 
 var to_spawn := 0
@@ -53,13 +56,57 @@ func _frames(dir: String) -> Array:
 	_frames_cache[dir] = arr
 	return arr
 
-# Zombie-Textur: erst animierter Ordner zombies/<kind>/, sonst einzelne Datei zombies/<kind>.png
+# Zombie-Textur: erst nummerierter Ordner zombies/<kind>/0.png, sonst einzelne Datei
 func _zombie_tex(kind: String) -> Texture2D:
 	var frames := _frames("res://assets/sprites/zombies/%s" % kind)
 	if frames.size() > 0:
 		var idx := int(_anim_clock / 0.16) % frames.size()
 		return frames[idx]
 	return _tex("res://assets/sprites/zombies/%s.png" % kind)
+
+# Benannte Zustands-Animation: sucht im Ordner alle PNGs, die "walking"/"idle"/"dying" enthalten
+func _zombie_anim(kind: String, state: String) -> Array:
+	var key := kind + "|" + state
+	if _anim_cache.has(key): return _anim_cache[key]
+	var dir := "res://assets/sprites/zombies/%s" % kind
+	var frames := []
+	var da := DirAccess.open(dir)
+	if da != null:
+		var names := []
+		for f in da.get_files():
+			var low := f.to_lower()
+			if low.ends_with(".png") and low.find(state) != -1:
+				names.append(f)
+		names.sort()   # 000,001,... -> richtige Reihenfolge
+		for n in names:
+			var t = load(dir + "/" + n)
+			if t != null: frames.append(t)
+	_anim_cache[key] = frames
+	return frames
+
+# Hintergrundbild: bevorzugt bg/night.png, sonst erstes PNG in bg/
+func _scene_bg() -> Texture2D:
+	if _bg_checked: return _bg_cached
+	_bg_checked = true
+	if ResourceLoader.exists("res://assets/sprites/bg/night.png"):
+		_bg_cached = load("res://assets/sprites/bg/night.png")
+	else:
+		var da := DirAccess.open("res://assets/sprites/bg")
+		if da != null:
+			for f in da.get_files():
+				if f.to_lower().ends_with(".png"):
+					_bg_cached = load("res://assets/sprites/bg/" + f)
+					break
+	return _bg_cached
+
+func _start_dying(z) -> void:
+	if not z.get("dropped", false): _kill(z)
+	z["dying"] = true
+	z["die_t"] = 0.0
+
+func _die_dur(z) -> float:
+	var df := _zombie_anim(str(z.kind), "dying")
+	return max(0.4, df.size() * 0.06)
 
 func world_of(w: int) -> Dictionary:
 	return BAL.act_of(w)
@@ -341,10 +388,15 @@ func _update(dt: float) -> void:
 	# Zombies
 	for i in range(zombies.size() - 1, -1, -1):
 		var z = zombies[i]
+		# Sterbe-Animation abspielen, dann erst entfernen
+		if z.get("dying", false):
+			z.die_t += dt
+			if z.die_t >= _die_dur(z): zombies.remove_at(i)
+			continue
 		if z.burn > 0: z.hp -= 8.0 * dt; z.burn -= dt
 		if z.poison > 0: z.hp -= 9.0 * dt; z.poison -= dt
 		if z.slow > 0: z.slow -= dt
-		if z.hp <= 0: _kill(z); zombies.remove_at(i); continue
+		if z.hp <= 0: _start_dying(z); continue
 		# Element-Boss-Faehigkeit (feuer/eis/blitz/untot)
 		if str(z.get("element", "")) != "":
 			z["ability_t"] = float(z.get("ability_t", 0.0)) + dt
@@ -365,6 +417,7 @@ func _update(dt: float) -> void:
 		if z.get("fly", false) and tgt != null:
 			z.fly = false
 			fx.append({"t": "boom", "x": z.x, "y": z.y, "life": 0.2})
+		z["eating"] = tgt != null   # steht/frisst -> Idle-Animation, sonst Walking
 		# Stachel-Schaden
 		for p in plants:
 			if p.arch == "spike" and p.row == z.row and abs(z.x - p.x) < Game.CELL * 0.5:
@@ -426,7 +479,8 @@ func _update(dt: float) -> void:
 			if z.row == m.row and z.x < m.x + Game.CELL * 0.4 and z.x > m.x - Game.CELL: _kill(z); z.hp = 0
 		if m.x > Game.LAWN_X + Game.COLS * Game.CELL + 30: m.active = false; m.used = true
 	for i in range(zombies.size() - 1, -1, -1):
-		if zombies[i].hp <= 0: zombies.remove_at(i)
+		if zombies[i].hp <= 0 and not zombies[i].get("dying", false):
+			_start_dying(zombies[i])   # z.B. vom Maeher getoetet -> Sterbe-Animation statt sofort weg
 	# Sonne
 	for i in range(suns.size() - 1, -1, -1):
 		var su = suns[i]
@@ -701,10 +755,16 @@ func _place(col: int, row: int) -> void:
 func _draw() -> void:
 	var wo := world_of(Game.wave)
 	var lawn_rect := Rect2(Game.LAWN_X, Game.LAWN_Y, Game.COLS * Game.CELL, rows * Game.CELL)
-	# Nacht-Hintergrundbild (falls vorhanden) statt der Kachel-Textur
-	var bg_tex: Texture2D = _tex("res://assets/sprites/bg/night.png") if wo.night else null
-	if bg_tex != null:
-		draw_texture_rect(bg_tex, lawn_rect, false)
+	# Hintergrundbild als Full-Screen-Kulisse (falls vorhanden) + dezentes Pflanzgitter
+	var bg := _scene_bg()
+	if bg != null:
+		var vp := get_viewport_rect().size
+		draw_texture_rect(bg, Rect2(0, 0, vp.x, vp.y), false)
+		for r in range(rows):
+			for c in range(Game.COLS):
+				var cell := Rect2(Game.LAWN_X + c * Game.CELL, Game.LAWN_Y + r * Game.CELL, Game.CELL, Game.CELL)
+				draw_rect(cell, Color(0.15, 0.4, 0.2, 0.22) if (r + c) % 2 == 0 else Color(0.12, 0.33, 0.16, 0.14))
+				draw_rect(cell, Color(1, 1, 1, 0.05), false, 1.0)
 	else:
 		for r in range(rows):
 			for c in range(Game.COLS):
@@ -863,13 +923,31 @@ func _draw_plant(p, col: Color, pr: float, cx: float, cy: float) -> void:
 
 # ---- Detaillierter Zombie: Torso + Arme + Gesicht (hohle rote Augen, zackiger Mund) ----
 func _draw_zombie(z, zc: Color, sz: float, zx: float, zy: float) -> void:
-	# Eigenes Sprite? (animierter Ordner oder Einzeldatei) -> zeichnen und fertig
-	var tex := _zombie_tex(str(z.kind))
+	var kind := str(z.kind)
+	# 1) Benannte Zustands-Animation (walking / idle / dying)
+	var state := "walking"
+	if z.get("dying", false): state = "dying"
+	elif z.get("eating", false): state = "idle"
+	var frames := _zombie_anim(kind, state)
+	if frames.is_empty() and state != "walking": frames = _zombie_anim(kind, "walking")
+	if frames.size() > 0:
+		var idx := 0
+		if state == "dying":
+			idx = clampi(int(float(z.get("die_t", 0.0)) / 0.06), 0, frames.size() - 1)
+		else:
+			idx = int(_anim_clock / 0.08) % frames.size()
+		var aw := sz * 2.9
+		var ah := sz * 2.9
+		draw_texture_rect(frames[idx], Rect2(zx - aw * 0.5, zy - ah * 0.62, aw, ah), false)
+		return
+	# 2) Einzeldatei-Sprite (zombies/<kind>.png oder 0.png)
+	var tex := _zombie_tex(kind)
 	if tex != null:
 		var w := sz * 1.7
 		var h := sz * 2.0
 		draw_texture_rect(tex, Rect2(zx - w * 0.5, zy - h * 0.6, w, h), false)
 		return
+	# 3) Gezeichneter Fallback
 	draw_rect(Rect2(zx - sz * 0.72, zy - sz * 0.12, sz * 0.45, sz * 0.16), zc.darkened(0.3))   # ausgestreckter Arm
 	draw_rect(Rect2(zx - sz / 2.0 - 2, zy - sz * 0.55 - 2, sz + 4, sz * 1.1 + 4), Color(0.06, 0.06, 0.09))  # Umriss
 	draw_rect(Rect2(zx - sz / 2.0, zy - sz * 0.55, sz, sz * 1.1), zc)                          # Torso
