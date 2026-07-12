@@ -938,14 +938,18 @@ func _draw_zombie(z, zc: Color, sz: float, zx: float, zy: float) -> void:
 			idx = int(_anim_clock / 0.08) % frames.size()
 		var aw := sz * 2.9
 		var ah := sz * 2.9
+		draw_set_transform(Vector2(zx * 2.0, 0.0), 0.0, Vector2(-1.0, 1.0))   # horizontal spiegeln -> Blick nach links
 		draw_texture_rect(frames[idx], Rect2(zx - aw * 0.5, zy - ah * 0.62, aw, ah), false)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		return
 	# 2) Einzeldatei-Sprite (zombies/<kind>.png oder 0.png)
 	var tex := _zombie_tex(kind)
 	if tex != null:
 		var w := sz * 1.7
 		var h := sz * 2.0
+		draw_set_transform(Vector2(zx * 2.0, 0.0), 0.0, Vector2(-1.0, 1.0))
 		draw_texture_rect(tex, Rect2(zx - w * 0.5, zy - h * 0.6, w, h), false)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 		return
 	# 3) Gezeichneter Fallback
 	draw_rect(Rect2(zx - sz * 0.72, zy - sz * 0.12, sz * 0.45, sz * 0.16), zc.darkened(0.3))   # ausgestreckter Arm
