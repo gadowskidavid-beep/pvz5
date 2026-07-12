@@ -12,6 +12,7 @@ var fx: Array = []
 var graveyard: Array = []   # tote Pflanzen fuer Necromancer-Wiederbelebung
 var popups: Array = []      # schwebende Zahlen (+Sonne, Belohnungen)
 var _font: Font             # Fallback-Font fuer die schwebenden Zahlen
+var _tex_cache := {}        # geladene Sprite-Texturen (null = kein Sprite -> gezeichneter Fallback)
 var rng := RandomNumberGenerator.new()
 
 var to_spawn := 0
@@ -28,7 +29,16 @@ var strike_t := 0.0        # Timer fuer Gewitter-Blitze
 func _ready() -> void:
 	rng.randomize()
 	_font = ThemeDB.fallback_font
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST   # scharfe Pixel-Art (kein Blur)
 	reset_run()
+
+# Laedt ein Sprite, falls vorhanden (sonst null -> gezeichneter Fallback). Ergebnis wird gecacht.
+func _tex(path: String) -> Texture2D:
+	if _tex_cache.has(path): return _tex_cache[path]
+	var t: Texture2D = null
+	if ResourceLoader.exists(path): t = load(path)
+	_tex_cache[path] = t
+	return t
 
 func world_of(w: int) -> Dictionary:
 	return BAL.act_of(w)
@@ -787,6 +797,12 @@ func _face(cx: float, cy: float, s: float, mood: String, eyecol := Color(0.1, 0.
 func _draw_plant(p, col: Color, pr: float, cx: float, cy: float) -> void:
 	var ck := str(p.ck)
 	var arch := str(p.arch)
+	# Eigenes Sprite? -> zeichnen und fertig
+	var tex := _tex("res://assets/sprites/plants/%s.png" % ck)
+	if tex != null:
+		var d := pr * 2.5
+		draw_texture_rect(tex, Rect2(cx - d * 0.5, cy - d * 0.5, d, d), false)
+		return
 	if ck == "sonne":
 		# Sonnenblume: goldene Bluetenblaetter + brauner Kern + froehliches Gesicht
 		for i in range(10):
@@ -820,6 +836,13 @@ func _draw_plant(p, col: Color, pr: float, cx: float, cy: float) -> void:
 
 # ---- Detaillierter Zombie: Torso + Arme + Gesicht (hohle rote Augen, zackiger Mund) ----
 func _draw_zombie(z, zc: Color, sz: float, zx: float, zy: float) -> void:
+	# Eigenes Sprite? -> zeichnen und fertig
+	var tex := _tex("res://assets/sprites/zombies/%s.png" % str(z.kind))
+	if tex != null:
+		var w := sz * 1.7
+		var h := sz * 2.0
+		draw_texture_rect(tex, Rect2(zx - w * 0.5, zy - h * 0.6, w, h), false)
+		return
 	draw_rect(Rect2(zx - sz * 0.72, zy - sz * 0.12, sz * 0.45, sz * 0.16), zc.darkened(0.3))   # ausgestreckter Arm
 	draw_rect(Rect2(zx - sz / 2.0 - 2, zy - sz * 0.55 - 2, sz + 4, sz * 1.1 + 4), Color(0.06, 0.06, 0.09))  # Umriss
 	draw_rect(Rect2(zx - sz / 2.0, zy - sz * 0.55, sz, sz * 1.1), zc)                          # Torso
@@ -838,6 +861,12 @@ func _draw_zombie(z, zc: Color, sz: float, zx: float, zy: float) -> void:
 # ---- Richtige Sonne: Strahlen + Glow + Gesicht ----
 func _draw_sun_icon(cx: float, cy: float, r: float) -> void:
 	var ctr := Vector2(cx, cy)
+	# Eigenes Sonnen-Sprite? -> zeichnen und fertig
+	var tex := _tex("res://assets/sprites/sun.png")
+	if tex != null:
+		var d := r * 2.8
+		draw_texture_rect(tex, Rect2(cx - d * 0.5, cy - d * 0.5, d, d), false)
+		return
 	for i in range(12):
 		var a := deg_to_rad(i * 30.0)
 		var d := Vector2(cos(a), sin(a))
