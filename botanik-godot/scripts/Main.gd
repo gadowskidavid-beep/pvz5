@@ -91,7 +91,7 @@ func _process(_delta: float) -> void:
 	# HUD lebt jedes Frame (Spiel laeuft weiter, egal ob Drawer offen)
 	sun_lbl.text = "Sonne  %d" % int(Game.sun)
 	fp_lbl.text = "FP  %d" % Game.fp
-	brain_lbl.text = "Gehirne  %d" % Game.brains
+	brain_lbl.text = "Skulls  %d" % Game.brains
 	wave_lbl.text = "Welle %d / 100%s" % [Game.wave, lawn.weather_hud()]
 	wave_bar.queue_redraw()
 	if d_fp != null: d_fp.text = "%d FP" % Game.fp
@@ -451,12 +451,12 @@ func _build_origin_picker(holder) -> void:
 		else:
 			var uc := Game.plant_unlock_cost(ck)
 			_card(g, "[Gesperrt] " + Game.CHASSIS[ck].n, Game.CHASSIS[ck].d, "Frei: FP %d" % uc, Game.fp >= uc, _unlock_plant.bind(ck))
-	_header(holder, "Mehr Samen-Slots (dauerhaft, Gehirne)", COL_PURPLE)
+	_header(holder, "Mehr Samen-Slots (dauerhaft, Skulls)", COL_PURPLE)
 	var b := Button.new()
 	if Game.seed_slot_max():
 		b.text = "Maximale Slots erreicht (%d)" % Game.slot_count(); b.disabled = true
 	else:
-		b.text = "Neuer Slot  (%d Gehirne)" % Game.seed_slot_cost()
+		b.text = "Neuer Slot  (%d Skulls)" % Game.seed_slot_cost()
 		b.disabled = Game.brains < Game.seed_slot_cost()
 		b.pressed.connect(_buy_slot)
 	b.custom_minimum_size = Vector2(300, 38)
@@ -991,7 +991,7 @@ func _build_menu(vb) -> void:
 	_menu_btn(vb, "Optionen", _menu_open_opt)
 	_menu_btn(vb, "Entwickler-Menue (Regler & Cheats)", _menu_open_dev)
 	_spacer(vb, 16)
-	_big(vb, "Gehirne (dauerhaft): %d     Prestige-Stufen: %d" % [Game.brains, _pres_total()], 14, COL_PURPLE)
+	_big(vb, "Skulls (dauerhaft): %d     Prestige-Stufen: %d" % [Game.brains, _pres_total()], 14, COL_PURPLE)
 	_big(vb, "Tipp: Zieh unten das Skill-Trees-Panel hoch, waehrend oben das Spiel laeuft.", 13, Color(0.65, 0.8, 0.68))
 
 func _menu_open_alm() -> void: open_overlay("almanac", "menu")
@@ -1010,7 +1010,7 @@ func _build_options(vb) -> void:
 	_header(vb, "Steuerung: Linksklick = Sonne sammeln / Pflanze setzen / Zombie schlagen (Hammer).", Color(0.75, 0.85, 0.78))
 	_header(vb, "Leertaste = Welle starten.  Unten der Pfeil oeffnet die Skill-Trees.", Color(0.75, 0.85, 0.78))
 	_spacer(vb, 12)
-	_header(vb, "Gehirne & Prestige zuruecksetzen (kann nicht rueckgaengig gemacht werden):", Color(1, 0.6, 0.6))
+	_header(vb, "Skulls & Prestige zuruecksetzen (kann nicht rueckgaengig gemacht werden):", Color(1, 0.6, 0.6))
 	var b := Button.new(); b.text = "Kompletten Fortschritt loeschen"; b.custom_minimum_size = Vector2(320, 40)
 	b.pressed.connect(_reset_progress)
 	vb.add_child(b)
@@ -1122,7 +1122,7 @@ func _do_rebirth() -> void:
 
 # ---- WIEDERGEBURT / PRESTIGE-BAUM ----
 func _build_prestige(vb) -> void:
-	_header(vb, "GEHIRN-UPGRADES  —  Gehirne: %d  (bleiben dauerhaft)" % Game.brains, COL_PURPLE)
+	_header(vb, "SKULL-UPGRADES  —  Skulls: %d  (bleiben dauerhaft)" % Game.brains, COL_PURPLE)
 	var g := _grid(vb, 3)
 	for k in Game.PRES_ORDER:
 		var p = Game.PRESTIGE[k]

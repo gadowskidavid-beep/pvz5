@@ -41,8 +41,20 @@ Fehlt eine Datei, wird weiter die eingebaute Grafik gezeichnet (nichts bricht).
 | `boss_c.png` | Blitz-Boss (W75) |
 | `megaboss.png` | Untoter Ueberlord (W100) |
 
+### Animierte Zombies (voller Sprite-Satz)
+Fuer jeden Zombie gibt es einen **eigenen Ordner** `assets/sprites/zombies/<name>/`.
+Lege dort die Animations-Frames als **`0.png`, `1.png`, `2.png` ...** ab (der Reihe nach).
+Das Spiel spielt sie automatisch als Lauf-Animation ab (~6 FPS).
+Alternativ reicht eine einzelne Datei `zombies/<name>.png` (keine Animation).
+
 ## Sonne (Sammel-Objekt)  ->  `assets/sprites/sun.png`
 Die kleine einsammelbare Sonne.
+
+## UI-Icons  ->  `assets/sprites/ui/`
+`coin.png`, `sun.png`, `skull.png`, `fp.png` (fuer die HUD-Anzeigen).
+
+## Hintergruende  ->  `assets/sprites/bg/`
+`night.png` = Nacht-Hintergrund (wird bei Nacht-Welten ueber die Rasenflaeche gezeichnet).
 
 ## Hochladen
 - Auf github.com: in den jeweiligen Ordner -> "Add file" -> "Upload files" -> committen.

@@ -13,6 +13,8 @@ var graveyard: Array = []   # tote Pflanzen fuer Necromancer-Wiederbelebung
 var popups: Array = []      # schwebende Zahlen (+Sonne, Belohnungen)
 var _font: Font             # Fallback-Font fuer die schwebenden Zahlen
 var _tex_cache := {}        # geladene Sprite-Texturen (null = kein Sprite -> gezeichneter Fallback)
+var _frames_cache := {}     # animierte Frame-Listen je Ordner
+var _anim_clock := 0.0      # globale Animations-Uhr
 var rng := RandomNumberGenerator.new()
 
 var to_spawn := 0
@@ -39,6 +41,25 @@ func _tex(path: String) -> Texture2D:
 	if ResourceLoader.exists(path): t = load(path)
 	_tex_cache[path] = t
 	return t
+
+# Laedt Animations-Frames aus einem Ordner: <dir>/0.png, 1.png, 2.png ... (gecacht)
+func _frames(dir: String) -> Array:
+	if _frames_cache.has(dir): return _frames_cache[dir]
+	var arr := []
+	for i in range(24):
+		var p := "%s/%d.png" % [dir, i]
+		if ResourceLoader.exists(p): arr.append(load(p))
+		else: break
+	_frames_cache[dir] = arr
+	return arr
+
+# Zombie-Textur: erst animierter Ordner zombies/<kind>/, sonst einzelne Datei zombies/<kind>.png
+func _zombie_tex(kind: String) -> Texture2D:
+	var frames := _frames("res://assets/sprites/zombies/%s" % kind)
+	if frames.size() > 0:
+		var idx := int(_anim_clock / 0.16) % frames.size()
+		return frames[idx]
+	return _tex("res://assets/sprites/zombies/%s.png" % kind)
 
 func world_of(w: int) -> Dictionary:
 	return BAL.act_of(w)
@@ -120,7 +141,7 @@ func _end_wave() -> void:
 		var rew := 150 + int(Game.brains * 0.25)
 		Game.brains += rew; Game.save_game()
 		Game.phase = "won"
-		msg = "SIEG! Welle 100 geschafft! +%d Gehirne" % rew; msg_t = 6.0
+		msg = "SIEG! Welle 100 geschafft! +%d Skulls" % rew; msg_t = 6.0
 		return
 	Game.phase = "prep"
 	Game.fp += Game.wave
@@ -186,6 +207,7 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 func _update(dt: float) -> void:
+	_anim_clock += dt
 	var wo := world_of(Game.wave)
 	# Himmels-Sonne
 	sky_timer -= dt
@@ -600,11 +622,11 @@ func _kill(z) -> void:
 		var b := int(max(1, round((z.brain + int(Game.wave / 5.0)) * Game.brain_mul() * rew)))
 		Game.brains += b; Game.save_game()
 		fx.append({"t": "boom", "x": z.x, "y": z.y, "life": 0.4})
-		msg = "Boss besiegt! +%d Gehirne" % b; msg_t = 2.5
+		msg = "Boss besiegt! +%d Skulls" % b; msg_t = 2.5
 	elif z.get("carrier", false) and int(z.get("brain", 0)) > 0:
 		var bc := int(max(1, round(z.brain * Game.brain_mul() * rew)))
 		Game.brains += bc; Game.save_game()
-		msg = "Gehirn erbeutet! +%d" % bc; msg_t = 1.5
+		msg = "Skull erbeutet! +%d" % bc; msg_t = 1.5
 	var fpg := int(max(1, round(z.fp * Game.fp_mul() * rew)))
 	if rng.randf() < Game.loot_chance():
 		fpg *= 2
@@ -678,16 +700,21 @@ func _place(col: int, row: int) -> void:
 # ---- Zeichnen ----
 func _draw() -> void:
 	var wo := world_of(Game.wave)
-	for r in range(rows):
-		for c in range(Game.COLS):
-			var g: Color
-			if wo.pond and r == rows - 1: g = (Color(0.11,0.33,0.4) if (r+c)%2==0 else Color(0.13,0.39,0.45))
-			else: g = (wo.g1 if (r + c) % 2 == 0 else wo.g2)
-			draw_rect(Rect2(Game.LAWN_X + c * Game.CELL, Game.LAWN_Y + r * Game.CELL, Game.CELL, Game.CELL), g)
-	if wo.night: draw_rect(Rect2(Game.LAWN_X, Game.LAWN_Y, Game.COLS * Game.CELL, rows * Game.CELL), Color(0.08,0.12,0.25,0.30))
-	if wo.get("roof", false): draw_rect(Rect2(Game.LAWN_X, Game.LAWN_Y, Game.COLS * Game.CELL, rows * Game.CELL), Color(0.5,0.35,0.18,0.14))
-	# Wetter-Overlay
 	var lawn_rect := Rect2(Game.LAWN_X, Game.LAWN_Y, Game.COLS * Game.CELL, rows * Game.CELL)
+	# Nacht-Hintergrundbild (falls vorhanden) statt der Kachel-Textur
+	var bg_tex: Texture2D = _tex("res://assets/sprites/bg/night.png") if wo.night else null
+	if bg_tex != null:
+		draw_texture_rect(bg_tex, lawn_rect, false)
+	else:
+		for r in range(rows):
+			for c in range(Game.COLS):
+				var g: Color
+				if wo.pond and r == rows - 1: g = (Color(0.11,0.33,0.4) if (r+c)%2==0 else Color(0.13,0.39,0.45))
+				else: g = (wo.g1 if (r + c) % 2 == 0 else wo.g2)
+				draw_rect(Rect2(Game.LAWN_X + c * Game.CELL, Game.LAWN_Y + r * Game.CELL, Game.CELL, Game.CELL), g)
+		if wo.night: draw_rect(lawn_rect, Color(0.08,0.12,0.25,0.30))
+	if wo.get("roof", false): draw_rect(lawn_rect, Color(0.5,0.35,0.18,0.14))
+	# Wetter-Overlay
 	if weather == "nebel": draw_rect(lawn_rect, Color(0.82, 0.84, 0.88, 0.24))
 	elif weather == "frost": draw_rect(lawn_rect, Color(0.55, 0.72, 1.0, 0.15))
 	elif weather == "gewitter": draw_rect(lawn_rect, Color(0.12, 0.12, 0.28, 0.22))
@@ -836,8 +863,8 @@ func _draw_plant(p, col: Color, pr: float, cx: float, cy: float) -> void:
 
 # ---- Detaillierter Zombie: Torso + Arme + Gesicht (hohle rote Augen, zackiger Mund) ----
 func _draw_zombie(z, zc: Color, sz: float, zx: float, zy: float) -> void:
-	# Eigenes Sprite? -> zeichnen und fertig
-	var tex := _tex("res://assets/sprites/zombies/%s.png" % str(z.kind))
+	# Eigenes Sprite? (animierter Ordner oder Einzeldatei) -> zeichnen und fertig
+	var tex := _zombie_tex(str(z.kind))
 	if tex != null:
 		var w := sz * 1.7
 		var h := sz * 2.0
