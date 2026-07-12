@@ -16,8 +16,7 @@ var _tex_cache := {}        # geladene Sprite-Texturen (null = kein Sprite -> ge
 var _frames_cache := {}     # animierte Frame-Listen je Ordner
 var _anim_cache := {}       # benannte Zustands-Animationen: "kind|state" -> [Texture2D]
 var _anim_clock := 0.0      # globale Animations-Uhr
-var _bg_checked := false    # Hintergrundbild schon gesucht?
-var _bg_cached: Texture2D = null
+var _bg_cache := {}         # "day"/"night" -> Texture2D (Tag/Nacht-Hintergrund)
 var rng := RandomNumberGenerator.new()
 
 var to_spawn := 0
@@ -84,20 +83,31 @@ func _zombie_anim(kind: String, state: String) -> Array:
 	_anim_cache[key] = frames
 	return frames
 
-# Hintergrundbild: bevorzugt bg/night.png, sonst erstes PNG in bg/
-func _scene_bg() -> Texture2D:
-	if _bg_checked: return _bg_cached
-	_bg_checked = true
-	if ResourceLoader.exists("res://assets/sprites/bg/night.png"):
-		_bg_cached = load("res://assets/sprites/bg/night.png")
+# Tag/Nacht-Hintergrund: bg/day.png bzw. bg/night.png, mit Heuristik + Fallback
+func _scene_bg(night: bool) -> Texture2D:
+	var key := "night" if night else "day"
+	if _bg_cache.has(key): return _bg_cache[key]
+	var tex: Texture2D = null
+	var direct := "res://assets/sprites/bg/%s.png" % key
+	if ResourceLoader.exists(direct):
+		tex = load(direct)
 	else:
 		var da := DirAccess.open("res://assets/sprites/bg")
+		var any_tex: Texture2D = null
+		var match_tex: Texture2D = null
 		if da != null:
 			for f in da.get_files():
-				if f.to_lower().ends_with(".png"):
-					_bg_cached = load("res://assets/sprites/bg/" + f)
-					break
-	return _bg_cached
+				var low := f.to_lower()
+				if not low.ends_with(".png"): continue
+				var p := "res://assets/sprites/bg/" + f
+				if any_tex == null: any_tex = load(p)
+				var is_night := low.find("graveyard") != -1 or low.find("night") != -1 or low.find("nacht") != -1 or low.find("dark") != -1
+				var is_day := low.find("day") != -1 or low.find("tag") != -1 or low.find("forest") != -1 or low.find("wald") != -1 or low.find("garden") != -1 or low.find("garten") != -1
+				if night and is_night: match_tex = load(p); break
+				if (not night) and is_day: match_tex = load(p); break
+		tex = match_tex if match_tex != null else any_tex
+	_bg_cache[key] = tex
+	return tex
 
 func _start_dying(z) -> void:
 	if not z.get("dropped", false): _kill(z)
@@ -755,8 +765,8 @@ func _place(col: int, row: int) -> void:
 func _draw() -> void:
 	var wo := world_of(Game.wave)
 	var lawn_rect := Rect2(Game.LAWN_X, Game.LAWN_Y, Game.COLS * Game.CELL, rows * Game.CELL)
-	# --- Hintergrund-Kulisse (Bild als Full-Screen-Backdrop) ---
-	var bg := _scene_bg()
+	# --- Hintergrund-Kulisse (Tag/Nacht, Full-Screen-Backdrop) ---
+	var bg := _scene_bg(bool(wo.night))
 	if bg != null:
 		var vp := get_viewport_rect().size
 		draw_texture_rect(bg, Rect2(0, 0, vp.x, vp.y), false)
