@@ -755,24 +755,32 @@ func _place(col: int, row: int) -> void:
 func _draw() -> void:
 	var wo := world_of(Game.wave)
 	var lawn_rect := Rect2(Game.LAWN_X, Game.LAWN_Y, Game.COLS * Game.CELL, rows * Game.CELL)
-	# Hintergrundbild als Full-Screen-Kulisse (falls vorhanden) + dezentes Pflanzgitter
+	# --- Hintergrund-Kulisse (Bild als Full-Screen-Backdrop) ---
 	var bg := _scene_bg()
 	if bg != null:
 		var vp := get_viewport_rect().size
 		draw_texture_rect(bg, Rect2(0, 0, vp.x, vp.y), false)
-		for r in range(rows):
-			for c in range(Game.COLS):
-				var cell := Rect2(Game.LAWN_X + c * Game.CELL, Game.LAWN_Y + r * Game.CELL, Game.CELL, Game.CELL)
-				draw_rect(cell, Color(0.15, 0.4, 0.2, 0.22) if (r + c) % 2 == 0 else Color(0.12, 0.33, 0.16, 0.14))
-				draw_rect(cell, Color(1, 1, 1, 0.05), false, 1.0)
-	else:
-		for r in range(rows):
-			for c in range(Game.COLS):
-				var g: Color
-				if wo.pond and r == rows - 1: g = (Color(0.11,0.33,0.4) if (r+c)%2==0 else Color(0.13,0.39,0.45))
-				else: g = (wo.g1 if (r + c) % 2 == 0 else wo.g2)
-				draw_rect(Rect2(Game.LAWN_X + c * Game.CELL, Game.LAWN_Y + r * Game.CELL, Game.CELL, Game.CELL), g)
-		if wo.night: draw_rect(lawn_rect, Color(0.08,0.12,0.25,0.30))
+	# --- Solider Rasen auf einem Erd-Sockel (Perspektive/Plattform) ---
+	var lx := float(Game.LAWN_X)
+	var ly := float(Game.LAWN_Y)
+	var lw := float(Game.COLS * Game.CELL)
+	var lh := float(rows * Game.CELL)
+	draw_rect(Rect2(lx - 12, ly - 8, lw + 24, lh + 42), Color(0.16, 0.10, 0.05))   # dunkler Erd-Rahmen (Tiefe)
+	draw_rect(Rect2(lx - 7, ly - 3, lw + 14, lh + 28), Color(0.32, 0.21, 0.12))    # Erde/Sockel
+	for r in range(rows):
+		for c in range(Game.COLS):
+			var g: Color
+			if bg == null and wo.pond and r == rows - 1: g = (Color(0.11,0.33,0.4) if (r+c)%2==0 else Color(0.13,0.39,0.45))
+			elif bg == null: g = (wo.g1 if (r + c) % 2 == 0 else wo.g2)
+			else: g = Color(0.32, 0.56, 0.25) if (r + c) % 2 == 0 else Color(0.26, 0.49, 0.20)
+			draw_rect(Rect2(lx + c * Game.CELL, ly + r * Game.CELL, Game.CELL, Game.CELL), g)
+	draw_rect(Rect2(lx, ly, lw, 5), Color(0.52, 0.82, 0.42, 0.8))        # heller Grasrand oben
+	for c in range(Game.COLS + 1):
+		draw_line(Vector2(lx + c * Game.CELL, ly), Vector2(lx + c * Game.CELL, ly + lh), Color(0, 0, 0, 0.13), 1.0)
+	for r in range(rows + 1):
+		draw_line(Vector2(lx, ly + r * Game.CELL), Vector2(lx + lw, ly + r * Game.CELL), Color(0, 0, 0, 0.13), 1.0)
+	draw_rect(Rect2(lx - 7, ly + lh, lw + 14, 10), Color(0, 0, 0, 0.30))  # Schatten an der Vorderkante
+	if bg == null and wo.night: draw_rect(lawn_rect, Color(0.08,0.12,0.25,0.30))
 	if wo.get("roof", false): draw_rect(lawn_rect, Color(0.5,0.35,0.18,0.14))
 	# Wetter-Overlay
 	if weather == "nebel": draw_rect(lawn_rect, Color(0.82, 0.84, 0.88, 0.24))

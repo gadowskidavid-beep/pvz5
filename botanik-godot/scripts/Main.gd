@@ -151,6 +151,14 @@ func _sb(bg: Color, border: Color, bw: int, radius: int, pad := 8) -> StyleBoxFl
 
 # ================= HUD (oben) =================
 func _build_hud() -> void:
+	# Solider Balken hinter dem oberen HUD (damit nichts ueber der Kulisse schwebt)
+	var topbar := Panel.new()
+	topbar.position = Vector2(0, 0)
+	topbar.size = Vector2(SCREEN_W, 92)
+	topbar.custom_minimum_size = Vector2(SCREEN_W, 92)
+	topbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	topbar.add_theme_stylebox_override("panel", _sb(Color(0.07, 0.09, 0.13, 0.96), Color(0.28, 0.45, 0.36), 2, 0, 0))
+	root.add_child(topbar)
 	# Waehrungs-Pills oben links
 	var pills := HBoxContainer.new()
 	pills.position = Vector2(14, 10)
@@ -242,6 +250,14 @@ func _open_dev() -> void: open_overlay("dev")
 
 # ================= UNTERE LEISTE =================
 func _build_bottom() -> void:
+	# Solider Balken hinter der unteren Leiste
+	var botbar := Panel.new()
+	botbar.position = Vector2(0, SCREEN_H - 72)
+	botbar.size = Vector2(SCREEN_W, 72)
+	botbar.custom_minimum_size = Vector2(SCREEN_W, 72)
+	botbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	botbar.add_theme_stylebox_override("panel", _sb(Color(0.07, 0.09, 0.13, 0.96), Color(0.28, 0.45, 0.36), 2, 0, 0))
+	root.add_child(botbar)
 	# Pflanzen-Karten links
 	seed_box = HBoxContainer.new()
 	seed_box.position = Vector2(12, SCREEN_H - 60)
