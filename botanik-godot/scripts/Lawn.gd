@@ -864,8 +864,8 @@ func _draw_sun_icon(cx: float, cy: float, r: float) -> void:
 	# Eigenes Sonnen-Sprite? -> zeichnen und fertig
 	var tex := _tex("res://assets/sprites/sun.png")
 	if tex != null:
-		var d := r * 2.8
-		draw_texture_rect(tex, Rect2(cx - d * 0.5, cy - d * 0.5, d, d), false)
+		var sd := r * 2.8
+		draw_texture_rect(tex, Rect2(cx - sd * 0.5, cy - sd * 0.5, sd, sd), false)
 		return
 	for i in range(12):
 		var a := deg_to_rad(i * 30.0)
