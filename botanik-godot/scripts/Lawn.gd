@@ -699,9 +699,7 @@ func _draw() -> void:
 		if p.has("gm"): pr = 24.0 + 6.0 * (float(p.gm) - 1.0) / max(0.01, BAL.SHROOM_GROWTH_MAX - 1.0)
 		var pby: float = p.y + sin(float(p.t) * 2.2) * 1.5             # sanftes Wippen
 		_shadow(p.x, p.y, pr)
-		draw_circle(Vector2(p.x, pby), pr, col.darkened(0.5))          # Umriss
-		draw_circle(Vector2(p.x, pby), pr - 3.0, col)                  # Koerper
-		draw_circle(Vector2(p.x - pr * 0.32, pby - pr * 0.32), pr * 0.30, col.lightened(0.4))   # Glanzlicht
+		_draw_plant(p, col, pr, p.x, pby)
 		_hp_bar(p.x, p.y + 30, p.hp / p.maxhp, Color(0.35,0.85,0.4))
 		# Nacht-Pilz: verbleibende Lebensdauer (lila Balken oben)
 		if p.has("age"):
@@ -722,8 +720,7 @@ func _draw() -> void:
 		var zy: float = z.y
 		if z.get("fly", false): zy = z.y - Game.CELL * 0.32   # Ballon schwebt hoeher
 		_shadow(z.x, zy + sz * 0.5, sz * 0.5)
-		draw_rect(Rect2(z.x - sz/2.0 - 2, zy - sz*0.55 - 2, sz + 4, sz*1.1 + 4), Color(0.06, 0.06, 0.09))   # Umriss
-		draw_rect(Rect2(z.x - sz/2.0, zy - sz*0.55, sz, sz*1.1), zc)
+		_draw_zombie(z, zc, float(sz), z.x, zy)
 		if z.get("fly", false):
 			draw_line(Vector2(z.x, zy - sz*0.55), Vector2(z.x, zy - sz*0.95), Color(0.25,0.25,0.25), 1.5)
 			draw_circle(Vector2(z.x, zy - sz*1.05), 13, Color(0.92,0.5,0.55))
@@ -747,10 +744,7 @@ func _draw() -> void:
 			break
 	# Sonne
 	for s in suns:
-		draw_circle(Vector2(s.x, s.y), 22, Color(1, 0.9, 0.3, 0.16))       # Glow
-		draw_circle(Vector2(s.x, s.y), 15, Color(1,0.85,0.25))
-		draw_circle(Vector2(s.x, s.y), 15, Color(0.9,0.6,0.1), false, 2.0)
-		draw_circle(Vector2(s.x - 4, s.y - 4), 4, Color(1, 1, 0.85, 0.85))  # Glanzpunkt
+		_draw_sun_icon(s.x, s.y, 16.0)
 	# Effekte
 	for e in fx:
 		if e.t == "boom": draw_circle(Vector2(e.x, e.y), 60 * (e.life/0.4), Color(1,0.6,0.1, e.life/0.4))
@@ -770,6 +764,89 @@ func _popup(x: float, y: float, text: String, col: Color) -> void:
 
 func _shadow(cx: float, cy: float, r: float) -> void:
 	draw_circle(Vector2(cx, cy + r * 0.7), r * 0.85, Color(0, 0, 0, 0.20))
+
+# ---- Gesicht: zwei Augen + Mund (mood: happy/neutral/angry) ----
+func _face(cx: float, cy: float, s: float, mood: String, eyecol := Color(0.1, 0.1, 0.12)) -> void:
+	var ex := s * 0.42
+	var ey := cy - s * 0.08
+	draw_circle(Vector2(cx - ex, ey), s * 0.27, Color(1, 1, 1))          # Augenweiss
+	draw_circle(Vector2(cx + ex, ey), s * 0.27, Color(1, 1, 1))
+	draw_circle(Vector2(cx - ex, ey), s * 0.13, eyecol)                  # Pupille
+	draw_circle(Vector2(cx + ex, ey), s * 0.13, eyecol)
+	draw_circle(Vector2(cx - ex + s * 0.05, ey - s * 0.05), s * 0.05, Color(1, 1, 1, 0.9))  # Glanz im Auge
+	draw_circle(Vector2(cx + ex + s * 0.05, ey - s * 0.05), s * 0.05, Color(1, 1, 1, 0.9))
+	var my := cy + s * 0.42
+	if mood == "happy":
+		draw_arc(Vector2(cx, my - s * 0.18), s * 0.32, deg_to_rad(20), deg_to_rad(160), 14, eyecol, 2.5)
+	elif mood == "angry":
+		draw_arc(Vector2(cx, my + s * 0.18), s * 0.32, deg_to_rad(200), deg_to_rad(340), 14, eyecol, 2.5)
+	else:
+		draw_line(Vector2(cx - s * 0.2, my), Vector2(cx + s * 0.2, my), eyecol, 2.5)
+
+# ---- Detaillierte Pflanze je nach Typ + Gesicht ----
+func _draw_plant(p, col: Color, pr: float, cx: float, cy: float) -> void:
+	var ck := str(p.ck)
+	var arch := str(p.arch)
+	if ck == "sonne":
+		# Sonnenblume: goldene Bluetenblaetter + brauner Kern + froehliches Gesicht
+		for i in range(10):
+			var a := deg_to_rad(i * 36.0)
+			draw_circle(Vector2(cx + cos(a) * pr * 0.98, cy + sin(a) * pr * 0.98), pr * 0.34, Color(1, 0.8, 0.18))
+		draw_circle(Vector2(cx, cy), pr * 0.72, Color(0.5, 0.32, 0.12))
+		draw_circle(Vector2(cx, cy), pr * 0.72, Color(0.32, 0.19, 0.06), false, 2.0)
+		_face(cx, cy, pr * 0.72, "happy", Color(0.22, 0.12, 0.03))
+		return
+	if ck == "lilypad":
+		draw_circle(Vector2(cx, cy), pr, Color(0.16, 0.45, 0.28))
+		draw_circle(Vector2(cx, cy), pr - 3.0, col)
+		_face(cx, cy, pr * 0.5, "happy")
+		return
+	# Basis-Koerper
+	draw_circle(Vector2(cx, cy), pr, col.darkened(0.5))
+	draw_circle(Vector2(cx, cy), pr - 3.0, col)
+	draw_circle(Vector2(cx - pr * 0.32, cy - pr * 0.32), pr * 0.30, col.lightened(0.4))
+	if arch == "shooter" or arch == "beam":
+		draw_rect(Rect2(cx + pr * 0.45, cy - pr * 0.2, pr * 0.78, pr * 0.4), col.darkened(0.28))
+		draw_circle(Vector2(cx + pr * 1.22, cy), pr * 0.24, col.darkened(0.4))
+		_face(cx - pr * 0.12, cy - pr * 0.05, pr * 0.55, "angry")
+	elif arch == "wall":
+		_face(cx, cy, pr * 0.72, "neutral")
+	elif arch == "fume" or arch == "lobber":
+		draw_circle(Vector2(cx - pr * 0.35, cy - pr * 0.32), pr * 0.16, col.lightened(0.55))
+		draw_circle(Vector2(cx + pr * 0.32, cy - pr * 0.36), pr * 0.13, col.lightened(0.55))
+		_face(cx, cy + pr * 0.12, pr * 0.55, "neutral")
+	else:
+		_face(cx, cy, pr * 0.62, "happy")
+
+# ---- Detaillierter Zombie: Torso + Arme + Gesicht (hohle rote Augen, zackiger Mund) ----
+func _draw_zombie(z, zc: Color, sz: float, zx: float, zy: float) -> void:
+	draw_rect(Rect2(zx - sz * 0.72, zy - sz * 0.12, sz * 0.45, sz * 0.16), zc.darkened(0.3))   # ausgestreckter Arm
+	draw_rect(Rect2(zx - sz / 2.0 - 2, zy - sz * 0.55 - 2, sz + 4, sz * 1.1 + 4), Color(0.06, 0.06, 0.09))  # Umriss
+	draw_rect(Rect2(zx - sz / 2.0, zy - sz * 0.55, sz, sz * 1.1), zc)                          # Torso
+	draw_rect(Rect2(zx - sz / 2.0, zy - sz * 0.55, sz, sz * 0.16), zc.lightened(0.12))         # Kopf-Highlight
+	var fy := zy - sz * 0.28
+	draw_circle(Vector2(zx - sz * 0.16, fy), sz * 0.11, Color(0.95, 0.95, 0.88))              # Augenweiss
+	draw_circle(Vector2(zx + sz * 0.16, fy), sz * 0.11, Color(0.95, 0.95, 0.88))
+	draw_circle(Vector2(zx - sz * 0.16, fy), sz * 0.055, Color(0.75, 0.1, 0.1))               # rote Pupille
+	draw_circle(Vector2(zx + sz * 0.16, fy), sz * 0.055, Color(0.75, 0.1, 0.1))
+	var my := zy + sz * 0.04
+	draw_line(Vector2(zx - sz * 0.22, my), Vector2(zx + sz * 0.22, my), Color(0.1, 0.05, 0.05), 2.5)  # Mund
+	for k in range(3):
+		var mx := zx - sz * 0.15 + k * sz * 0.15
+		draw_line(Vector2(mx, my), Vector2(mx + sz * 0.07, my - sz * 0.09), Color(0.1, 0.05, 0.05), 1.5)  # Zaehne
+
+# ---- Richtige Sonne: Strahlen + Glow + Gesicht ----
+func _draw_sun_icon(cx: float, cy: float, r: float) -> void:
+	var ctr := Vector2(cx, cy)
+	for i in range(12):
+		var a := deg_to_rad(i * 30.0)
+		var d := Vector2(cos(a), sin(a))
+		draw_line(ctr + d * r * 0.95, ctr + d * r * 1.55, Color(1, 0.8, 0.2), 3.0)
+	draw_circle(ctr, r * 1.3, Color(1, 0.9, 0.3, 0.20))
+	draw_circle(ctr, r, Color(1, 0.82, 0.15))
+	draw_circle(ctr, r, Color(0.95, 0.6, 0.1), false, 2.5)
+	_face(cx, cy, r * 0.95, "happy", Color(0.6, 0.35, 0.05))
+	draw_circle(ctr + Vector2(-r * 0.4, -r * 0.4), r * 0.22, Color(1, 1, 0.85, 0.6))
 
 func _hp_bar(cx: float, y: float, frac: float, c: Color) -> void:
 	if frac >= 1.0: return
