@@ -10,6 +10,8 @@ var suns: Array = []
 var mowers: Array = []
 var fx: Array = []
 var graveyard: Array = []   # tote Pflanzen fuer Necromancer-Wiederbelebung
+var popups: Array = []      # schwebende Zahlen (+Sonne, Belohnungen)
+var _font: Font             # Fallback-Font fuer die schwebenden Zahlen
 var rng := RandomNumberGenerator.new()
 
 var to_spawn := 0
@@ -25,6 +27,7 @@ var strike_t := 0.0        # Timer fuer Gewitter-Blitze
 
 func _ready() -> void:
 	rng.randomize()
+	_font = ThemeDB.fallback_font
 	reset_run()
 
 func world_of(w: int) -> Dictionary:
@@ -32,7 +35,7 @@ func world_of(w: int) -> Dictionary:
 
 func reset_run() -> void:
 	Game.rebirth()
-	plants.clear(); zombies.clear(); peas.clear(); suns.clear(); fx.clear(); graveyard.clear()
+	plants.clear(); zombies.clear(); peas.clear(); suns.clear(); fx.clear(); graveyard.clear(); popups.clear()
 	rows = Game.lanes_count()
 	mowers.clear()
 	for r in range(rows):
@@ -403,6 +406,11 @@ func _update(dt: float) -> void:
 	for i in range(fx.size() - 1, -1, -1):
 		fx[i].life -= dt
 		if fx[i].life <= 0: fx.remove_at(i)
+	# Schwebende Zahlen steigen auf und verblassen
+	for i in range(popups.size() - 1, -1, -1):
+		popups[i].y -= 26.0 * dt
+		popups[i].life -= dt
+		if popups[i].life <= 0: popups.remove_at(i)
 
 func _lane_has(p) -> bool:
 	var maxx := 1.0e9
@@ -614,7 +622,9 @@ func lawn_click(pos: Vector2) -> void:
 	# Sonne einsammeln
 	for i in range(suns.size() - 1, -1, -1):
 		if pos.distance_to(Vector2(suns[i].x, suns[i].y)) < 30:
-			Game.sun += suns[i].value; suns.remove_at(i); return
+			var sv: int = int(suns[i].value)
+			_popup(suns[i].x, suns[i].y, "+%d" % sv, Color(1, 0.9, 0.35))
+			Game.sun += sv; suns.remove_at(i); return
 	var col := int((pos.x - Game.LAWN_X) / Game.CELL)
 	var row := int((pos.y - Game.LAWN_Y) / Game.CELL)
 	if col < 0 or col >= Game.COLS or row < 0 or row >= rows: return
@@ -672,6 +682,10 @@ func _draw() -> void:
 	elif weather == "frost": draw_rect(lawn_rect, Color(0.55, 0.72, 1.0, 0.15))
 	elif weather == "gewitter": draw_rect(lawn_rect, Color(0.12, 0.12, 0.28, 0.22))
 	draw_rect(Rect2(Game.LAWN_X - 14, Game.LAWN_Y, 9, rows * Game.CELL), Color(0.42,0.32,0.62))
+	# Tiefe: sanfter Verlauf (oben heller, unten dunkler)
+	var _lh := rows * Game.CELL
+	draw_rect(Rect2(Game.LAWN_X, Game.LAWN_Y, Game.COLS * Game.CELL, _lh * 0.45), Color(1, 1, 1, 0.03))
+	draw_rect(Rect2(Game.LAWN_X, Game.LAWN_Y + _lh * 0.62, Game.COLS * Game.CELL, _lh * 0.38), Color(0, 0, 0, 0.10))
 	# Rasenmäher
 	for m in mowers:
 		if m.used: continue
@@ -683,7 +697,11 @@ func _draw() -> void:
 		# Nacht-Pilze pulsieren/wachsen sichtbar mit ihrer Staerke
 		var pr := 28.0
 		if p.has("gm"): pr = 24.0 + 6.0 * (float(p.gm) - 1.0) / max(0.01, BAL.SHROOM_GROWTH_MAX - 1.0)
-		draw_circle(Vector2(p.x, p.y), pr, col)
+		var pby: float = p.y + sin(float(p.t) * 2.2) * 1.5             # sanftes Wippen
+		_shadow(p.x, p.y, pr)
+		draw_circle(Vector2(p.x, pby), pr, col.darkened(0.5))          # Umriss
+		draw_circle(Vector2(p.x, pby), pr - 3.0, col)                  # Koerper
+		draw_circle(Vector2(p.x - pr * 0.32, pby - pr * 0.32), pr * 0.30, col.lightened(0.4))   # Glanzlicht
 		_hp_bar(p.x, p.y + 30, p.hp / p.maxhp, Color(0.35,0.85,0.4))
 		# Nacht-Pilz: verbleibende Lebensdauer (lila Balken oben)
 		if p.has("age"):
@@ -703,6 +721,8 @@ func _draw() -> void:
 		var sz = 60 if z.boss else 40
 		var zy: float = z.y
 		if z.get("fly", false): zy = z.y - Game.CELL * 0.32   # Ballon schwebt hoeher
+		_shadow(z.x, zy + sz * 0.5, sz * 0.5)
+		draw_rect(Rect2(z.x - sz/2.0 - 2, zy - sz*0.55 - 2, sz + 4, sz*1.1 + 4), Color(0.06, 0.06, 0.09))   # Umriss
 		draw_rect(Rect2(z.x - sz/2.0, zy - sz*0.55, sz, sz*1.1), zc)
 		if z.get("fly", false):
 			draw_line(Vector2(z.x, zy - sz*0.55), Vector2(z.x, zy - sz*0.95), Color(0.25,0.25,0.25), 1.5)
@@ -727,8 +747,10 @@ func _draw() -> void:
 			break
 	# Sonne
 	for s in suns:
+		draw_circle(Vector2(s.x, s.y), 22, Color(1, 0.9, 0.3, 0.16))       # Glow
 		draw_circle(Vector2(s.x, s.y), 15, Color(1,0.85,0.25))
 		draw_circle(Vector2(s.x, s.y), 15, Color(0.9,0.6,0.1), false, 2.0)
+		draw_circle(Vector2(s.x - 4, s.y - 4), 4, Color(1, 1, 0.85, 0.85))  # Glanzpunkt
 	# Effekte
 	for e in fx:
 		if e.t == "boom": draw_circle(Vector2(e.x, e.y), 60 * (e.life/0.4), Color(1,0.6,0.1, e.life/0.4))
@@ -736,6 +758,18 @@ func _draw() -> void:
 		elif e.t == "fume": draw_rect(Rect2(e.x, e.y - Game.CELL*0.4, e.w, Game.CELL*0.8), Color(0.6,0.6,0.6, e.life/0.2*0.5))
 		elif e.t == "splat": draw_circle(Vector2(e.x, e.y), 11, Color(0.7,0.95,0.5, e.life/0.2))
 		elif e.t == "bolt": draw_line(Vector2(e.x, e.y), Vector2(e.x2, e.y2), Color(1,0.95,0.4, e.life/0.2), 3)
+	# Schwebende Zahlen (+Sonne etc.)
+	if _font != null:
+		for pu in popups:
+			var a: float = clamp(float(pu.life), 0.0, 1.0)
+			var pc: Color = pu.col; pc.a = a
+			draw_string(_font, Vector2(float(pu.x) - 12.0, float(pu.y)), str(pu.text), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, pc)
+
+func _popup(x: float, y: float, text: String, col: Color) -> void:
+	popups.append({"x": x, "y": y, "text": text, "life": 1.1, "col": col})
+
+func _shadow(cx: float, cy: float, r: float) -> void:
+	draw_circle(Vector2(cx, cy + r * 0.7), r * 0.85, Color(0, 0, 0, 0.20))
 
 func _hp_bar(cx: float, y: float, frac: float, c: Color) -> void:
 	if frac >= 1.0: return

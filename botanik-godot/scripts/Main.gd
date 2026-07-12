@@ -125,12 +125,12 @@ func _process(_delta: float) -> void:
 # ================= THEME =================
 func _make_theme() -> Theme:
 	var th := Theme.new()
-	th.default_font_size = 15
-	th.set_stylebox("normal", "Button", _sb(Color(0.16, 0.29, 0.23), Color(0.32, 0.55, 0.42), 2, 8))
-	th.set_stylebox("hover", "Button", _sb(Color(0.23, 0.40, 0.31), Color(0.5, 0.8, 0.58), 2, 8))
-	th.set_stylebox("pressed", "Button", _sb(Color(0.30, 0.52, 0.36), Color(0.6, 0.95, 0.65), 2, 8))
-	th.set_stylebox("disabled", "Button", _sb(Color(0.13, 0.16, 0.15), Color(0.2, 0.25, 0.22), 1, 8))
-	th.set_stylebox("focus", "Button", _sb(Color(0, 0, 0, 0), Color(0.6, 0.9, 0.65), 1, 8))
+	th.default_font_size = 16
+	th.set_stylebox("normal", "Button", _sb(Color(0.16, 0.29, 0.23), Color(0.32, 0.55, 0.42), 2, 11))
+	th.set_stylebox("hover", "Button", _sb(Color(0.24, 0.43, 0.33), Color(0.55, 0.85, 0.62), 2, 11))
+	th.set_stylebox("pressed", "Button", _sb(Color(0.30, 0.52, 0.36), Color(0.6, 0.95, 0.65), 2, 11))
+	th.set_stylebox("disabled", "Button", _sb(Color(0.13, 0.16, 0.15), Color(0.2, 0.25, 0.22), 1, 11))
+	th.set_stylebox("focus", "Button", _sb(Color(0, 0, 0, 0), Color(0.6, 0.9, 0.65), 1, 11))
 	th.set_color("font_color", "Button", Color(0.9, 0.98, 0.9))
 	th.set_color("font_hover_color", "Button", Color(1, 1, 1))
 	th.set_color("font_pressed_color", "Button", Color(1, 1, 1))
