@@ -1,4 +1,11 @@
-; Godot 4 Projekt-Konfiguration — Botanik-Labor (GDScript)
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
 config_version=5
 
 [application]
@@ -14,7 +21,5 @@ Game="*res://scripts/Game.gd"
 
 [display]
 
-window/size/viewport_width=1152
-window/size/viewport_height=648
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"

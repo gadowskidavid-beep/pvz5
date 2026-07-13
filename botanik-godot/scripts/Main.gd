@@ -17,13 +17,11 @@ var root: Control
 # HUD
 var sun_lbl: Label
 var fp_lbl: Label
-var coin_lbl: Label
 var brain_lbl: Label
 var wave_lbl: Label
 var wave_bar: Control
 var msg_lbl: Label
 var wave_btn: Button
-var speed_btn: Button
 var seed_box: HBoxContainer
 var tool_ham: Button
 var tool_sho: Button
@@ -35,6 +33,17 @@ var d_tabs: HBoxContainer
 var d_treewrap: ScrollContainer
 var d_info: VBoxContainer
 var drawer_open := false
+var _tree_time := 0.0                 # Animations-Uhr: macht den Skill-Tree lebendig
+var _tree_canvas: Control = null      # aktuelle Baum-Leinwand (fuer Dauer-Redraw)
+var _tree_fx: Array = []              # Kauf-Explosionen {pos, life, col}
+var _tree_owned_snapshot := {}        # erkennt frisch gekaufte Knoten -> Funken-Burst
+var _tree_snap_ready := false
+var _tree_info_panel: PanelContainer = null   # Detail-Panel rechts im Drawer
+var _ti_title: Label = null
+var _ti_desc: Label = null
+var _ti_meta: Label = null
+var _tree_seen_nodes := {}        # Nebel des Unbekannten: was wurde schon aufgedeckt?
+var _tree_needs_rebuild := false  # nach Kauf: Baum neu bauen (enthuellte Skills klickbar)
 var _dragging := false
 var _drag_moved := false
 var _dtween: Tween
@@ -90,12 +99,19 @@ func _ready() -> void:
 	open_overlay("menu")
 
 func _process(_delta: float) -> void:
+	_tree_time += _delta
+	if drawer_open and is_instance_valid(_tree_canvas):
+		_tree_canvas.queue_redraw()
+	for i in range(_tree_fx.size() - 1, -1, -1):
+		_tree_fx[i].life -= _delta
+		if _tree_fx[i].life <= 0.0: _tree_fx.remove_at(i)
+	if _tree_needs_rebuild and drawer_open:
+		_tree_needs_rebuild = false
+		_rebuild_drawer()
 	# HUD lebt jedes Frame (Spiel laeuft weiter, egal ob Drawer offen)
-	sun_lbl.text = "Sonne  %s" % _fmt(int(Game.sun))
-	fp_lbl.text = "FP  %s" % _fmt(Game.fp)
-	coin_lbl.text = "Muenzen  %s" % _fmt(Game.coins)
-	brain_lbl.text = "Skulls  %s" % _fmt(Game.brains)
-	if speed_btn != null: speed_btn.text = "Tempo %dx" % int(round(Engine.time_scale))
+	sun_lbl.text = "Sonne  %d" % int(Game.sun)
+	fp_lbl.text = "FP  %d" % Game.fp
+	brain_lbl.text = "Skulls  %d" % Game.brains
 	wave_lbl.text = "Welle %d / 100%s" % [Game.wave, lawn.weather_hud()]
 	wave_bar.queue_redraw()
 	if d_fp != null: d_fp.text = "%d FP" % Game.fp
@@ -170,7 +186,6 @@ func _build_hud() -> void:
 	root.add_child(pills)
 	sun_lbl = _hud_pill(pills, COL_GOLD)
 	fp_lbl = _hud_pill(pills, COL_CYAN)
-	coin_lbl = _hud_pill(pills, Color(0.95, 0.66, 0.22))
 	brain_lbl = _hud_pill(pills, COL_PINK)
 	# kleine Navigation
 	var nav := HBoxContainer.new()
@@ -216,20 +231,6 @@ func _build_hud() -> void:
 	wave_btn.add_theme_color_override("font_color", Color(0.15, 0.09, 0.02))
 	wave_btn.pressed.connect(_on_wave)
 	root.add_child(wave_btn)
-	# Spieltempo-Umschalter (1x/2x/3x) - QoL fuer den Idle-Loop
-	speed_btn = Button.new()
-	speed_btn.custom_minimum_size = Vector2(84, 38)
-	speed_btn.position = Vector2(SCREEN_W - 336, 58)
-	speed_btn.add_theme_font_size_override("font_size", 15)
-	speed_btn.tooltip_text = "Spieltempo umschalten (1x / 2x / 3x)"
-	speed_btn.pressed.connect(_cycle_speed)
-	root.add_child(speed_btn)
-
-func _cycle_speed() -> void:
-	var s := int(round(Engine.time_scale))
-	if s < 1: s = 1
-	s = s % 3 + 1   # 1 -> 2 -> 3 -> 1
-	Engine.time_scale = float(s)
 
 func _hud_pill(parent, col: Color) -> Label:
 	var pc := PanelContainer.new()
@@ -249,33 +250,16 @@ func _draw_wavebar(bar: Control) -> void:
 	bar.draw_rect(Rect2(0, 0, w, h), Color(0.1, 0.13, 0.16))
 	var frac: float = clamp(float(Game.wave) / 100.0, 0.0, 1.0)
 	bar.draw_rect(Rect2(0, 0, w * frac, h), Color(0.4, 0.82, 0.5))
-	bar.draw_rect(Rect2(0, 0, w * frac, h * 0.5), Color(1, 1, 1, 0.12))   # Glanz oben
 	var nb := _next_boss()
 	for m in [25, 50, 75, 100]:
 		var x: float = w * float(m) / 100.0
-		var passed: bool = Game.wave >= m
-		var c: Color = Color(1, 0.3, 0.3) if m == nb else (Color(0.55, 0.85, 0.6) if passed else Color(0.82, 0.78, 0.6))
-		bar.draw_rect(Rect2(x - 1, -2, 2, h + 4), Color(c.r, c.g, c.b, 0.5))
-		_draw_skull(bar, x, h * 0.5, 5.5, c)
-
-# Kleiner Totenkopf-Marker (Boss-Welle) auf dem Wellenbalken
-func _draw_skull(bar: Control, cx: float, cy: float, r: float, col: Color) -> void:
-	bar.draw_circle(Vector2(cx, cy - r * 0.15), r, col)                          # Schaedel
-	bar.draw_rect(Rect2(cx - r * 0.55, cy + r * 0.5, r * 1.1, r * 0.7), col)      # Kiefer
-	bar.draw_circle(Vector2(cx - r * 0.4, cy - r * 0.15), r * 0.28, Color(0.08, 0.05, 0.07))  # Auge L
-	bar.draw_circle(Vector2(cx + r * 0.4, cy - r * 0.15), r * 0.28, Color(0.08, 0.05, 0.07))  # Auge R
+		var c: Color = Color(1, 0.3, 0.3) if m == nb else Color(0.85, 0.8, 0.5)
+		bar.draw_rect(Rect2(x - 2, -3, 4, h + 6), c)
 
 func _next_boss() -> int:
 	for m in [25, 50, 75, 100]:
 		if Game.wave < m: return m
 	return 100
-
-# Kompakte Zahlen: ab 10k -> "12.3k", ab 1M -> "1.2M"
-func _fmt(n: int) -> String:
-	var a: int = abs(n)
-	if a >= 1000000: return "%.1fM" % (float(n) / 1000000.0)
-	if a >= 10000: return "%.1fk" % (float(n) / 1000.0)
-	return str(n)
 
 # Nav-Handler
 func _open_alm() -> void: open_overlay("almanac")
@@ -387,6 +371,10 @@ func _build_drawer() -> void:
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.add_theme_stylebox_override("panel", _sb(Color(0.06, 0.09, 0.08, 0.99), COL_ACCENT, 2, 0))
 	drawer.add_child(bg)
+	var roots := RootsArt.new()
+	roots.set_anchors_preset(Control.PRESET_FULL_RECT)
+	roots.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	drawer.add_child(roots)
 	var col := VBoxContainer.new()
 	col.set_anchors_preset(Control.PRESET_FULL_RECT)
 	col.offset_left = 14; col.offset_right = -14; col.offset_top = 6; col.offset_bottom = -10
@@ -605,11 +593,11 @@ func _pick_tree(key: String) -> void:
 	_rebuild_drawer()
 
 func _zoom_out() -> void:
-	_tree_zoom = max(0.35, _tree_zoom - 0.12)
+	_tree_zoom = max(0.18, _tree_zoom - 0.12)
 	_rebuild_drawer()
 
 func _zoom_in() -> void:
-	_tree_zoom = min(1.8, _tree_zoom + 0.12)
+	_tree_zoom = min(2.2, _tree_zoom + 0.12)
 	_rebuild_drawer()
 
 # Mausrad zoomt rein/raus; Linksklick auf freier Flaeche gedrueckt halten = umschauen (Panning)
@@ -703,8 +691,8 @@ func _build_tree_canvas(parent) -> void:
 		minc = min(minc, p.x); maxc = max(maxc, p.x)
 		maxr = max(maxr, p.y); minr = min(minr, p.y)
 	var z := _tree_zoom
-	var sx := 190.0 * z
-	var sy := 122.0 * z
+	var sx := 238.0 * z   # mehr Luft zwischen den Skills
+	var sy := 156.0 * z
 	var width := (maxc - minc) * sx + 340.0 * z
 	var height := (maxr - minr) * sy + 200.0 * z
 	var ox := -minc * sx + 170.0 * z
@@ -712,7 +700,13 @@ func _build_tree_canvas(parent) -> void:
 	_tree_px = {}
 	for id in nodes:
 		var pp = nodes[id].pos
-		_tree_px[id] = Vector2(ox + pp.x * sx, oy - pp.y * sy)
+		# Chaos: jeder Skill sitzt leicht versetzt (deterministisch, kein Flackern)
+		var jx := 0.0
+		var jy := 0.0
+		if str(nodes[id].get("req", "")) != "":
+			jx = (float(abs(hash(str(id))) % 45) - 22.0) * z
+			jy = (float(abs(hash(str(id) + "y")) % 33) - 16.0) * z
+		_tree_px[id] = Vector2(ox + pp.x * sx + jx, oy - pp.y * sy + jy)
 	_tree_center = Vector2(ox, oy)
 	_tree_w = width
 	_tree_h = height
@@ -720,14 +714,19 @@ func _build_tree_canvas(parent) -> void:
 	canvas.custom_minimum_size = Vector2(width, height)
 	canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	canvas.draw.connect(_draw_tree.bind(canvas))
+	_tree_canvas = canvas
+	_tree_owned_snapshot = {}
+	_tree_seen_nodes = {}
+	_tree_snap_ready = false
 	parent.add_child(canvas)
 	for br in branches:
-		var lb := Label.new(); lb.text = "Ast: " + str(br[1]); lb.modulate = Color(0.55, 0.62, 0.58)
+		var lb := Label.new(); lb.text = str(br[1]).to_upper(); lb.modulate = Color(0.68, 0.78, 0.71, 0.85)
 		lb.add_theme_font_size_override("font_size", int(max(9, 12 * z)))
 		lb.position = Vector2(ox + float(br[0]) * sx - 34 * z, oy + 46 * z)
 		canvas.add_child(lb)
 	for id in nodes:
 		var nd = nodes[id]
+		if not _node_visible(nodes, id): continue   # im Nebel -> noch nicht klickbar
 		var center: Vector2 = _tree_px[id]
 		var rare := bool(nd.get("rare", false))
 		var selected: bool = (id == info_node)
@@ -783,29 +782,38 @@ func _tree_node(canvas, center: Vector2, title: String, subtitle: String, cost: 
 	btn.tooltip_text = "%s\n%s" % [title, subtitle]
 	if cb.is_valid(): btn.pressed.connect(cb)
 	else: btn.disabled = true
+	btn.mouse_entered.connect(_tree_show_info.bind(title, subtitle, cost, show_cost, state))
 	holder.add_child(btn)
 	var box := VBoxContainer.new()
 	box.set_anchors_preset(Control.PRESET_FULL_RECT)
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
-	box.add_theme_constant_override("separation", 1)
+	box.add_theme_constant_override("separation", 0)
+	# BILD statt Text: eigenes PNG unter assets/sprites/skills/<skillname>.png
+	# (Kleinschreibung, Leerzeichen -> _, Umlaute -> ae/oe/ue). Sonst gezeichnetes Symbol.
+	var icon_path := "res://assets/sprites/skills/%s.png" % _skill_slug(title)
+	if ResourceLoader.exists(icon_path):
+		var tr := TextureRect.new()
+		tr.texture = load(icon_path)
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.custom_minimum_size = Vector2(30, 30) * z
+		tr.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(tr)
+	else:
+		var ni := NodeIcon.new()
+		ni.glyph = _skill_glyph(title, subtitle)
+		ni.col = ecol.lightened(0.25)
+		ni.custom_minimum_size = Vector2(26, 26) * z
+		ni.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		ni.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(ni)
 	var t := Label.new(); t.text = title
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; t.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	t.add_theme_font_size_override("font_size", int(max(9, 13 * z))); t.modulate = Color(0.96, 0.99, 0.96)
+	t.add_theme_font_size_override("font_size", int(max(8, 9 * z))); t.modulate = Color(0.9, 0.95, 0.9, 0.8)
 	box.add_child(t)
 	holder.add_child(box)
-	# Zustands-Abzeichen: Schloss (gesperrt) bzw. Haken (freigeschaltet)
-	var badge_mode := ""
-	if state == "lock" or state == "need" or state == "legend_lock": badge_mode = "lock"
-	elif state == "owned" or state == "legend_owned": badge_mode = "check"
-	if badge_mode != "":
-		var badge := NodeBadge.new(); badge.mode = badge_mode
-		var bs := 18.0 * z
-		badge.custom_minimum_size = Vector2(bs, bs)
-		badge.size = Vector2(bs, bs)
-		badge.position = Vector2(w - bs - 4.0 * z, 4.0 * z)
-		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		holder.add_child(badge)
 	if show_cost:
 		var pill := Label.new(); pill.text = "%d FP" % cost
 		pill.add_theme_font_size_override("font_size", int(max(8, 12 * z))); pill.modulate = Color(1, 0.96, 0.82)
@@ -813,6 +821,85 @@ func _tree_node(canvas, center: Vector2, title: String, subtitle: String, cost: 
 		pill.position = Vector2(w / 2.0 - 30 * z, -22 * z)
 		pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		holder.add_child(pill)
+
+# Nebel des Unbekannten: sichtbar = Basis, gekauft, oder direkt naechste Stufe
+func _node_visible(nodes: Dictionary, id) -> bool:
+	var req := str(nodes[id].get("req", ""))
+	if req == "": return true
+	if _n_owned(id): return true
+	return _n_owned(req)
+
+# Geschwungene Verbindung (quadratische Bezier-Kurve, Richtung per Hash)
+func _conn_points(a: Vector2, bp: Vector2, seedc: float) -> PackedVector2Array:
+	var mid := (a + bp) * 0.5
+	var per := Vector2(-(bp - a).y, (bp - a).x).normalized()
+	var side := 1.0 if fmod(seedc, 2.0) < 1.0 else -1.0
+	var c1: Vector2 = mid + per * (side * clampf((bp - a).length() * 0.18, 10.0, 36.0))
+	var pts := PackedVector2Array()
+	for i in range(13):
+		var u := float(i) / 12.0
+		pts.append(a.lerp(c1, u).lerp(c1.lerp(bp, u), u))
+	return pts
+
+# Skill-Name -> Dateiname (fuer eigene PNG-Icons)
+func _skill_slug(s: String) -> String:
+	var r := s.to_lower()
+	r = r.replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss")
+	r = r.replace(" ", "_").replace("-", "_").replace(".", "").replace(":", "")
+	return r
+
+# Skill-Name/-Beschreibung -> gezeichnetes Symbol
+func _skill_glyph(title: String, subtitle: String) -> String:
+	var s := (title + " " + subtitle).to_lower()
+	if "feuer" in s or "brand" in s or "zuend" in s or "flamm" in s: return "flame"
+	if "eis" in s or "frost" in s or "kält" in s or "kaelte" in s: return "snow"
+	if "blitz" in s or "zap" in s or "strom" in s or "gewitter" in s: return "bolt"
+	if "nekro" in s or "untod" in s or "grab" in s or "gift" in s or "tod" in s: return "skull"
+	if "ertrag" in s or "sonne" in s or "münz" in s or "muenz" in s or "gold" in s: return "sun"
+	if "tempo" in s or "rate" in s or "schnell" in s or "cooldown" in s: return "clock"
+	if "schaden" in s or "angriff" in s or "durchschuss" in s or "treffer" in s: return "arrow"
+	if "hp" in s or "leben" in s or "panzer" in s or "robust" in s or "schild" in s or "wachsam" in s: return "shield"
+	return "leaf"
+
+# Detail-Panel rechts im Drawer: zeigt beim Drueberfahren die volle Beschreibung
+func _tree_show_info(title: String, subtitle: String, cost: int, show_cost: bool, state: String) -> void:
+	if _tree_info_panel == null or not is_instance_valid(_tree_info_panel):
+		_tree_info_panel = PanelContainer.new()
+		_tree_info_panel.add_theme_stylebox_override("panel", _sb(Color(0.07, 0.10, 0.08, 0.95), Color(0.30, 0.55, 0.38), 2, 12, 12))
+		_tree_info_panel.position = Vector2(SCREEN_W - 300, 62)
+		_tree_info_panel.custom_minimum_size = Vector2(276, 0)
+		_tree_info_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var v := VBoxContainer.new()
+		v.add_theme_constant_override("separation", 4)
+		_tree_info_panel.add_child(v)
+		_ti_title = Label.new()
+		_ti_title.add_theme_font_size_override("font_size", 18)
+		v.add_child(_ti_title)
+		_ti_desc = Label.new()
+		_ti_desc.add_theme_font_size_override("font_size", 13)
+		_ti_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_ti_desc.custom_minimum_size = Vector2(252, 0)
+		_ti_desc.modulate = Color(0.85, 0.92, 0.86)
+		v.add_child(_ti_desc)
+		_ti_meta = Label.new()
+		_ti_meta.add_theme_font_size_override("font_size", 13)
+		v.add_child(_ti_meta)
+		drawer.add_child(_tree_info_panel)
+	_tree_info_panel.visible = true
+	_ti_title.text = title
+	_ti_desc.text = subtitle
+	if state == "owned" or state == "root" or state == "legend_owned":
+		_ti_title.modulate = Color(0.6, 0.95, 0.65)
+		_ti_meta.text = "Erforscht ✓"
+		_ti_meta.modulate = Color(0.6, 0.95, 0.65)
+	elif state == "avail" or state == "legend_avail":
+		_ti_title.modulate = Color(1.0, 0.9, 0.55)
+		_ti_meta.text = ("Kaufbar: %d FP  —  klicke den Skill!" % cost) if show_cost else "Kaufbar — klicke den Skill!"
+		_ti_meta.modulate = Color(1.0, 0.85, 0.4)
+	else:
+		_ti_title.modulate = Color(0.75, 0.8, 0.78)
+		_ti_meta.text = ("Gesperrt — erforsche zuerst den vorherigen Skill (%d FP)" % cost) if show_cost else "Gesperrt — erforsche zuerst den vorherigen Skill"
+		_ti_meta.modulate = Color(0.6, 0.65, 0.62)
 
 func _pill_bg(state: String) -> Color:
 	if state.begins_with("legend"): return Color(0.25, 0.15, 0.35)
@@ -829,60 +916,176 @@ func _style_tree_node(b: Button, state: String, selected: bool, ecol: Color) -> 
 	var bd := ecol
 	var bg := ecol.darkened(0.80)
 	if state == "owned" or state == "root" or state == "legend_owned":
-		bg = ecol.darkened(0.42); bd = ecol.lightened(0.15)   # satt gefuellt
+		bg = ecol.darkened(0.58)
 	elif state == "avail" or state == "legend_avail":
-		bg = ecol.darkened(0.72)
-	else:  # lock / need / legend_lock -> abgedunkelt/entsaettigt
-		bd = ecol.darkened(0.55)
-		bg = ecol.darkened(0.90)
+		bg = ecol.darkened(0.74)
+	else:  # lock / need / legend_lock -> abgedunkelt
+		bd = ecol.darkened(0.5)
+		bg = ecol.darkened(0.88)
 	var bw := 3 if state.begins_with("legend") else 2
+	# Die FORM verraet den Zustand: kaufbar = runde Pille mit Gold-Schimmer,
+	# gekauft = weich gerundet, gesperrt = kantiger Block, legendaer = dicker Rahmen
+	var rad := 16
+	if state == "avail" or state == "legend_avail":
+		rad = 30
+		bd = bd.lerp(Color(1.0, 0.85, 0.35), 0.45)
+	elif state == "owned" or state == "root" or state == "legend_owned":
+		rad = 18
+	else:
+		rad = 6
+	if state.begins_with("legend"): bw = 4
 	if selected: bd = Color(1, 1, 1); bw = 3
 	for st in ["normal", "hover", "pressed", "disabled"]:
-		var sbf := _sb(bg, bd, bw, 16, 6)
-		if state.begins_with("legend"):
-			# Rare/Legendaer: lila Glow-Rahmen (Doppelrahmen-Optik)
-			sbf.shadow_color = Color(0.72, 0.42, 1.0, 0.5)
-			sbf.shadow_size = 5
-		b.add_theme_stylebox_override(st, sbf)
+		b.add_theme_stylebox_override(st, _sb(bg, bd, bw, rad, 6))
 
 func _draw_tree(canvas) -> void:
-	# ---- Themen-Hintergrund: 4 Quadranten + Deko ----
+	# ---- Lebendiger Skill-Tree: 4 Element-Zonen, Partikel, Pulse, Explosionen ----
 	var w := _tree_w
 	var h := _tree_h
 	var ctr := _tree_center
 	var z := _tree_zoom
+	var t := _tree_time
 	if w > 1.0:
 		canvas.draw_colored_polygon(PackedVector2Array([ctr, Vector2(0, 0), Vector2(w, 0)]), Color(1, 0.85, 0.25, 0.10))      # oben: Gewitter (gelb)
 		canvas.draw_colored_polygon(PackedVector2Array([ctr, Vector2(0, h), Vector2(w, h)]), Color(0.55, 0.3, 0.75, 0.13))    # unten: Untod (lila)
 		canvas.draw_colored_polygon(PackedVector2Array([ctr, Vector2(0, 0), Vector2(0, h)]), Color(0.3, 0.55, 1.0, 0.11))     # links: Frost (blau)
 		canvas.draw_colored_polygon(PackedVector2Array([ctr, Vector2(w, 0), Vector2(w, h)]), Color(1.0, 0.35, 0.12, 0.12))    # rechts: Feuer (rot)
+		# weiche Element-Vignetten an den Raendern
+		canvas.draw_circle(Vector2(ctr.x, 0), w * 0.22, Color(1, 0.85, 0.25, 0.05))
+		canvas.draw_circle(Vector2(ctr.x, h), w * 0.22, Color(0.55, 0.3, 0.75, 0.06))
+		canvas.draw_circle(Vector2(0, ctr.y), w * 0.16, Color(0.3, 0.55, 1.0, 0.05))
+		canvas.draw_circle(Vector2(w, ctr.y), w * 0.16, Color(1.0, 0.35, 0.12, 0.05))
 		_draw_stars(canvas, w, h)
 		_draw_theme_decor(canvas, w, h)
-		# radialer Glow in der Mitte (Origin)
+		_draw_element_particles(canvas, w, h, t)
+		# filmische Vignette an den Raendern
+		for vi in range(3):
+			var va := 0.10 - float(vi) * 0.03
+			var vd := 18.0 + float(vi) * 16.0
+			canvas.draw_rect(Rect2(0, 0, w, vd), Color(0, 0, 0, va))
+			canvas.draw_rect(Rect2(0, h - vd, w, vd), Color(0, 0, 0, va))
+			canvas.draw_rect(Rect2(0, 0, vd, h), Color(0, 0, 0, va))
+			canvas.draw_rect(Rect2(w - vd, 0, vd, h), Color(0, 0, 0, va))
+		# pulsierender Runen-Kreis + Wurzeln unter der Basis
 		for gi in range(6):
 			canvas.draw_circle(ctr, (16.0 + gi * 15.0) * z, Color(0.45, 0.85, 0.5, 0.045))
+		canvas.draw_arc(ctr, (44.0 + sin(t * 1.6) * 3.0) * z, t * 0.5, t * 0.5 + TAU * 0.78, 40, Color(0.45, 0.85, 0.5, 0.35), 2.0)
+		canvas.draw_arc(ctr, (58.0 + sin(t * 1.6 + 1.0) * 3.0) * z, -t * 0.35, -t * 0.35 + TAU * 0.6, 40, Color(0.45, 0.85, 0.5, 0.2), 2.0)
+		for ri in range(3):
+			var rx := ctr.x + (float(ri) - 1.0) * 26.0 * z
+			canvas.draw_line(ctr + Vector2(0, 26.0 * z), Vector2(rx, ctr.y + (72.0 + 8.0 * sin(t + float(ri))) * z), Color(0.4, 0.3, 0.18, 0.5), 3.0 * z)
 	var nodes := _n_nodes()
-	# Glow-Halos hinter den Knoten
+	# Kauf-Erkennung: frisch gekaufte Knoten explodieren in Funken
+	if not _tree_snap_ready:
+		for id in nodes:
+			if _n_owned(id): _tree_owned_snapshot[id] = true
+		_tree_snap_ready = true
+	else:
+		for id in nodes:
+			if _n_owned(id) and not _tree_owned_snapshot.has(id):
+				_tree_owned_snapshot[id] = true
+				_tree_needs_rebuild = true   # enthuellte Skills sofort klickbar machen
+				if _tree_px.has(id):
+					_tree_fx.append({"pos": _tree_px[id], "life": 0.6, "col": _elem_color(id)})
+	# Aufdeckung: frisch enthuellte Skills ploppen mit Ring + Text auf
+	for id in nodes:
+		if _node_visible(nodes, id) and not _tree_seen_nodes.has(id):
+			_tree_seen_nodes[id] = true
+			if _tree_snap_ready and _tree_px.has(id):
+				_tree_fx.append({"pos": _tree_px[id], "life": 0.8, "col": Color(0.75, 0.88, 1.0), "txt": "Neu entdeckt!"})
+	# Glow-Halos: kaufbare Knoten pulsieren golden und rufen "hol mich!"
 	for id in nodes:
 		if not _tree_px.has(id): continue
 		var ec2 := _elem_color(id)
-		var al := 0.06
-		if _n_owned(id): al = 0.26
-		elif _n_can(id): al = 0.15
-		canvas.draw_circle(_tree_px[id], 34.0 * z, Color(ec2.r, ec2.g, ec2.b, al))
-	# Verbindungslinien
+		var pxp: Vector2 = _tree_px[id]
+		var seedf := float(abs(hash(id)) % 100) * 0.13
+		if not _node_visible(nodes, id):
+			# Geheimnis im Nebel: hier waechst noch etwas...
+			var fog := 0.5 + 0.5 * sin(t * 1.8 + seedf)
+			canvas.draw_circle(pxp, (7.0 + 2.0 * fog) * z, Color(0.75, 0.8, 0.9, 0.10 + 0.06 * fog))
+			canvas.draw_circle(pxp, 2.5 * z, Color(0.85, 0.9, 1.0, 0.25))
+			continue
+		if _n_owned(id):
+			canvas.draw_circle(pxp, 34.0 * z, Color(ec2.r, ec2.g, ec2.b, 0.26))
+			var sp := pxp + Vector2(cos(t * 1.3 + seedf), sin(t * 1.3 + seedf)) * 30.0 * z
+			canvas.draw_circle(sp, 1.6, Color(1, 1, 1, 0.35 + 0.3 * sin(t * 5.0 + seedf)))
+		elif _n_can(id):
+			var pu := 0.5 + 0.5 * sin(t * 3.2 + seedf)
+			canvas.draw_circle(pxp, (34.0 + 5.0 * pu) * z, Color(1.0, 0.85, 0.35, 0.10 + 0.10 * pu))
+			canvas.draw_circle(pxp, 34.0 * z, Color(ec2.r, ec2.g, ec2.b, 0.15))
+			canvas.draw_arc(pxp, (40.0 + 3.0 * pu) * z, t * 1.2, t * 1.2 + TAU * 0.65, 30, Color(1.0, 0.85, 0.35, 0.35 + 0.25 * pu), 2.0)
+		else:
+			canvas.draw_circle(pxp, 34.0 * z, Color(ec2.r, ec2.g, ec2.b, 0.06))
+		# Rare/Legendaer: Partikel umkreist den Knoten
+		if bool(nodes[id].get("rare", false)) and (_n_owned(id) or _n_can(id)):
+			var op := pxp + Vector2(cos(t * 2.2 + seedf), sin(t * 2.2 + seedf)) * 42.0 * z
+			canvas.draw_circle(op, 2.6, Color(0.85, 0.6, 1.0, 0.8))
+	# Verbindungen: geschwungene Ranken mit Blaettern und Energie-Puls auf der Kurve
 	for id in nodes:
 		var req := str(nodes[id].get("req", ""))
 		if req == "" or not _tree_px.has(id) or not _tree_px.has(req): continue
 		var a: Vector2 = _tree_px[req]
 		var bp: Vector2 = _tree_px[id]
 		var ec := _elem_color(id)
+		var seedc := float(abs(hash(id)) % 100) * 0.1
+		var pts := _conn_points(a, bp, seedc)
+		if not _node_visible(nodes, id):
+			# Stummel ins Verborgene: die Ranke verliert sich im Nebel
+			if _node_visible(nodes, req):
+				for si in range(3):
+					canvas.draw_line(pts[si], pts[si + 1], Color(ec.r, ec.g, ec.b, 0.25 - float(si) * 0.07), 3.0 * z)
+			continue
 		if _n_owned(id):
-			canvas.draw_line(a, bp, Color(ec.r, ec.g, ec.b, 0.95), 5.0 * z)
+			canvas.draw_polyline(pts, Color(ec.r, ec.g, ec.b, 0.95), 5.0 * z)
+			var per := Vector2(-(bp - a).y, (bp - a).x).normalized()
+			canvas.draw_circle(pts[4] + per * 4.5 * z, 3.2 * z, Color(0.45, 0.8, 0.4, 0.8))
+			canvas.draw_circle(pts[8] - per * 4.5 * z, 3.2 * z, Color(0.45, 0.8, 0.4, 0.8))
+			var pt2 := fmod(t * 0.5 + seedc, 1.0)
+			var pp: Vector2 = pts[int(pt2 * 12.0)]
+			canvas.draw_circle(pp, 4.0 * z, Color(1, 1, 1, 0.85))
+			canvas.draw_circle(pp, 7.5 * z, Color(ec.r, ec.g, ec.b, 0.4))
 		elif _n_can(id):
-			canvas.draw_line(a, bp, Color(ec.r, ec.g, ec.b, 0.7), 4.0 * z)
+			var pu2 := 0.5 + 0.5 * sin(t * 3.0 + seedc)
+			canvas.draw_polyline(pts, Color(ec.r, ec.g, ec.b, 0.5 + 0.35 * pu2), 4.0 * z)
 		else:
-			canvas.draw_dashed_line(a, bp, ec.darkened(0.45), 3.0 * z, 9.0)
+			for si in range(0, 12, 2):
+				canvas.draw_line(pts[si], pts[si + 1], ec.darkened(0.45), 3.0 * z)
+	# Knospen: an erforschten Skills pulsiert neues Wachstum Richtung Unerforschtem
+	for id in nodes:
+		var req3 := str(nodes[id].get("req", ""))
+		if req3 == "" or _n_owned(id) or not _n_owned(req3): continue
+		if not (_tree_px.has(id) and _tree_px.has(req3)): continue
+		var pa: Vector2 = _tree_px[req3]
+		var dirn: Vector2 = (_tree_px[id] - pa).normalized()
+		var bud := pa + dirn * (30.0 + 3.0 * sin(t * 3.0)) * z
+		canvas.draw_circle(bud, 3.4 * z, Color(0.55, 0.9, 0.5, 0.85))
+		canvas.draw_circle(bud + dirn * 5.0 * z, 2.0 * z, Color(0.75, 1.0, 0.6, 0.7))
+	# Hover-Ring um den Skill unter der Maus
+	var mp: Vector2 = canvas.get_local_mouse_position()
+	for id in nodes:
+		if not _tree_px.has(id) or not _node_visible(nodes, id): continue
+		if mp.distance_to(_tree_px[id]) < 44.0 * z:
+			canvas.draw_arc(_tree_px[id], 46.0 * z, t * 2.0, t * 2.0 + TAU * 0.85, 34, Color(1, 1, 1, 0.5), 2.0)
+			break
+	# Entdeckt-Zaehler
+	var vis_n := 0
+	var hid_n := 0
+	for id in nodes:
+		if _node_visible(nodes, id): vis_n += 1
+		else: hid_n += 1
+	var ctxt := "%d Skills entdeckt" % vis_n
+	if hid_n > 0: ctxt += "  ·  im Nebel wartet noch mehr..."
+	canvas.draw_string(canvas.get_theme_default_font(), Vector2(16, 24), ctxt, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.7, 0.8, 0.74, 0.9))
+	# Kauf-Explosionen: Ring + 8 Funken fliegen davon
+	for e in _tree_fx:
+		var lf2: float = clamp(float(e.life) / 0.6, 0.0, 1.0)
+		var ec3: Color = e.col
+		canvas.draw_arc(e.pos, (1.0 - lf2) * 52.0 + 8.0, 0.0, TAU, 30, Color(ec3.r, ec3.g, ec3.b, lf2 * 0.8), 3.0)
+		for k in range(8):
+			var ang := TAU * float(k) / 8.0
+			canvas.draw_circle(e.pos + Vector2(cos(ang), sin(ang)) * ((1.0 - lf2) * 44.0), 2.5 * lf2 + 0.5, Color(1, 1, 0.85, lf2))
+		if e.has("txt"):
+			canvas.draw_string(canvas.get_theme_default_font(), e.pos + Vector2(-52, -46.0 - (1.0 - lf2) * 14.0), str(e.txt), HORIZONTAL_ALIGNMENT_CENTER, 104, 13, Color(0.85, 0.93, 1.0, lf2))
 
 func _draw_stars(canvas, w: float, h: float) -> void:
 	var rng := RandomNumberGenerator.new()
@@ -893,6 +1096,37 @@ func _draw_stars(canvas, w: float, h: float) -> void:
 		var sr := rng.randf_range(0.6, 2.1)
 		canvas.draw_circle(Vector2(sx, sy), sr, Color(1, 1, 1, rng.randf_range(0.04, 0.18)))
 
+# Lebendige Element-Partikel: Glut steigt, Schnee faellt, Sporen schweben, Blitz wetterleuchtet
+func _draw_element_particles(canvas, w: float, h: float, t: float) -> void:
+	# Partikel leben im NORMIERTEN Raum (0..1): Zoomen verschiebt nichts mehr,
+	# das Muster bleibt pro Oeffnung stabil und skaliert nur sanft mit.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 99
+	# FEUER rechts: aufsteigende Glut
+	for i in range(14):
+		var fspd := rng.randf_range(0.05, 0.11)
+		var fxn := 1.0 - rng.randf_range(0.02, 0.28)
+		var wob := rng.randf() * TAU
+		var fyn := 1.0 - fmod(t * fspd + rng.randf(), 1.0)
+		canvas.draw_circle(Vector2(fxn * w + sin(t * 2.0 + wob) * 6.0, fyn * h), rng.randf_range(1.2, 2.6), Color(1.0, 0.55 + rng.randf() * 0.3, 0.15, 0.5 * clampf(fyn + 0.2, 0.15, 1.0)))
+	# FROST links: fallende, taumelnde Schneeflocken
+	for i in range(14):
+		var sspd := rng.randf_range(0.03, 0.07)
+		var sxn := rng.randf_range(0.01, 0.28)
+		var wob2 := rng.randf() * TAU
+		var syn := fmod(t * sspd + rng.randf(), 1.0)
+		canvas.draw_circle(Vector2(sxn * w + sin(t * 1.4 + wob2) * 9.0, syn * h), rng.randf_range(1.0, 2.2), Color(0.8, 0.92, 1.0, 0.45))
+	# UNTOD unten: langsam aufsteigende Sporen
+	for i in range(10):
+		var uspd := rng.randf_range(0.02, 0.05)
+		var uxn := 0.5 + rng.randf_range(-0.3, 0.3)
+		var uyn := 1.0 - fmod(t * uspd + rng.randf() * 0.4, 1.0) * 0.38
+		canvas.draw_circle(Vector2(uxn * w + sin(t * 1.1 + rng.randf() * TAU) * 7.0, uyn * h), rng.randf_range(1.2, 2.4), Color(0.65, 0.45, 0.85, 0.4))
+	# BLITZ oben: gelegentliches Wetterleuchten ueber den ganzen Himmel
+	var fl := sin(t * 7.0) * sin(t * 3.1 + 1.7)
+	if fl > 0.86:
+		canvas.draw_rect(Rect2(0, 0, w, h * 0.16), Color(1.0, 0.95, 0.6, (fl - 0.86) * 2.2))
+
 func _draw_theme_decor(canvas, w: float, h: float) -> void:
 	var cx := w / 2.0
 	# BLITZ oben — Zickzack-Blitze
@@ -901,7 +1135,7 @@ func _draw_theme_decor(canvas, w: float, h: float) -> void:
 		var yb := 14.0
 		var pts := PackedVector2Array([Vector2(bx, yb), Vector2(bx + 16, yb + 20), Vector2(bx + 4, yb + 24), Vector2(bx + 22, yb + 46)])
 		for i in range(pts.size() - 1):
-			canvas.draw_line(pts[i], pts[i + 1], Color(1, 0.92, 0.35, 0.45), 3.0)
+			canvas.draw_line(pts[i], pts[i + 1], Color(1, 0.92, 0.35, 0.25 + 0.45 * abs(sin(_tree_time * 2.4 + float(k)))), 3.0)
 	# FEUER rechts — Flammen (Dreiecke)
 	for i in range(5):
 		var fx := w - 26.0
@@ -927,7 +1161,13 @@ func _make_overlay(n: String) -> void:
 	var panel := Panel.new()
 	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	panel.visible = false
+	panel.add_theme_stylebox_override("panel", _sb(Color(0.05, 0.07, 0.06, 0.99), Color(0.20, 0.36, 0.25), 2, 0, 0))
 	root.add_child(panel)
+	var strip := NightStrip.new()
+	strip.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	strip.offset_bottom = 52
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(strip)
 	var scroll := ScrollContainer.new()
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	scroll.offset_top = 58; scroll.offset_left = 20; scroll.offset_right = -20; scroll.offset_bottom = -20
@@ -940,6 +1180,10 @@ func _make_overlay(n: String) -> void:
 	var close := Button.new()
 	close.text = "X  Schliessen"; close.position = Vector2(16, 14); close.custom_minimum_size = Vector2(140, 34)
 	close.pressed.connect(close_all)
+	close.add_theme_font_size_override("font_size", 15)
+	close.add_theme_stylebox_override("normal", _wood_sb(Color(0.31, 0.22, 0.12), Color(0.15, 0.10, 0.05)))
+	close.add_theme_stylebox_override("hover", _wood_sb(Color(0.39, 0.28, 0.16), COL_ACCENT))
+	close.add_theme_stylebox_override("pressed", _wood_sb(Color(0.24, 0.17, 0.10), COL_ACCENT))
 	panel.add_child(close)
 	overlays[n] = {"panel": panel, "content": vb, "close": close}
 
@@ -1028,6 +1272,24 @@ func _grid(parent, cols: int) -> GridContainer:
 	g.add_theme_constant_override("h_separation", 8); g.add_theme_constant_override("v_separation", 8)
 	parent.add_child(g)
 	return g
+
+# Karte mit gezeichnetem Mini-Portraet (Almanach)
+func _card_icon(grid, kind: String, col: Color, title: String, desc: String) -> void:
+	var pc := PanelContainer.new()
+	pc.add_theme_stylebox_override("panel", _sb(Color(0.09, 0.13, 0.10), Color(0.22, 0.38, 0.26), 2, 12, 10))
+	var hb := HBoxContainer.new(); hb.add_theme_constant_override("separation", 10)
+	pc.add_child(hb)
+	var ic := Portrait.new(); ic.kind = kind; ic.col = col
+	ic.custom_minimum_size = Vector2(56, 56)
+	hb.add_child(ic)
+	var v := VBoxContainer.new()
+	var tl := Label.new(); tl.text = title; tl.add_theme_font_size_override("font_size", 17); tl.modulate = COL_ACCENT
+	v.add_child(tl)
+	var dl := Label.new(); dl.text = desc; dl.add_theme_font_size_override("font_size", 12); dl.modulate = Color(0.72, 0.82, 0.75)
+	dl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; dl.custom_minimum_size = Vector2(220, 0)
+	v.add_child(dl)
+	hb.add_child(v)
+	grid.add_child(pc)
 
 func _card(grid, title: String, desc: String, btn_text: String, enabled: bool, cb: Callable) -> void:
 	var pc := PanelContainer.new()
@@ -1216,15 +1478,22 @@ func _dev_speed_reset() -> void:
 
 # ---- TODES-SCREEN ----
 func _build_death(vb) -> void:
-	_spacer(vb, 8)
-	_big(vb, "DU WURDEST UEBERRANNT!", 36, Color(1, 0.4, 0.4))
-	_big(vb, "Es ist noch nicht vorbei. Du verlierst alle Skills dieses Runs,", 15, Color(0.9, 0.8, 0.8))
-	_big(vb, "aber deine GEHIRNE bleiben - dafuer sind sie da!", 15, COL_PURPLE)
-	_spacer(vb, 10)
+	var scene := DeathScene.new()
+	scene.custom_minimum_size = Vector2(1060, 240)
+	scene.wave_reached = Game.wave
+	vb.add_child(scene)
+	_spacer(vb, 6)
+	_big(vb, "Deine Skulls bleiben — investiere sie und komm staerker zurueck!", 16, COL_PURPLE)
+	_spacer(vb, 6)
 	_build_prestige(vb)
 	_spacer(vb, 14)
-	var b := Button.new(); b.text = "WIEDERGEBURT  -  Neuer Versuch"; b.custom_minimum_size = Vector2(360, 54)
-	b.add_theme_font_size_override("font_size", 20); b.pressed.connect(_do_rebirth)
+	var b := Button.new(); b.text = "WIEDERGEBURT  —  Neuer Versuch"
+	b.custom_minimum_size = Vector2(400, 58)
+	b.add_theme_font_size_override("font_size", 21)
+	b.add_theme_stylebox_override("normal", _stone_sb(Color(0.36, 0.22, 0.50), Color(0.20, 0.10, 0.30)))
+	b.add_theme_stylebox_override("hover", _stone_sb(Color(0.46, 0.30, 0.62), COL_PURPLE))
+	b.add_theme_stylebox_override("pressed", _stone_sb(Color(0.28, 0.16, 0.40), COL_PURPLE))
+	b.pressed.connect(_do_rebirth)
 	vb.add_child(b)
 
 func _do_rebirth() -> void:
@@ -1255,7 +1524,7 @@ func _build_almanac(vb) -> void:
 	for ck in Game.CH_ORDER:
 		var c = Game.CHASSIS[ck]
 		var s = Game.compute_chassis_stats(ck)
-		_card(g, c.n, "%s\nSonne %d  HP %d" % [c.d, int(s.cost), int(s.hp)], "", false, Callable())
+		_card_icon(g, str(ck), c.col, str(c.n), "%s\nSonne %d  HP %d" % [c.d, int(s.cost), int(s.hp)])
 
 # ---- ZOMBIE-BUCH ----
 func _build_zombiebook(vb) -> void:
@@ -1503,22 +1772,177 @@ class MenuScene extends Control:
 		draw_rect(Rect2(lx + 20.0, ly + bh - 34.0, 12, 34), Color(0.6, 0.4, 0.9, 0.85))
 		draw_rect(Rect2(lx + 38.0, ly + bh - 26.0, 12, 26), Color(0.35, 0.9, 0.5, 0.85))
 
-
 # ================================================================
-# SKILL-NODE-ABZEICHEN — kleines Schloss (gesperrt) bzw. Haken
-# (freigeschaltet), prozedural gezeichnet.
+# STERNEN-KOPFLEISTE fuer alle Overlays
 # ================================================================
-class NodeBadge extends Control:
-	var mode := "lock"
+class NightStrip extends Control:
+	var t := 0.0
+	func _process(delta: float) -> void:
+		t += delta
+		queue_redraw()
 	func _draw() -> void:
 		var w := size.x
 		var h := size.y
-		if mode == "lock":
-			# Buegel (oberer Halbkreis) + Schloss-Koerper
-			draw_arc(Vector2(w * 0.5, h * 0.45), w * 0.20, PI, TAU, 12, Color(0.86, 0.86, 0.92), 2.0)
-			draw_rect(Rect2(w * 0.28, h * 0.45, w * 0.44, h * 0.42), Color(0.86, 0.86, 0.92))
-			draw_circle(Vector2(w * 0.5, h * 0.63), w * 0.05, Color(0.18, 0.18, 0.24))
+		draw_rect(Rect2(0, 0, w, h), Color(0.09, 0.05, 0.14))
+		var rs := RandomNumberGenerator.new()
+		rs.seed = 4
+		for i in range(26):
+			draw_circle(Vector2(rs.randf() * w, rs.randf() * h * 0.8), 1.1, Color(0.9, 0.92, 1.0, 0.25 + 0.4 * (0.5 + 0.5 * sin(t * 1.4 + float(i)))))
+		draw_circle(Vector2(w - 60.0, h * 0.5), 14, Color(0.93, 0.91, 0.80))
+		draw_circle(Vector2(w - 66.0, h * 0.45), 12.5, Color(0.09, 0.05, 0.14))
+		draw_rect(Rect2(0, h - 2.0, w, 2), Color(0.45, 0.85, 0.5, 0.6))
+
+# ================================================================
+# ERD-/WURZEL-HINTERGRUND fuer den Skill-Tree-Drawer
+# ================================================================
+class RootsArt extends Control:
+	func _draw() -> void:
+		var w := size.x
+		var h := size.y
+		draw_rect(Rect2(0, h - 26.0, w, 26), Color(0.13, 0.09, 0.06, 0.8))
+		var rs := RandomNumberGenerator.new()
+		rs.seed = 21
+		for i in range(7):
+			var x := w * (0.08 + 0.14 * float(i))
+			var y := h - 20.0
+			for s in range(6):
+				var nx := x + rs.randf_range(-34.0, 34.0)
+				var ny := y - rs.randf_range(26.0, 48.0)
+				draw_line(Vector2(x, y), Vector2(nx, ny), Color(0.35, 0.24, 0.14, 0.26), 3.0 - float(s) * 0.35)
+				x = nx
+				y = ny
+		draw_line(Vector2(w * 0.5, h - 26.0), Vector2(w * 0.5, h - 44.0), Color(0.35, 0.7, 0.4, 0.7), 3.0)
+		draw_circle(Vector2(w * 0.5 - 5.0, h - 46.0), 4.5, Color(0.4, 0.8, 0.45, 0.7))
+		draw_circle(Vector2(w * 0.5 + 5.0, h - 46.0), 4.5, Color(0.4, 0.8, 0.45, 0.7))
+
+# ================================================================
+# TODES-SZENE — dein Grabstein mit erreichter Welle
+# ================================================================
+class DeathScene extends Control:
+	var wave_reached := 0
+	var t := 0.0
+	func _process(delta: float) -> void:
+		t += delta
+		queue_redraw()
+	func _draw() -> void:
+		var w := size.x
+		var h := size.y
+		draw_rect(Rect2(0, 0, w, h), Color(0.10, 0.04, 0.08))
+		draw_rect(Rect2(0, h * 0.45, w, h * 0.12), Color(0.5, 0.12, 0.12, 0.25))
+		draw_rect(Rect2(0, h * 0.55, w, h * 0.45), Color(0.07, 0.05, 0.05))
+		var rs := RandomNumberGenerator.new()
+		rs.seed = 13
+		for i in range(24):
+			draw_circle(Vector2(rs.randf() * w, rs.randf() * h * 0.4), 1.2, Color(1, 0.9, 0.9, 0.2 + 0.4 * (0.5 + 0.5 * sin(t + float(i)))))
+		for xf in [0.12, 0.88]:
+			var kx: float = w * float(xf)
+			draw_rect(Rect2(kx - 4.0, h * 0.42, 8, h * 0.30), Color(0.16, 0.15, 0.17))
+			draw_rect(Rect2(kx - 22.0, h * 0.50, 44, 8), Color(0.16, 0.15, 0.17))
+		var gw := 340.0
+		var gy := h * 0.14
+		var pts := PackedVector2Array()
+		pts.append(Vector2(w * 0.5 - gw * 0.5, h * 0.92))
+		pts.append(Vector2(w * 0.5 - gw * 0.5, gy + 70.0))
+		for i in range(13):
+			var a := PI + PI * float(i) / 12.0
+			pts.append(Vector2(w * 0.5 + cos(a) * gw * 0.5, gy + 70.0 + sin(a) * 70.0))
+		pts.append(Vector2(w * 0.5 + gw * 0.5, h * 0.92))
+		draw_colored_polygon(pts, Color(0.30, 0.31, 0.36))
+		var f := get_theme_default_font()
+		var glow := 0.5 + 0.5 * sin(t * 2.0)
+		draw_string(f, Vector2(w * 0.5 - 170.0, gy + 62.0), "HIER RUHT DEIN RUN", HORIZONTAL_ALIGNMENT_CENTER, 340, 20, Color(0.13, 0.13, 0.16))
+		draw_string(f, Vector2(w * 0.5 - 170.0, gy + 112.0), "WELLE %d" % wave_reached, HORIZONTAL_ALIGNMENT_CENTER, 340, 42, Color(0.95, 0.35, 0.35))
+		draw_string(f, Vector2(w * 0.5 - 170.0, gy + 140.0), "erreicht", HORIZONTAL_ALIGNMENT_CENTER, 340, 17, Color(0.16, 0.16, 0.20))
+		for sxf in [0.34, 0.66]:
+			var sx: float = w * float(sxf)
+			var sy := h * 0.80
+			draw_circle(Vector2(sx, sy), 13.0, Color(0.85, 0.66, 1.0, 0.25 + 0.3 * glow))
+			draw_circle(Vector2(sx, sy), 9.0, Color(0.92, 0.85, 1.0))
+			draw_circle(Vector2(sx - 3.0, sy - 1.0), 2.2, Color(0.2, 0.1, 0.3))
+			draw_circle(Vector2(sx + 3.0, sy - 1.0), 2.2, Color(0.2, 0.1, 0.3))
+
+# ================================================================
+# MINI-PORTRAET — gezeichnete Pflanzen-Icons (Almanach & Co.)
+# ================================================================
+class Portrait extends Control:
+	var kind := ""
+	var col := Color(0.5, 0.8, 0.5)
+	func _draw() -> void:
+		var c := size * 0.5
+		var r: float = min(size.x, size.y) * 0.36
+		if kind == "sonne":
+			for i in range(10):
+				var a := deg_to_rad(i * 36.0)
+				draw_circle(c + Vector2(cos(a), sin(a)) * r, r * 0.36, Color(1, 0.8, 0.18))
+			draw_circle(c, r * 0.74, Color(0.5, 0.32, 0.12))
+		elif kind == "pilz" or kind == "sonnenpilz" or kind == "wasserpilz":
+			draw_rect(Rect2(c.x - r * 0.3, c.y, r * 0.6, r), Color(0.92, 0.88, 0.8))
+			var capc := col
+			if kind == "sonnenpilz": capc = Color(1.0, 0.8, 0.25)
+			var pts := PackedVector2Array()
+			for i in range(13):
+				var a := PI + PI * float(i) / 12.0
+				pts.append(c + Vector2(cos(a) * r * 1.1, sin(a) * r * 0.95))
+			draw_colored_polygon(pts, capc)
+			draw_circle(c + Vector2(-r * 0.4, -r * 0.5), r * 0.14, Color(1, 1, 1, 0.9))
+			draw_circle(c + Vector2(r * 0.3, -r * 0.6), r * 0.12, Color(1, 1, 1, 0.9))
+		elif kind == "wall":
+			draw_circle(c + Vector2(0, -r * 0.2), r * 0.85, col.darkened(0.15))
+			draw_circle(c + Vector2(0, r * 0.25), r * 0.95, col)
+		elif kind == "lilypad":
+			draw_circle(c, r * 1.05, Color(0.16, 0.45, 0.28))
+			draw_circle(c, r * 0.92, col)
+		elif kind == "frostbluete":
+			for i in range(6):
+				var a := deg_to_rad(i * 60.0 + 30.0)
+				draw_line(c, c + Vector2(cos(a), sin(a)) * r * 1.15, Color(0.62, 0.85, 1.0), 3.0)
+			draw_circle(c, r * 0.5, Color(0.85, 0.95, 1.0))
 		else:
-			# Haken
-			draw_line(Vector2(w * 0.20, h * 0.52), Vector2(w * 0.42, h * 0.74), Color(0.5, 1.0, 0.62), 3.0)
-			draw_line(Vector2(w * 0.42, h * 0.74), Vector2(w * 0.82, h * 0.28), Color(0.5, 1.0, 0.62), 3.0)
+			draw_circle(c, r, col.darkened(0.4))
+			draw_circle(c, r - 2.0, col)
+			draw_rect(Rect2(c.x + r * 0.45, c.y - r * 0.2, r * 0.8, r * 0.4), col.darkened(0.3))
+		draw_circle(c + Vector2(-r * 0.3, -r * 0.1), 2.4, Color(0.1, 0.1, 0.12))
+		draw_circle(c + Vector2(r * 0.3, -r * 0.1), 2.4, Color(0.1, 0.1, 0.12))
+
+# ================================================================
+# GEZEICHNETE SKILL-SYMBOLE — Fallback, solange keine PNGs da sind
+# ================================================================
+class NodeIcon extends Control:
+	var glyph := "leaf"
+	var col := Color(0.6, 0.9, 0.6)
+	func _draw() -> void:
+		var c := size * 0.5
+		var r: float = min(size.x, size.y) * 0.42
+		if glyph == "flame":
+			draw_colored_polygon(PackedVector2Array([c + Vector2(0, -r), c + Vector2(r * 0.7, r * 0.5), c + Vector2(-r * 0.7, r * 0.5)]), col)
+			draw_circle(c + Vector2(0, r * 0.25), r * 0.4, col.lightened(0.35))
+		elif glyph == "snow":
+			for i in range(3):
+				var a := deg_to_rad(i * 60.0)
+				draw_line(c - Vector2(cos(a), sin(a)) * r, c + Vector2(cos(a), sin(a)) * r, col, 2.4)
+			draw_circle(c, r * 0.22, col.lightened(0.3))
+		elif glyph == "bolt":
+			draw_colored_polygon(PackedVector2Array([c + Vector2(r * 0.25, -r), c + Vector2(-r * 0.3, r * 0.12), c + Vector2(0, r * 0.12), c + Vector2(-r * 0.25, r), c + Vector2(r * 0.3, -r * 0.12), c + Vector2(0, -r * 0.12)]), col)
+		elif glyph == "skull":
+			draw_circle(c + Vector2(0, -r * 0.15), r * 0.62, col)
+			draw_rect(Rect2(c.x - r * 0.3, c.y + r * 0.22, r * 0.6, r * 0.35), col)
+			draw_circle(c + Vector2(-r * 0.24, -r * 0.2), r * 0.15, Color(0.08, 0.08, 0.1))
+			draw_circle(c + Vector2(r * 0.24, -r * 0.2), r * 0.15, Color(0.08, 0.08, 0.1))
+		elif glyph == "sun":
+			for i in range(8):
+				var a2 := deg_to_rad(i * 45.0)
+				draw_line(c + Vector2(cos(a2), sin(a2)) * r * 0.55, c + Vector2(cos(a2), sin(a2)) * r, col, 2.2)
+			draw_circle(c, r * 0.4, col)
+		elif glyph == "clock":
+			draw_arc(c, r * 0.8, 0.0, TAU, 24, col, 2.4)
+			draw_line(c, c + Vector2(0, -r * 0.55), col, 2.2)
+			draw_line(c, c + Vector2(r * 0.4, 0), col, 2.2)
+		elif glyph == "arrow":
+			draw_line(c + Vector2(-r * 0.7, r * 0.7), c + Vector2(r * 0.45, -r * 0.45), col, 3.0)
+			draw_colored_polygon(PackedVector2Array([c + Vector2(r * 0.75, -r * 0.75), c + Vector2(r * 0.75, -r * 0.15), c + Vector2(r * 0.15, -r * 0.75)]), col)
+		elif glyph == "shield":
+			draw_colored_polygon(PackedVector2Array([c + Vector2(-r * 0.7, -r * 0.6), c + Vector2(r * 0.7, -r * 0.6), c + Vector2(r * 0.55, r * 0.3), c + Vector2(0, r), c + Vector2(-r * 0.55, r * 0.3)]), col)
+		else:
+			draw_line(c + Vector2(0, r * 0.6), c + Vector2(0, -r * 0.3), col, 2.2)
+			draw_circle(c + Vector2(-r * 0.32, -r * 0.35), r * 0.32, col.lightened(0.2))
+			draw_circle(c + Vector2(r * 0.32, -r * 0.35), r * 0.32, col.lightened(0.2))
