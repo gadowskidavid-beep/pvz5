@@ -230,11 +230,21 @@ func _draw_wavebar(bar: Control) -> void:
 	bar.draw_rect(Rect2(0, 0, w, h), Color(0.1, 0.13, 0.16))
 	var frac: float = clamp(float(Game.wave) / 100.0, 0.0, 1.0)
 	bar.draw_rect(Rect2(0, 0, w * frac, h), Color(0.4, 0.82, 0.5))
+	bar.draw_rect(Rect2(0, 0, w * frac, h * 0.5), Color(1, 1, 1, 0.12))   # Glanz oben
 	var nb := _next_boss()
 	for m in [25, 50, 75, 100]:
 		var x: float = w * float(m) / 100.0
-		var c: Color = Color(1, 0.3, 0.3) if m == nb else Color(0.85, 0.8, 0.5)
-		bar.draw_rect(Rect2(x - 2, -3, 4, h + 6), c)
+		var passed: bool = Game.wave >= m
+		var c: Color = Color(1, 0.3, 0.3) if m == nb else (Color(0.55, 0.85, 0.6) if passed else Color(0.82, 0.78, 0.6))
+		bar.draw_rect(Rect2(x - 1, -2, 2, h + 4), Color(c.r, c.g, c.b, 0.5))
+		_draw_skull(bar, x, h * 0.5, 5.5, c)
+
+# Kleiner Totenkopf-Marker (Boss-Welle) auf dem Wellenbalken
+func _draw_skull(bar: Control, cx: float, cy: float, r: float, col: Color) -> void:
+	bar.draw_circle(Vector2(cx, cy - r * 0.15), r, col)                          # Schaedel
+	bar.draw_rect(Rect2(cx - r * 0.55, cy + r * 0.5, r * 1.1, r * 0.7), col)      # Kiefer
+	bar.draw_circle(Vector2(cx - r * 0.4, cy - r * 0.15), r * 0.28, Color(0.08, 0.05, 0.07))  # Auge L
+	bar.draw_circle(Vector2(cx + r * 0.4, cy - r * 0.15), r * 0.28, Color(0.08, 0.05, 0.07))  # Auge R
 
 func _next_boss() -> int:
 	for m in [25, 50, 75, 100]:
