@@ -534,7 +534,13 @@ func _update(dt: float) -> void:
 			continue
 		p.t += dt
 		if p.arch == "sun":
-			if p.t >= s.interval: p.t = 0.0; suns.append({"x": p.x + rng.randf_range(-8,8), "y": p.y, "ty": p.y, "vy": 0.0, "value": int(s.amount * float(p.get("gm", 1.0))), "falling": false, "life": 12.0})
+			if p.t >= s.interval:
+				p.t = 0.0
+				suns.append({"x": p.x + rng.randf_range(-8,8), "y": p.y, "ty": p.y, "vy": 0.0, "value": int(s.amount * float(p.get("gm", 1.0))), "falling": false, "life": 12.0})
+				# kleiner Funken-Ausbruch bei der Sonnen-Produktion
+				for _sk in range(4):
+					var sa := rng.randf() * TAU
+					fx.append({"t": "gib", "x": float(p.x), "y": float(p.y) - 6.0, "vx": cos(sa) * 42.0, "vy": -40.0 - rng.randf() * 45.0, "life": 0.42, "col": Color(1.0, 0.9, 0.4), "sz": 2.0 + rng.randf() * 1.2})
 		elif p.arch == "shooter":
 			if p.t >= s.shot_int and (beat_now or not BAL.RHYTHM_SHOOT) and _lane_has(p): p.t = 0.0; _shoot(p); p["recoil"] = 1.0
 		elif p.arch == "beam":
@@ -566,6 +572,7 @@ func _update(dt: float) -> void:
 					z["shield"] = float(z.shield) - pe.dmg   # Schild absorbiert frontale Erbsen
 				else:
 					z.hp -= pe.dmg; _apply_fx(z, pe.effects, pe.dmg)
+					z["hitflash"] = 0.16   # kurzes weisses Aufblitzen beim Treffer
 				Music.play_sfx("pea_hit", 0.09)
 				pe.hit.append(z)
 				if int(pe.pierce) > 0:
@@ -585,6 +592,7 @@ func _update(dt: float) -> void:
 		if z.burn > 0: z.hp -= 8.0 * dt; z.burn -= dt
 		if z.poison > 0: z.hp -= 9.0 * dt; z.poison -= dt
 		if z.slow > 0: z.slow -= dt
+		if float(z.get("hitflash", 0.0)) > 0.0: z["hitflash"] = float(z.hitflash) - dt
 		if z.hp <= 0: _start_dying(z); continue
 		# Element-Boss-Faehigkeit (feuer/eis/blitz/untot)
 		if str(z.get("element", "")) != "":
@@ -992,6 +1000,10 @@ func _place(col: int, row: int) -> void:
 	var x = Game.LAWN_X + col * Game.CELL + Game.CELL / 2.0
 	var y = Game.LAWN_Y + row * Game.CELL + Game.CELL / 2.0
 	plants.append({"ck": ck, "arch": s.arch, "row": row, "col": col, "x": x, "y": y, "hp": float(s.hp), "maxhp": float(s.hp), "s": s, "t": 0.0, "fuse": (0.7 if s.arch == "bomb" else 0.0), "done": false, "element": Game.seed_element(slot)})
+	# Staub-Woelkchen beim Pflanzen
+	for _dk in range(5):
+		var da := rng.randf() * TAU
+		fx.append({"t": "gib", "x": float(x), "y": float(y) + 16.0, "vx": cos(da) * 55.0, "vy": -20.0 - rng.randf() * 28.0, "life": 0.36, "col": Color(0.62, 0.46, 0.3), "sz": 2.4 + rng.randf() * 1.6})
 	Music.play_sfx("plant")
 	# Intuitiver Start: die allererste gesetzte Pflanze startet Welle 1
 	if Game.wave == 0 and Game.phase == "prep":
@@ -1105,6 +1117,8 @@ func _draw() -> void:
 		var zy: float = z.y
 		if z.get("fly", false): zy = z.y - Game.CELL * 0.32   # Ballon schwebt hoeher
 		_shadow(z.x, zy + sz * 0.5, sz * 0.5)
+		var _hf := float(z.get("hitflash", 0.0))
+		if _hf > 0.0: zc = zc.lerp(Color(1, 1, 1), clamp(_hf / 0.16, 0.0, 1.0) * 0.8)   # Treffer-Aufblitzen
 		_draw_zombie(z, zc, float(sz), z.x, zy)
 		if z.boss:
 			draw_arc(Vector2(z.x, zy), sz * 0.78 + sin(_anim_clock * 3.0) * 2.5, 0.0, TAU, 30, Color(zc.r, zc.g, zc.b, 0.5), 3.0)
