@@ -147,6 +147,7 @@ func reset_run() -> void:
 	Game.rebirth()
 	plants.clear(); zombies.clear(); peas.clear(); suns.clear(); fx.clear(); graveyard.clear(); popups.clear()
 	rows = Game.lanes_count()
+	Game.update_lawn_y(rows)   # Rasen mittig auf dem Bildschirm
 	mowers.clear()
 	for r in range(rows):
 		mowers.append({"row": r, "x": float(Game.LAWN_X - 30), "active": false, "used": false})
@@ -158,10 +159,20 @@ func reset_run() -> void:
 # Reihen nachziehen, wenn neue freigeschaltet wurden (mid-run kaufbar)
 func _sync_rows() -> void:
 	var want := Game.lanes_count()
-	if want > rows:
-		for r in range(rows, want):
-			mowers.append({"row": r, "x": float(Game.LAWN_X - 30), "active": false, "used": false})
-		rows = want
+	if want <= rows: return
+	# Rasen bleibt zentriert: LAWN_Y neu berechnen und alle vorhandenen Objekte mitschieben
+	var old_y := Game.LAWN_Y
+	Game.update_lawn_y(want)
+	var dy := float(Game.LAWN_Y - old_y)
+	if dy != 0.0:
+		for p in plants: p.y += dy
+		for z in zombies: z.y += dy
+		for pe in peas: pe.y += dy
+		for su in suns: su.y += dy; su.ty += dy
+		for g in graveyard: g.y += dy
+	for r in range(rows, want):
+		mowers.append({"row": r, "x": float(Game.LAWN_X - 30), "active": false, "used": false})
+	rows = want
 
 func start_wave() -> void:
 	if Game.phase != "prep": return

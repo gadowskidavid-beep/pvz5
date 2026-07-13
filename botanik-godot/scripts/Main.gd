@@ -1627,7 +1627,7 @@ func _build_general(vb) -> void:
 	if Game.lane_count_max():
 		_card(gl, "* Alle Reihen frei", "%d / %d Reihen aktiv" % [Game.LANE_MAX, Game.LANE_MAX], "", false, Callable())
 	else:
-		_card(gl, "Neue Rasen-Reihe", "Schaltet die naechste Reihe frei (max %d)" % Game.LANE_MAX, "FP %d" % Game.lane_cost(), Game.fp >= Game.lane_cost(), _buy_lane)
+		_card(gl, "Rasen ausbauen (+2 Reihen)", "Erweitert den Rasen um 2 Reihen (bleibt mittig, max %d)" % Game.LANE_MAX, "FP %d" % Game.lane_cost(), Game.fp >= Game.lane_cost(), _buy_lane)
 	_header(vb, "Ausruestung (FP)", Color(0.55, 0.7, 1))
 	var g3 := _grid(vb, 3)
 	for k in Game.EQ_ORDER:
