@@ -874,7 +874,13 @@ func _make_overlay(n: String) -> void:
 	var panel := Panel.new()
 	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	panel.visible = false
+	panel.add_theme_stylebox_override("panel", _sb(Color(0.06, 0.05, 0.11, 0.99), COL_ACCENT, 2, 0, 0))
 	root.add_child(panel)
+	# Nachthimmel-Backdrop (Sterne + Verlauf) hinter dem Inhalt - einheitlicher Look
+	var backdrop := OverlayBg.new()
+	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(backdrop)
 	var scroll := ScrollContainer.new()
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	scroll.offset_top = 58; scroll.offset_left = 20; scroll.offset_right = -20; scroll.offset_bottom = -20
@@ -1163,15 +1169,32 @@ func _dev_speed_reset() -> void:
 
 # ---- TODES-SCREEN ----
 func _build_death(vb) -> void:
-	_spacer(vb, 8)
-	_big(vb, "DU WURDEST UEBERRANNT!", 36, Color(1, 0.4, 0.4))
-	_big(vb, "Es ist noch nicht vorbei. Du verlierst alle Skills dieses Runs,", 15, Color(0.9, 0.8, 0.8))
-	_big(vb, "aber deine GEHIRNE bleiben - dafuer sind sie da!", 15, COL_PURPLE)
-	_spacer(vb, 10)
+	# Friedhof-Szene mit eingemeisseltem "Welle X erreicht"
+	var scene := DeathScene.new()
+	scene.custom_minimum_size = Vector2(1000, 330)
+	vb.add_child(scene)
+	var t1 := Label.new(); t1.text = "DU WURDEST UEBERRANNT"
+	t1.add_theme_font_size_override("font_size", 34); t1.modulate = Color(1, 0.4, 0.4)
+	t1.position = Vector2(280, 14); t1.custom_minimum_size = Vector2(440, 0)
+	t1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; scene.add_child(t1)
+	var sl := Label.new(); sl.text = "R. I. P."
+	sl.add_theme_font_size_override("font_size", 18); sl.modulate = Color(0.62, 0.64, 0.72)
+	sl.position = Vector2(460, 104); sl.custom_minimum_size = Vector2(80, 0)
+	sl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; scene.add_child(sl)
+	var wl := Label.new(); wl.text = "Welle %d erreicht" % Game.wave
+	wl.add_theme_font_size_override("font_size", 24); wl.modulate = Color(0.88, 0.9, 0.98)
+	wl.position = Vector2(350, 148); wl.custom_minimum_size = Vector2(300, 0)
+	wl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; scene.add_child(wl)
+	_big(vb, "Deine Skills dieses Runs sind weg - aber deine SKULLS bleiben.", 15, COL_PURPLE)
 	_build_prestige(vb)
 	_spacer(vb, 14)
-	var b := Button.new(); b.text = "WIEDERGEBURT  -  Neuer Versuch"; b.custom_minimum_size = Vector2(360, 54)
-	b.add_theme_font_size_override("font_size", 20); b.pressed.connect(_do_rebirth)
+	var b := Button.new(); b.text = "WIEDERGEBURT"; b.custom_minimum_size = Vector2(300, 68)
+	b.add_theme_font_size_override("font_size", 22)
+	b.add_theme_stylebox_override("normal", _stone_sb(Color(0.30, 0.18, 0.36), COL_PURPLE))
+	b.add_theme_stylebox_override("hover", _stone_sb(Color(0.40, 0.24, 0.48), Color(0.92, 0.72, 1.0)))
+	b.add_theme_stylebox_override("pressed", _stone_sb(Color(0.24, 0.14, 0.30), COL_PURPLE))
+	b.add_theme_color_override("font_color", Color(0.96, 0.9, 1.0))
+	b.pressed.connect(_do_rebirth)
 	vb.add_child(b)
 
 func _do_rebirth() -> void:
@@ -1186,13 +1209,54 @@ func _build_prestige(vb) -> void:
 	_header(vb, "SKULL-UPGRADES  —  Skulls: %d  (bleiben dauerhaft)" % Game.brains, COL_PURPLE)
 	var g := _grid(vb, 3)
 	for k in Game.PRES_ORDER:
-		var p = Game.PRESTIGE[k]
-		var lv := Game.pres_lvl(k)
-		if Game.pres_max(k):
-			_card(g, "%s  (MAX)" % p.n, p.d, "", false, Callable())
-		else:
-			var c := Game.pres_cost(k)
-			_card(g, "%s  St.%d/%d" % [p.n, lv, int(p.max)], p.d, "Gehirn %d" % c, Game.brains >= c, _buy_pres.bind(k))
+		_pres_card(g, k)
+
+# Prestige-Karte im Skull-Theme mit sichtbaren Stufen (Punkte bzw. Balken)
+func _pres_card(grid, k: String) -> void:
+	var p = Game.PRESTIGE[k]
+	var lv := Game.pres_lvl(k)
+	var mx := int(p.max)
+	var maxed := Game.pres_max(k)
+	var pc := PanelContainer.new(); pc.custom_minimum_size = Vector2(176, 0)
+	pc.add_theme_stylebox_override("panel", _sb(Color(0.13, 0.09, 0.18), COL_PURPLE.darkened(0.2), 1, 10))
+	var m := MarginContainer.new()
+	for side in ["margin_left", "margin_top", "margin_right", "margin_bottom"]:
+		m.add_theme_constant_override(side, 8)
+	var v := VBoxContainer.new()
+	var t := Label.new(); t.text = "%s  (Lv %d/%d)" % [p.n, lv, mx]
+	t.add_theme_font_size_override("font_size", 14); t.modulate = COL_PURPLE
+	v.add_child(t)
+	var prog := PresProgress.new(); prog.lv = lv; prog.maxv = mx
+	prog.custom_minimum_size = Vector2(154, 14)
+	v.add_child(prog)
+	var d := Label.new(); d.text = str(p.d); d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	d.custom_minimum_size = Vector2(154, 0); d.modulate = Color(0.75, 0.72, 0.85); d.add_theme_font_size_override("font_size", 11)
+	v.add_child(d)
+	if maxed:
+		var ml := Label.new(); ml.text = "MAX erreicht"; ml.modulate = Color(0.6, 0.95, 0.7)
+		v.add_child(ml)
+	else:
+		var c := Game.pres_cost(k)
+		var b := Button.new(); b.text = "Skull %d" % c; b.disabled = Game.brains < c
+		b.pressed.connect(_buy_pres.bind(k)); v.add_child(b)
+	m.add_child(v); pc.add_child(m); grid.add_child(pc)
+
+# Karte mit prozeduralem Mini-Portrait links + Text rechts
+func _portrait_card(grid, portrait: Control, title: String, desc: String) -> void:
+	var pc := PanelContainer.new(); pc.custom_minimum_size = Vector2(176, 0)
+	var m := MarginContainer.new()
+	for side in ["margin_left", "margin_top", "margin_right", "margin_bottom"]:
+		m.add_theme_constant_override(side, 8)
+	var hb := HBoxContainer.new(); hb.add_theme_constant_override("separation", 8)
+	portrait.custom_minimum_size = Vector2(46, 46)
+	hb.add_child(portrait)
+	var v := VBoxContainer.new(); v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var t := Label.new(); t.text = title; t.add_theme_font_size_override("font_size", 13); t.modulate = Color(0.95, 1, 0.9)
+	v.add_child(t)
+	var d := Label.new(); d.text = desc; d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	d.custom_minimum_size = Vector2(102, 0); d.modulate = Color(0.72, 0.82, 0.74); d.add_theme_font_size_override("font_size", 10)
+	v.add_child(d)
+	hb.add_child(v); m.add_child(hb); pc.add_child(m); grid.add_child(pc)
 
 # ---- ALMANACH ----
 func _build_almanac(vb) -> void:
@@ -1202,7 +1266,8 @@ func _build_almanac(vb) -> void:
 	for ck in Game.CH_ORDER:
 		var c = Game.CHASSIS[ck]
 		var s = Game.compute_chassis_stats(ck)
-		_card(g, c.n, "%s\nSonne %d  HP %d" % [c.d, int(s.cost), int(s.hp)], "", false, Callable())
+		var port := PlantPortrait.new(); port.ck = ck
+		_portrait_card(g, port, c.n, "%s\nSonne %d  HP %d" % [c.d, int(s.cost), int(s.hp)])
 
 # ---- ZOMBIE-BUCH ----
 func _build_zombiebook(vb) -> void:
@@ -1212,9 +1277,10 @@ func _build_zombiebook(vb) -> void:
 		var z = Game.ZTYPES[zk]
 		if Game.seen.has(zk):
 			var extra := ""
-			if z.get("boss", false): extra = "  BOSS (Gehirne!)"
+			if z.get("boss", false): extra = "  BOSS (Skulls!)"
 			elif z.get("vault", false): extra = "  springt"
-			_card(g, z.n, "HP %d  Schaden %d%s" % [int(z.hp), int(z.dmg), extra], "", false, Callable())
+			var port := ZombiePortrait.new(); port.kind = zk
+			_portrait_card(g, port, z.n, "HP %d  Schaden %d%s" % [int(z.hp), int(z.dmg), extra])
 		else:
 			_card(g, "???", "Noch nicht begegnet", "", false, Callable())
 
@@ -1449,3 +1515,133 @@ class MenuScene extends Control:
 		# Reagenzglaeser vor dem Labor
 		draw_rect(Rect2(lx + 20.0, ly + bh - 34.0, 12, 34), Color(0.6, 0.4, 0.9, 0.85))
 		draw_rect(Rect2(lx + 38.0, ly + bh - 26.0, 12, 26), Color(0.35, 0.9, 0.5, 0.85))
+
+
+# ================================================================
+# OVERLAY-BACKDROP — dezenter Nachthimmel (Sterne + Verlauf) hinter
+# allen pausierenden Overlays, fuer einen einheitlichen Look.
+# ================================================================
+class OverlayBg extends Control:
+	var t := 0.0
+	func _process(delta: float) -> void:
+		t += delta
+		queue_redraw()
+	func _draw() -> void:
+		var w := size.x
+		var h := size.y
+		draw_rect(Rect2(0, 0, w, h), Color(0.06, 0.05, 0.11))
+		draw_rect(Rect2(0, 0, w, h * 0.5), Color(0.09, 0.06, 0.16, 0.6))
+		var rs := RandomNumberGenerator.new()
+		rs.seed = 99
+		for i in range(70):
+			var sx := rs.randf() * w
+			var sy := rs.randf() * h
+			var tw := 0.5 + 0.5 * sin(t * 1.4 + float(i) * 1.7)
+			draw_circle(Vector2(sx, sy), 0.6 + rs.randf() * 1.4, Color(0.85, 0.9, 1.0, 0.10 + 0.28 * tw))
+		draw_rect(Rect2(0, h - 70.0, w, 70.0), Color(0.10, 0.14, 0.12, 0.22))
+
+# ================================================================
+# TODES-SZENE — Friedhof bei Nacht mit Haupt-Grabstein (Welle X)
+# und gluehenden Skulls. Komplett prozedural gezeichnet.
+# ================================================================
+class DeathScene extends Control:
+	var t := 0.0
+	func _process(delta: float) -> void:
+		t += delta
+		queue_redraw()
+	func _stone(p: Vector2, sw: float, sh: float, col: Color) -> void:
+		draw_rect(Rect2(p.x - sw * 0.5, p.y - sh + sw * 0.5, sw, sh - sw * 0.5), col)
+		draw_circle(Vector2(p.x, p.y - sh + sw * 0.5), sw * 0.5, col)
+	func _skull(c: Vector2, r: float, glow: float) -> void:
+		draw_circle(c, r * 1.6, Color(0.72, 0.5, 1.0, 0.10 + 0.14 * glow))
+		draw_circle(c - Vector2(0, r * 0.1), r, Color(0.90, 0.90, 0.96))
+		draw_rect(Rect2(c.x - r * 0.5, c.y + r * 0.35, r, r * 0.6), Color(0.90, 0.90, 0.96))
+		draw_circle(c + Vector2(-r * 0.42, -r * 0.1), r * 0.26, Color(0.10, 0.06, 0.12))
+		draw_circle(c + Vector2(r * 0.42, -r * 0.1), r * 0.26, Color(0.10, 0.06, 0.12))
+	func _draw() -> void:
+		var w := size.x
+		var h := size.y
+		var gy := h * 0.66
+		# Boden + Nebel
+		draw_rect(Rect2(0, gy, w, h - gy), Color(0.08, 0.10, 0.09))
+		draw_rect(Rect2(0, gy - 14.0, w, 26.0), Color(0.32, 0.34, 0.42, 0.10))
+		# Deko-Grabsteine im Hintergrund
+		_stone(Vector2(w * 0.5 - 220.0, gy + 8.0), 60.0, 80.0, Color(0.18, 0.19, 0.23))
+		_stone(Vector2(w * 0.5 + 220.0, gy + 4.0), 66.0, 88.0, Color(0.17, 0.18, 0.22))
+		# Haupt-Grabstein
+		var cx := w * 0.5
+		var tw := 168.0
+		var th := 210.0
+		var topy := gy - th + tw * 0.5
+		draw_rect(Rect2(cx - tw * 0.5, topy, tw, th - tw * 0.5), Color(0.27, 0.28, 0.33))
+		draw_circle(Vector2(cx, topy), tw * 0.5, Color(0.27, 0.28, 0.33))
+		draw_rect(Rect2(cx - tw * 0.5, topy, tw, th - tw * 0.5), Color(0.15, 0.16, 0.2), false, 3.0)
+		# gluehende Skulls links & rechts
+		var g := 0.5 + 0.5 * sin(t * 2.0)
+		_skull(Vector2(cx - 150.0, gy - 26.0), 15.0, g)
+		_skull(Vector2(cx + 150.0, gy - 44.0), 17.0, 1.0 - g)
+
+
+# ================================================================
+# PRESTIGE-FORTSCHRITT — gefuellte Punkte (<=10 Stufen) sonst Balken.
+# ================================================================
+class PresProgress extends Control:
+	var lv := 0
+	var maxv := 1
+	func _draw() -> void:
+		var w := size.x
+		var h := size.y
+		if maxv <= 10:
+			var step := w / float(max(1, maxv))
+			var r: float = min(step * 0.30, h * 0.45)
+			for i in range(maxv):
+				var cx := step * (float(i) + 0.5)
+				var filled := i < lv
+				draw_circle(Vector2(cx, h * 0.5), r, Color(0.86, 0.6, 1.0) if filled else Color(0.26, 0.2, 0.34))
+		else:
+			draw_rect(Rect2(0, h * 0.3, w, h * 0.4), Color(0.22, 0.16, 0.3))
+			var frac: float = clamp(float(lv) / float(max(1, maxv)), 0.0, 1.0)
+			draw_rect(Rect2(0, h * 0.3, w * frac, h * 0.4), Color(0.82, 0.55, 1.0))
+
+# ================================================================
+# MINI-PORTRAITS fuer Almanach / Zombie-Buch (prozedural).
+# ================================================================
+class PlantPortrait extends Control:
+	var ck := ""
+	func _draw() -> void:
+		var c := size * 0.5
+		var r: float = min(size.x, size.y) * 0.36
+		var col: Color = Game.CHASSIS.get(ck, {}).get("col", Color(0.5, 0.8, 0.4))
+		var arch: String = str(Game.CHASSIS.get(ck, {}).get("arch", ""))
+		if arch == "sun":
+			for i in range(10):
+				var a := deg_to_rad(i * 36.0)
+				draw_circle(c + Vector2(cos(a), sin(a)) * r, r * 0.32, Color(1, 0.8, 0.2))
+			draw_circle(c, r * 0.72, Color(0.5, 0.32, 0.12))
+		else:
+			draw_circle(c, r, col.darkened(0.4))
+			draw_circle(c, r - 2.0, col)
+			if arch == "shooter" or arch == "beam":
+				draw_rect(Rect2(c.x + r * 0.4, c.y - r * 0.2, r * 0.7, r * 0.4), col.darkened(0.3))
+		draw_circle(c + Vector2(-r * 0.3, -r * 0.1), r * 0.16, Color(1, 1, 1))
+		draw_circle(c + Vector2(r * 0.3, -r * 0.1), r * 0.16, Color(1, 1, 1))
+		draw_circle(c + Vector2(-r * 0.3, -r * 0.1), r * 0.08, Color(0.1, 0.1, 0.12))
+		draw_circle(c + Vector2(r * 0.3, -r * 0.1), r * 0.08, Color(0.1, 0.1, 0.12))
+
+class ZombiePortrait extends Control:
+	var kind := ""
+	func _draw() -> void:
+		var c := size * 0.5
+		var sz: float = min(size.x, size.y) * 0.5
+		var col: Color = Game.ZTYPES.get(kind, {}).get("col", Color(0.5, 0.55, 0.5))
+		draw_rect(Rect2(c.x - sz * 0.4, c.y - sz * 0.5, sz * 0.8, sz * 1.0), col)
+		draw_circle(c + Vector2(-sz * 0.15, -sz * 0.15), sz * 0.09, Color(0.9, 0.9, 0.85))
+		draw_circle(c + Vector2(sz * 0.15, -sz * 0.15), sz * 0.09, Color(0.9, 0.9, 0.85))
+		draw_circle(c + Vector2(-sz * 0.15, -sz * 0.15), sz * 0.045, Color(0.8, 0.1, 0.1))
+		draw_circle(c + Vector2(sz * 0.15, -sz * 0.15), sz * 0.045, Color(0.8, 0.1, 0.1))
+		if kind == "cone":
+			draw_colored_polygon(PackedVector2Array([Vector2(c.x - sz * 0.3, c.y - sz * 0.5), Vector2(c.x + sz * 0.3, c.y - sz * 0.5), Vector2(c.x, c.y - sz * 0.95)]), Color(0.88, 0.46, 0.14))
+		elif kind == "bucket":
+			draw_rect(Rect2(c.x - sz * 0.32, c.y - sz * 0.85, sz * 0.64, sz * 0.42), Color(0.72, 0.74, 0.78))
+		elif kind == "brainz":
+			draw_circle(c + Vector2(0, -sz * 0.55), sz * 0.28, Color(0.86, 0.5, 1.0))
