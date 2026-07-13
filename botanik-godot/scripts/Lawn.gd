@@ -38,6 +38,7 @@ var _boss_seen := false     # Boss-Auftritt: einmaliger Screen-Flash
 var combo := 0
 var combo_t := 0.0
 const COMBO_WINDOW := 2.6   # Sekunden bis der Combo verfaellt
+var auto_wave_t := 0.0      # Countdown bis zur automatischen naechsten Welle
 # Screen-Shake (nur die Spielwelt, nicht das HUD)
 var _shake := 0.0
 var _shake_mag := 0.0
@@ -311,6 +312,7 @@ func _end_wave() -> void:
 		return
 	Game.phase = "prep"
 	Game.fp += Game.wave
+	auto_wave_t = 3.5   # bei aktiviertem Auto-Modus startet die naechste Welle nach kurzer Pause
 	# Wellen-Abschluss-Bonus (skaliert mit der Welle) — belohnt Durchhalten
 	var bonus_sun := 25 + Game.wave * 5
 	Game.sun += bonus_sun
@@ -463,6 +465,11 @@ func _update(dt: float) -> void:
 		if idle_timer <= 0 and zombies.size() < Game.idle_cap():
 			idle_timer = rng.randf_range(5.0, 9.0)
 			_spawn("basic")
+		# Auto-Modus: naechste Welle nach kurzer Pause selbst starten (erst ab Welle 1)
+		if Game.auto_wave and Game.wave >= 1:
+			auto_wave_t -= dt
+			if auto_wave_t <= 0.0:
+				start_wave()
 	# Umwelt-Zerstoerung (Dachterrasse/Finstere Zone): beschaedigt zufaellige Pflanzen
 	if wo.get("hazard", false) and not plants.is_empty():
 		hazard_timer -= dt
@@ -1103,6 +1110,13 @@ func _draw() -> void:
 		var ix = z.x + sz*0.4
 		if z.burn > 0: draw_circle(Vector2(ix, zy - sz*0.5), 4, Color(1,0.5,0.1))
 		if z.poison > 0: draw_circle(Vector2(ix, zy - sz*0.5 + 10), 4, Color(0.6,0.9,0.3))
+		if z.slow > 0:
+			# Eis-Splitter um verlangsamte Zombies
+			for si in range(3):
+				var sa := _anim_clock * 1.4 + float(si) * TAU / 3.0
+				var ip := Vector2(z.x + cos(sa) * sz * 0.42, zy + sin(sa) * sz * 0.36)
+				draw_circle(ip, 2.6, Color(0.72, 0.9, 1.0, 0.85))
+				draw_circle(ip, 4.2, Color(0.6, 0.85, 1.0, 0.25))
 		if str(z.get("shirt", "")) != "" and not z.get("dying", false):
 			_draw_shirt(z.x, zy + sz * 0.08, str(z.shirt), z.get("enraged", false))
 	# Boss-Lebensbalken oben am Bildschirm
@@ -1115,6 +1129,11 @@ func _draw() -> void:
 			draw_rect(Rect2(bx - 3, by - 3, bw + 6, 22), Color(0, 0, 0, 0.55))
 			draw_rect(Rect2(bx, by, bw, 16), Color(0.18, 0.05, 0.08))
 			draw_rect(Rect2(bx, by, bw * bfrac, 16), bz.col)
+			# Boss-Name ueber dem Balken
+			if _font != null:
+				var bn := str(Game.ZTYPES.get(str(bz.kind), {}).get("n", "BOSS")).to_upper()
+				draw_string_outline(_font, Vector2(bx, by - 6), bn, HORIZONTAL_ALIGNMENT_CENTER, bw, 15, 4, Color(0, 0, 0, 0.7))
+				draw_string(_font, Vector2(bx, by - 6), bn, HORIZONTAL_ALIGNMENT_CENTER, bw, 15, Color(1, 0.85, 0.7))
 			break
 	# Sonne
 	for s in suns:

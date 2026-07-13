@@ -129,6 +129,7 @@ var phase := "prep"     # "prep" | "fight"
 var shovel := false
 var paused := false      # true wenn ein Overlay offen ist
 var game_speed := 1      # Spiel-Tempo: 1x / 2x / 3x (Fast-Forward fuer Idle)
+var auto_wave := false   # naechste Welle automatisch starten (Idle-Komfort)
 
 const SAVE_PATH := "user://botanik_save.json"
 

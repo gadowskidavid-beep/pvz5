@@ -24,6 +24,7 @@ var wave_bar: Control
 var msg_lbl: Label
 var wave_btn: Button
 var speed_btn: Button
+var auto_btn: Button
 var seed_box: VBoxContainer
 var seed_panel: Panel
 var chain_bar: HBoxContainer      # Chain-Schnellwahl rund um die Sonne
@@ -245,6 +246,13 @@ func _build_hud() -> void:
 	speed_btn.add_theme_color_override("font_color", Color(1, 0.9, 0.4))
 	speed_btn.pressed.connect(_cycle_speed)
 	nav.add_child(speed_btn)
+	# Auto-Welle (Idle): naechste Welle automatisch starten
+	auto_btn = Button.new()
+	auto_btn.text = "Auto"
+	auto_btn.custom_minimum_size = Vector2(58, 0)
+	auto_btn.tooltip_text = "Naechste Welle automatisch starten (Idle)"
+	auto_btn.pressed.connect(_toggle_auto)
+	nav.add_child(auto_btn)
 	# Meldung mittig
 	msg_lbl = Label.new()
 	msg_lbl.position = Vector2(SCREEN_W / 2.0 - 200, 44)
@@ -445,6 +453,11 @@ func _open_dev() -> void: open_overlay("dev")
 func _cycle_speed() -> void:
 	Game.game_speed = Game.game_speed % 3 + 1
 	if speed_btn != null: speed_btn.text = "%dx" % Game.game_speed
+func _toggle_auto() -> void:
+	Game.auto_wave = not Game.auto_wave
+	if auto_btn != null:
+		auto_btn.text = "Auto *" if Game.auto_wave else "Auto"
+		auto_btn.add_theme_color_override("font_color", Color(0.5, 1, 0.6) if Game.auto_wave else Color(0.9, 0.98, 0.9))
 
 # ================= UNTERE LEISTE =================
 func _build_bottom() -> void:
