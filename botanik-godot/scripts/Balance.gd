@@ -9,6 +9,10 @@ const ACT_SIZE := 25          # Wellen pro Rasen
 const FINAL_WAVE := 100
 const BOSS_WAVES := [25, 50, 75, 100]
 const MINIBOSS_WAVE := 9      # kleiner Extra-Boss zum Kennenlernen
+
+# ---- Musik / Rhythmus ----
+const MUSIC_BPM := 128.0      # Takt fuer Beat-synchrones Schiessen + Pflanzen-Bounce (auf den Song stellen)
+const RHYTHM_SHOOT := true    # true = Schuetzen feuern auf den Beat; false = normale Feuerrate
 const MAX_CHAINS := 3         # (nicht mehr genutzt)
 
 # ---- Wellen-Menge (Anzahl Zombies) ----
