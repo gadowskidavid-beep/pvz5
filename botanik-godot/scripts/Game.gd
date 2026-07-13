@@ -397,6 +397,7 @@ func buy_pass(k: String) -> bool:
 func new_run() -> void:
 	sun = start_sun()
 	coins = 0
+	fp = BAL.START_FP          # Tutorial-Starthilfe: genau genug fuer 1 Schuetzen (vorher toter Code)
 	wave = 0
 	phase = "prep"
 	run_shop.clear()
