@@ -123,6 +123,15 @@ func _start_dying(z) -> void:
 	if not z.get("dropped", false): _kill(z)
 	z["dying"] = true
 	z["die_t"] = 0.0
+	# Liebespaar: stirbt einer, wird der Partner sauer und rennt los
+	var partner = z.get("partner", null)
+	if partner != null and not partner.get("dying", false) and float(partner.get("hp", 0.0)) > 0.0:
+		partner["enraged"] = true
+		partner["partner"] = null      # Link loesen (kein Zirkelbezug)
+		fx.append({"t": "boom", "x": partner.x, "y": partner.y - 20, "life": 0.3})
+		Music.play_sfx("rage", 0.3)
+		msg = "Ein Renn-Zombie hat seinen Partner verloren — jetzt rennt er wuetend!"; msg_t = 1.8
+	z["partner"] = null
 
 func _die_dur(z) -> float:
 	var df := _zombie_anim(str(z.kind), "dying")
@@ -270,13 +279,12 @@ func _end_wave() -> void:
 		for m in mowers: m.used = false; m.active = false; m.x = float(Game.LAWN_X - 30)
 	msg = "Welle %d geschafft! +%d FP" % [Game.wave, Game.wave]; msg_t = 2.0
 
-func _spawn(kind: String) -> void:
+func _make_zombie(kind: String) -> Dictionary:
 	var b = Game.ZTYPES[kind]
-	Game.seen[kind] = true
 	var row := rng.randi() % rows
 	var hp_mul := 1.0 + Game.wave * BAL.Z_HP_PER_WAVE + pow(Game.wave, BAL.Z_HP_POW) * BAL.Z_HP_POW_MUL
 	var hp := float(b.hp) * hp_mul
-	zombies.append({
+	return {
 		"kind": kind, "row": row, "x": float(Game.LAWN_X + Game.COLS * Game.CELL + 20),
 		"y": Game.LAWN_Y + row * Game.CELL + Game.CELL / 2.0,
 		"hp": hp, "maxhp": hp, "speed": float(b.speed) * (1.0 + Game.wave * BAL.Z_SPD_PER_WAVE),
@@ -287,8 +295,26 @@ func _spawn(kind: String) -> void:
 		"slow": 0.0, "burn": 0.0, "poison": 0.0, "dropped": false, "switched": false,
 		"element": str(b.get("element", "")), "ability_t": 0.0,
 		"fly": b.get("fly", false), "rage": b.get("rage", false),
-		"shield": float(b.get("shield", 0.0)), "maxshield": float(b.get("shield", 0.0))
-	})
+		"shield": float(b.get("shield", 0.0)), "maxshield": float(b.get("shield", 0.0)),
+		"enraged": false, "shirt": "", "partner": null
+	}
+
+func _spawn(kind: String) -> void:
+	Game.seen[kind] = true
+	var z1 = _make_zombie(kind)
+	zombies.append(z1)
+	# Renn-Zombie kommt als LIEBESPAAR: zwei Partner (Shirt "him"/"her"),
+	# stirbt einer, wird der andere sauer und rennt los.
+	if kind == "sprinter":
+		z1["shirt"] = "him"
+		var z2 = _make_zombie(kind)
+		z2["shirt"] = "her"
+		z2["row"] = z1.row
+		z2["y"] = z1.y
+		z2["x"] = float(z1.x) + Game.CELL * 0.85   # laeuft direkt hinter dem Partner
+		z1["partner"] = z2
+		z2["partner"] = z1
+		zombies.append(z2)
 
 func _spawn_one() -> void:
 	var act := world_of(Game.wave)
@@ -549,8 +575,11 @@ func _update(dt: float) -> void:
 			if tgt.hp <= 0: _plant_dies(tgt)
 		else:
 			var spd: float = z.speed
-			# Renn-Zombie: je weniger HP, desto schneller (bis +130%)
-			if z.get("rage", false): spd = float(z.speed) * (1.0 + (1.0 - z.hp / z.maxhp) * 1.3)
+			if str(z.kind) == "sprinter":
+				# Liebespaar bummelt gemuetlich (0.6x) - bis der Partner stirbt, dann Vollgas (2.0x)
+				spd = float(z.speed) * (2.0 if z.get("enraged", false) else 0.6)
+			elif z.get("rage", false):
+				spd = float(z.speed) * (1.0 + (1.0 - z.hp / z.maxhp) * 1.3)
 			z.x -= spd * sl * dt
 		if z.x < Game.LAWN_X + 10:
 			if not _mow(z.row):
@@ -927,6 +956,7 @@ func _draw() -> void:
 	for z in zombies:
 		var zc: Color = z.col
 		if z.slow > 0: zc = zc.lerp(Color(0.6,0.8,1), 0.4)
+		if z.get("enraged", false): zc = zc.lerp(Color(1.0, 0.25, 0.15), 0.5)   # wuetend -> rot
 		var sz = 60 if z.boss else 40
 		var zy: float = z.y
 		if z.get("fly", false): zy = z.y - Game.CELL * 0.32   # Ballon schwebt hoeher
@@ -946,6 +976,8 @@ func _draw() -> void:
 		var ix = z.x + sz*0.4
 		if z.burn > 0: draw_circle(Vector2(ix, zy - sz*0.5), 4, Color(1,0.5,0.1))
 		if z.poison > 0: draw_circle(Vector2(ix, zy - sz*0.5 + 10), 4, Color(0.6,0.9,0.3))
+		if str(z.get("shirt", "")) != "" and not z.get("dying", false):
+			_draw_shirt(z.x, zy + sz * 0.08, str(z.shirt), z.get("enraged", false))
 	# Boss-Lebensbalken oben am Bildschirm
 	for bz in zombies:
 		if bz.boss and bz.hp > 0:
@@ -1004,6 +1036,18 @@ func _draw_rain(rect: Rect2) -> void:
 		var a := (1.0 - life) * 0.30
 		var rr := 2.0 + life * 6.0
 		draw_arc(Vector2(sx, groundy), rr, PI, TAU, 8, Color(0.75, 0.85, 1.0, a), 1.0)
+
+# ---- T-Shirt der Liebespaar-Zombies: kleines Herz + "him"/"her" (+ Wut-Dampf wenn sauer) ----
+func _draw_shirt(cx: float, cy: float, shirt: String, angry: bool) -> void:
+	var hc := Color(1.0, 0.2, 0.2) if angry else Color(1.0, 0.30, 0.45)
+	draw_circle(Vector2(cx - 3.0, cy - 2.0), 2.4, hc)
+	draw_circle(Vector2(cx + 3.0, cy - 2.0), 2.4, hc)
+	draw_colored_polygon(PackedVector2Array([Vector2(cx - 5.2, cy - 1.0), Vector2(cx + 5.2, cy - 1.0), Vector2(cx, cy + 5.0)]), hc)
+	if _font != null:
+		draw_string(_font, Vector2(cx - 14.0, cy + 20.0), ("him" if shirt == "him" else "her"), HORIZONTAL_ALIGNMENT_CENTER, 28, 10, Color(1, 1, 1))
+	if angry:
+		draw_line(Vector2(cx - 11, cy - 16), Vector2(cx - 14, cy - 22), Color(1, 0.4, 0.3, 0.85), 2.0)
+		draw_line(Vector2(cx + 11, cy - 16), Vector2(cx + 14, cy - 22), Color(1, 0.4, 0.3, 0.85), 2.0)
 
 # ---- Gesicht: zwei Augen + Mund (mood: happy/neutral/angry) ----
 func _face(cx: float, cy: float, s: float, mood: String, eyecol := Color(0.1, 0.1, 0.12)) -> void:
