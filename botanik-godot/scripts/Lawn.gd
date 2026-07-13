@@ -170,6 +170,7 @@ func start_wave() -> void:
 		var bk := Game.boss_key_for_wave(Game.wave)
 		_spawn(bk)   # Boss kommt SOFORT — waehrend du im Umbruch neu baust
 		fx.append({"t": "flash", "life": 0.35, "col": Color(1.0, 0.92, 0.8)})
+		Music.play_sfx("boss_spawn", 1.0)
 		to_spawn += int(Game.ZTYPES[bk].get("summon", 0))
 		var wo := world_of(Game.wave)
 		if umbruch:
@@ -460,6 +461,7 @@ func _update(dt: float) -> void:
 					z["shield"] = float(z.shield) - pe.dmg   # Schild absorbiert frontale Erbsen
 				else:
 					z.hp -= pe.dmg; _apply_fx(z, pe.effects, pe.dmg)
+				Music.play_sfx("pea_hit", 0.09)
 				pe.hit.append(z)
 				if int(pe.pierce) > 0:
 					pe.pierce = int(pe.pierce) - 1
@@ -507,6 +509,7 @@ func _update(dt: float) -> void:
 				_apply_fx(z, p.s.effects, float(p.s.dmg))
 		if tgt != null and z.vault and not z.jumped and float(tgt.s.get("tall", 0.0)) <= 0.0:
 			z.x = tgt.x - Game.CELL * 0.55; z.jumped = true
+			Music.play_sfx("jump", 0.2)
 		elif tgt != null and z.smash:
 			# Smasher/Boss zerschmettert die Pflanze sofort -> Meta muss sich anpassen
 			var px = tgt.x; var py = tgt.y
@@ -588,6 +591,7 @@ func _lane_has(p) -> bool:
 	return false
 
 func _shoot(p) -> void:
+	Music.play_sfx("shoot_pea")
 	var s = p.s
 	var ex := int(s.get("extra_lanes", 0))
 	_spawn_pea(p, p.row, s)
@@ -606,6 +610,7 @@ func _beam(p) -> void:
 	fx.append({"t": "beam", "x": p.x, "y": p.y, "life": 0.12})
 
 func _fume(p) -> void:
+	Music.play_sfx("shoot_shroom")
 	var s = p.s
 	var gm := float(p.get("gm", 1.0))
 	var reach = p.x + (s.range if s.range > 0 else 2.6) * Game.CELL
@@ -614,6 +619,7 @@ func _fume(p) -> void:
 	fx.append({"t": "fume", "x": p.x, "y": p.y, "w": (s.range if s.range > 0 else 2.6) * Game.CELL, "life": 0.2})
 
 func _lob(p) -> void:
+	Music.play_sfx("shoot_shroom")
 	var s = p.s
 	var tx = p.x + 4 * Game.CELL
 	var best := 1.0e9
@@ -772,6 +778,7 @@ func _kill(z) -> void:
 
 func _lose() -> void:
 	Game.phase = "dead"
+	Music.play_sfx("dead", 1.0)
 	msg = "Überrannt!"; msg_t = 4.0
 
 # ---- Eingabe ----
@@ -792,6 +799,7 @@ func lawn_click(pos: Vector2) -> void:
 		if pos.distance_to(Vector2(suns[i].x, suns[i].y)) < 30:
 			var sv: int = int(suns[i].value)
 			_popup(suns[i].x, suns[i].y, "+%d" % sv, Color(1, 0.9, 0.35))
+			Music.play_sfx("collect_sun")
 			Game.sun += sv; suns.remove_at(i); return
 	var col := int((pos.x - Game.LAWN_X) / Game.CELL)
 	var row := int((pos.y - Game.LAWN_Y) / Game.CELL)

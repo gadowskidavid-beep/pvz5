@@ -1435,6 +1435,12 @@ func _build_options(vb) -> void:
 	msl.custom_minimum_size = Vector2(300, 24)
 	msl.value_changed.connect(func(v): Music.set_volume(v))
 	mrow.add_child(mlbl); mrow.add_child(msl); vb.add_child(mrow)
+	var srow := HBoxContainer.new(); srow.add_theme_constant_override("separation", 12)
+	var slbl := Label.new(); slbl.text = "Effekte (SFX)"; slbl.custom_minimum_size = Vector2(120, 0)
+	var ssl := HSlider.new(); ssl.min_value = -40.0; ssl.max_value = 6.0; ssl.step = 1.0; ssl.value = Music.sfx_volume_db
+	ssl.custom_minimum_size = Vector2(300, 24)
+	ssl.value_changed.connect(func(v): Music.set_sfx_volume(v))
+	srow.add_child(slbl); srow.add_child(ssl); vb.add_child(srow)
 	var mute := CheckButton.new(); mute.text = "Musik stumm"; mute.button_pressed = Music.muted
 	mute.toggled.connect(func(on): Music.set_muted(on))
 	vb.add_child(mute)
