@@ -884,6 +884,12 @@ func _kill(z) -> void:
 	combo_t = COMBO_WINDOW
 	run_kills += 1
 	best_combo = max(best_combo, combo)
+	# Combo-Meilenstein: Bonus-FP + kleiner Shake bei 10/20/30 ...
+	if combo >= 10 and combo % 10 == 0:
+		var cb := combo * 3
+		Game.fp += cb
+		_popup(z.x, z.y - 46, "COMBO x%d  +%d FP" % [combo, cb], Color(1.0, 0.85, 0.3))
+		_add_shake(5.0)
 	var cmult := 1.0 + 0.04 * float(min(combo, 25))   # bis zu +100% bei Combo 25
 	if combo >= 3:
 		_popup(z.x, z.y - 30, "Combo x%d" % combo, Color(1.0, 0.62, 0.2))
@@ -1075,6 +1081,10 @@ func _draw() -> void:
 		elif bool(es.get("poison", false)) or float(es.get("necro", 0.0)) > 0.0:
 			draw_arc(Vector2(p.x, pby), ar, 0.0, TAU, 26, Color(0.72, 0.40, 0.95, 0.45), 2.5)
 		_hp_bar(p.x, p.y + 30, p.hp / p.maxhp, Color(0.35,0.85,0.4))
+		# Warnung: pulsierender roter Ring, wenn die Pflanze fast zerstoert ist
+		if p.hp / p.maxhp < 0.3:
+			var wp := 0.5 + 0.5 * sin(_anim_clock * 8.0)
+			draw_arc(Vector2(p.x, pby), pr + 8.0, 0.0, TAU, 24, Color(1.0, 0.25, 0.2, 0.35 + 0.4 * wp), 2.5)
 		# Nacht-Pilz: verbleibende Lebensdauer (lila Balken oben)
 		if p.has("age"):
 			var lifeleft: float = clamp(1.0 - float(p.age) / BAL.SHROOM_LIFESPAN, 0.0, 1.0)
@@ -1418,6 +1428,15 @@ func _draw_evo(p, cx: float, cy: float, pr: float) -> void:
 
 # ---- Projektil je Element: Feuer=Flammen-Welle, Blitz=Plasma, Eis=blau, Gift=gruen ----
 func _draw_projectile(x: float, y: float, effects) -> void:
+	# Bewegungs-Schweif hinter dem Projektil (element-gefaerbt, verblassend)
+	var trc := Color(0.62, 0.95, 0.4, 0.5)
+	if effects.has("burn"): trc = Color(1.0, 0.55, 0.15, 0.5)
+	elif effects.has("chain"): trc = Color(0.5, 1.0, 0.6, 0.5)
+	elif effects.has("slow"): trc = Color(0.5, 0.8, 1.0, 0.5)
+	elif effects.has("poison"): trc = Color(0.6, 0.9, 0.35, 0.5)
+	for k in range(3):
+		var ta := trc; ta.a = trc.a * (1.0 - float(k) / 3.0)
+		draw_circle(Vector2(x - float(k + 1) * 6.0, y), 5.0 - float(k) * 1.2, ta)
 	if effects.has("burn"):
 		draw_circle(Vector2(x, y), 8.0, Color(1.0, 0.5, 0.12, 0.30))
 		var t := _anim_clock * 22.0 + x * 0.2
