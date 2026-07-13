@@ -25,6 +25,8 @@ var msg_lbl: Label
 var wave_btn: Button
 var seed_box: VBoxContainer
 var seed_panel: Panel
+var chain_bar: HBoxContainer      # Chain-Schnellwahl rund um die Sonne
+var chain_panel: Panel
 var tool_ham: Button
 var tool_sho: Button
 
@@ -69,6 +71,10 @@ var _tree_ref := 0        # Slot-Index bei mode "slot"
 var _tree_zoom := 1.0     # Zoom-Faktor fuer den Skill-Baum
 var _tree_panning := false # Linksklick-Ziehen zum Umschauen im Baum
 var info_node := ""       # aktuell gewaehlter Knoten (im aktuellen Baum)
+# Kamera/Scroll im Baum halten (kein Zurueckspringen beim Skillen)
+var _keep_scroll_next := false
+var _scroll_keep := Vector2.ZERO
+var _scroll_restore_frames := 0
 
 const SCREEN_W := 1152
 const SCREEN_H := 648
@@ -111,6 +117,11 @@ func _process(_delta: float) -> void:
 	if _tree_needs_rebuild and drawer_open:
 		_tree_needs_rebuild = false
 		_rebuild_drawer()
+	# Baum-Ansicht nach dem Skillen an Ort und Stelle halten (kein Zurueckspringen)
+	if _scroll_restore_frames > 0 and is_instance_valid(d_treewrap):
+		d_treewrap.scroll_horizontal = int(_scroll_keep.x)
+		d_treewrap.scroll_vertical = int(_scroll_keep.y)
+		_scroll_restore_frames -= 1
 	# HUD lebt jedes Frame (Spiel laeuft weiter, egal ob Drawer offen)
 	sun_display.amount = int(Game.sun)
 	sun_display.queue_redraw()
@@ -251,6 +262,121 @@ func _build_hud() -> void:
 	wave_btn.add_theme_color_override("font_color", Color(0.15, 0.09, 0.02))
 	wave_btn.pressed.connect(_on_wave)
 	root.add_child(wave_btn)
+	# Chain-Schnellwahl rund um die Sonne (Klick = freischalten + in naechsten freien Slot)
+	_build_chainbar()
+
+# ================= CHAIN-SCHNELLWAHL (rund um die Sonne) =================
+# Alle 8 Chains als kleine Bild-Buttons. Klick: schaltet die Chain frei (FP)
+# und legt sie automatisch in den naechsten freien Samen-Slot.
+func _build_chainbar() -> void:
+	# Rechte Randspalte (x>960 ist frei vom Spielfeld) — kollidiert nie mit dem Rasen
+	var cx := SCREEN_W - 182.0
+	chain_panel = Panel.new()
+	chain_panel.position = Vector2(cx - 6, 100)
+	chain_panel.size = Vector2(176, 402)
+	chain_panel.custom_minimum_size = Vector2(176, 402)
+	chain_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chain_panel.add_theme_stylebox_override("panel", _sb(Color(0.06, 0.09, 0.12, 0.9), Color(0.30, 0.48, 0.38), 2, 12, 0))
+	root.add_child(chain_panel)
+	var hdr := Label.new()
+	hdr.text = "CHAINS"
+	hdr.position = Vector2(cx + 4, 106)
+	hdr.add_theme_font_size_override("font_size", 13)
+	hdr.add_theme_color_override("font_color", Color(0.72, 0.92, 0.78))
+	hdr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(hdr)
+	chain_bar = VBoxContainer.new()
+	chain_bar.position = Vector2(cx, 128)
+	chain_bar.add_theme_constant_override("separation", 4)
+	root.add_child(chain_bar)
+	refresh_chains()
+
+func _chain_slot(ck: String) -> int:
+	for i in range(Game.slot_count()):
+		if Game.seed_chain(i) == ck: return i
+	return -1
+
+func _next_free_slot() -> int:
+	for i in range(Game.slot_count()):
+		if Game.seed_chain(i) == "": return i
+	return -1
+
+func _toast(t: String) -> void:
+	lawn.msg = t; lawn.msg_t = 1.8
+
+func refresh_chains() -> void:
+	if chain_bar == null: return
+	for c in chain_bar.get_children(): c.queue_free()
+	for ck in Game.CH_ORDER:
+		var btn := Button.new()
+		btn.custom_minimum_size = Vector2(164, 42)
+		var unlocked: bool = Game.plant_unlocked(ck)
+		var slot := _chain_slot(ck)
+		var tip := "%s\n%s" % [Game.CHASSIS[ck].n, Game.CHASSIS[ck].d]
+		if not unlocked: tip += "\nFreischalten: %d FP" % Game.plant_unlock_cost(ck)
+		elif slot >= 0: tip += "\nLiegt in Samen-Slot %d (Klick = auswaehlen)" % (slot + 1)
+		else: tip += "\nKlick: in naechsten freien Samen-Slot legen"
+		btn.tooltip_text = tip
+		if slot >= 0:
+			btn.add_theme_stylebox_override("normal", _sb(Color(0.16, 0.42, 0.24), Color(0.6, 1, 0.7), 2, 9, 2))
+		elif not unlocked:
+			btn.add_theme_stylebox_override("normal", _sb(Color(0.11, 0.12, 0.15), Color(0.38, 0.4, 0.45), 1, 9, 2))
+		var pcol: Color = Game.CHASSIS[ck].col
+		if not unlocked: pcol = pcol.lerp(Color(0.22, 0.22, 0.26), 0.62)
+		var port := Portrait.new(); port.kind = ck; port.col = pcol
+		port.position = Vector2(5, 5); port.size = Vector2(32, 32)
+		port.custom_minimum_size = Vector2(32, 32)
+		port.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		btn.add_child(port)
+		# Name der Chain
+		var name_lbl := Label.new()
+		name_lbl.text = str(Game.CHASSIS[ck].n)
+		name_lbl.position = Vector2(42, 3)
+		name_lbl.add_theme_font_size_override("font_size", 12)
+		name_lbl.modulate = Color(0.92, 0.97, 0.9) if unlocked else Color(0.6, 0.62, 0.65)
+		name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		btn.add_child(name_lbl)
+		# Status: FP-Kosten (gesperrt) oder Slot-Nummer (aktiv)
+		var tag := Label.new()
+		tag.position = Vector2(42, 22)
+		tag.add_theme_font_size_override("font_size", 11)
+		tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if not unlocked:
+			tag.text = "%d FP" % Game.plant_unlock_cost(ck)
+			tag.modulate = COL_CYAN
+		elif slot >= 0:
+			tag.text = "Samen-Slot %d" % (slot + 1)
+			tag.modulate = Color(0.72, 1, 0.78)
+		else:
+			tag.text = "frei — Klick"
+			tag.modulate = Color(0.85, 0.85, 0.6)
+		btn.add_child(tag)
+		btn.pressed.connect(_chain_quick.bind(ck))
+		chain_bar.add_child(btn)
+
+func _chain_quick(ck: String) -> void:
+	# 1) Freischalten, falls noetig
+	if not Game.plant_unlocked(ck):
+		if not Game.unlock_plant(ck):
+			_toast("Zu wenig FP fuer %s (%d FP)" % [Game.CHASSIS[ck].n, Game.plant_unlock_cost(ck)])
+			return
+		_toast("%s freigeschaltet!" % Game.CHASSIS[ck].n)
+	# 2) Schon in einem Slot? -> diesen zum Setzen waehlen
+	var existing := _chain_slot(ck)
+	if existing >= 0:
+		Game.place_slot = existing
+		Game.shovel = false
+		refresh_seeds(); return
+	# 3) In den naechsten freien Slot legen
+	var free := _next_free_slot()
+	if free < 0:
+		_toast("Kein freier Samen-Slot — kaufe im Labor einen neuen")
+		refresh_seeds(); return
+	Game.seed_set_chain(free, ck)
+	Game.place_slot = free
+	Game.shovel = false
+	_toast("%s  ->  Samen-Slot %d" % [Game.CHASSIS[ck].n, free + 1])
+	refresh_seeds()
 
 func _hud_pill(parent, col: Color) -> Label:
 	var pc := PanelContainer.new()
@@ -393,6 +519,8 @@ func refresh_seeds() -> void:
 		var h := 34.0 + float(_slots) * 64.0
 		seed_panel.size = Vector2(140, h)
 		seed_panel.custom_minimum_size = Vector2(140, h)
+	# Chain-Schnellwahl mit aktualisieren (Freischalt-/Slot-Zustand)
+	refresh_chains()
 
 func _plant_level(slot: int) -> int:
 	var n := 0
@@ -519,6 +647,9 @@ func _animate_drawer() -> void:
 	_dtween.tween_property(drawer, "position:y", ty, 0.3).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 func _rebuild_drawer() -> void:
+	# Kamera/Scroll merken, damit das Skillen die Ansicht nicht zurueckspringt
+	if _keep_scroll_next and is_instance_valid(d_treewrap):
+		_scroll_keep = Vector2(d_treewrap.scroll_horizontal, d_treewrap.scroll_vertical)
 	# Tabs: die Samen-Slots + Element + Spiel + Zombies
 	for c in d_tabs.get_children(): c.queue_free()
 	for i in range(Game.slot_count()):
@@ -549,6 +680,10 @@ func _rebuild_drawer() -> void:
 				_header(holder, "FOKUS-BAUM GESPERRT", Color(1, 0.7, 0.4))
 				_header(holder, "Schalte im Tab 'Labor' die GARAGE mit Sonne frei (%d), um Elemente zu skillen." % Game.GARAGE_COST, Color(0.85, 0.8, 0.6))
 	_rebuild_info()
+	# Scroll-Position nach dem Neuaufbau ein paar Frames lang wiederherstellen
+	if _keep_scroll_next:
+		_scroll_restore_frames = 4
+		_keep_scroll_next = false
 
 # Leerer Slot -> 8 Chains zur Auswahl (Ursprung)
 func _build_origin_picker(holder) -> void:
@@ -692,8 +827,23 @@ func _select_node(id: String) -> void:
 
 func _buy_selected() -> void:
 	if _n_buy(info_node):
+		_keep_scroll_next = true
 		_rebuild_drawer()
 		refresh_seeds()
+
+# Ein Klick auf einen Skill-Knoten: sofort kaufen (keine Bestaetigung).
+# Nicht kaufbar -> nur auswaehlen; der Grund steht im Hover-Panel.
+func _node_click(id: String) -> void:
+	info_node = id
+	if id == "root" or _n_owned(id):
+		_rebuild_info(); return
+	if _n_can(id) and Game.fp >= _n_cost(id):
+		if _n_buy(id):
+			_keep_scroll_next = true
+			_rebuild_drawer()
+			refresh_seeds()
+		return
+	_rebuild_info()
 
 # ---- Info-Feld rechts ----
 func _rebuild_info() -> void:
@@ -813,7 +963,8 @@ func _build_tree_canvas(parent) -> void:
 			elif can and Game.fp >= cost: state = "legend_avail" if rare else "avail"
 			elif can: state = "legend_lock" if rare else "need"
 			else: state = "legend_lock" if rare else "lock"
-			_tree_node(canvas, center, str(nd.n), str(nd.d), cost, not owned, state, selected, ecol, _select_node.bind(id))
+			# Ein Klick kauft sofort (kein Bestaetigen); Hover zeigt die Info
+			_tree_node(canvas, center, str(nd.n), str(nd.d), cost, not owned, state, selected, ecol, _node_click.bind(id))
 	# Grosse Element-Ueberschriften an den Armspitzen (wie im Referenzbild)
 	_dir_label(canvas, "GEWITTER", Color(1, 0.9, 0.4), Vector2(ox - 44 * z, oy - maxr * sy - 26 * z))
 	_dir_label(canvas, "UNTOD", Color(0.82, 0.55, 1), Vector2(ox - 30 * z, oy - minr * sy + 12 * z))

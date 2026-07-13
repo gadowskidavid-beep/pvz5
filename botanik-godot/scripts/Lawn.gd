@@ -33,6 +33,7 @@ var strike_t := 0.0        # Timer fuer Gewitter-Blitze
 var beat_interval := 0.469  # Sekunden pro Beat (aus BPM, in _ready gesetzt)
 var beat_t := 0.0           # Zeit seit letztem Beat
 var beat_pulse := 0.0       # 1.0 auf dem Beat, klingt schnell ab (fuer Bounce)
+var _boss_seen := false     # Boss-Auftritt: einmaliger Screen-Flash
 
 func _ready() -> void:
 	rng.randomize()
@@ -378,6 +379,16 @@ func _update(dt: float) -> void:
 		beat_now = true
 		beat_pulse = 1.0
 	if beat_pulse > 0.0: beat_pulse = max(0.0, beat_pulse - dt / 0.16)
+	# Boss-Auftritt: einmaliger roter Screen-Flash, wenn ein Boss auf dem Feld erscheint
+	var boss_now := false
+	for z in zombies:
+		if z.get("boss", false) and float(z.get("hp", 0.0)) > 0.0:
+			boss_now = true; break
+	if boss_now and not _boss_seen:
+		fx.append({"t": "flash", "col": Color(1.0, 0.2, 0.15), "life": 0.6})
+		_boss_seen = true
+	elif not boss_now:
+		_boss_seen = false
 	var wo := world_of(Game.wave)
 	var night := BAL.is_night_wave(Game.wave)
 	# Himmels-Sonne (nachts seltener & weniger)
@@ -900,6 +911,8 @@ func _draw() -> void:
 	if bg != null:
 		var vp := get_viewport_rect().size
 		draw_texture_rect(bg, Rect2(0, 0, vp.x, vp.y), false)
+	else:
+		_draw_sky(night)
 	# --- Solider Rasen auf einem Erd-Sockel (Perspektive/Plattform) ---
 	var lx := float(Game.LAWN_X)
 	var ly := float(Game.LAWN_Y)
@@ -920,6 +933,7 @@ func _draw() -> void:
 	for r in range(rows + 1):
 		draw_line(Vector2(lx, ly + r * Game.CELL), Vector2(lx + lw, ly + r * Game.CELL), Color(0, 0, 0, 0.13), 1.0)
 	draw_rect(Rect2(lx - 7, ly + lh, lw + 14, 10), Color(0, 0, 0, 0.30))  # Schatten an der Vorderkante
+	if bg == null: _draw_grass_deco(lx, ly, lw, lh, night)                # Grasbueschel + Blueten (nur ohne BG-Bild)
 	if bg == null and night: draw_rect(lawn_rect, Color(0.08,0.12,0.25,0.30))
 	if wo.get("roof", false): draw_rect(lawn_rect, Color(0.5,0.35,0.18,0.14))
 	# Wetter-Overlay
@@ -950,6 +964,15 @@ func _draw() -> void:
 		_shadow(p.x, p.y, pr)
 		_draw_plant(p, col, pr, p.x - rk, pby)
 		_draw_evo(p, p.x - rk, pby, pr)
+		# Muendungsblitz beim Schuss (nutzt den vorhandenen Rueckstoss-Wert, Element-gefaerbt)
+		var _rc := clamp(float(p.get("recoil", 0.0)), 0.0, 1.0)
+		if _rc > 0.35 and (str(p.arch) == "shooter" or str(p.arch) == "beam"):
+			var ms: Dictionary = p.s
+			var mcol := Color(1.0, 0.95, 0.6, _rc)
+			if bool(ms.get("burn", false)): mcol = Color(1.0, 0.55, 0.2, _rc)
+			elif bool(ms.get("slow", false)): mcol = Color(0.6, 0.85, 1.0, _rc)
+			elif bool(ms.get("chain", false)) or float(ms.get("zap", 0.0)) > 0.0: mcol = Color(0.7, 1.0, 0.6, _rc)
+			draw_circle(Vector2(p.x + pr * 0.9, pby), 5.0 + 5.0 * _rc, mcol)
 		# Element-Aura: der gewaehlte Skill-Ast ist auf dem Rasen sichtbar
 		var es: Dictionary = p.s
 		var ar := pr + 5.0 + sin(float(p.t) * 4.0) * 1.5
@@ -1024,12 +1047,18 @@ func _draw() -> void:
 			var fc: Color = e.get("col", Color(1, 1, 1))
 			fc.a = clamp(float(e.life), 0.0, 1.0) * 0.55
 			draw_rect(Rect2(Game.LAWN_X - 14, Game.LAWN_Y - 10, Game.COLS * Game.CELL + 28, rows * Game.CELL + 40), fc)
-	# Schwebende Zahlen (+Sonne etc.)
+	# Schwebende Zahlen (+Sonne etc.) — mit dunklem Umriss fuer bessere Lesbarkeit
 	if _font != null:
 		for pu in popups:
 			var a: float = clamp(float(pu.life), 0.0, 1.0)
 			var pc: Color = pu.col; pc.a = a
-			draw_string(_font, Vector2(float(pu.x) - 12.0, float(pu.y)), str(pu.text), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, pc)
+			var pos := Vector2(float(pu.x) - 12.0, float(pu.y))
+			draw_string_outline(_font, pos, str(pu.text), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 4, Color(0, 0, 0, a * 0.8))
+			draw_string(_font, pos, str(pu.text), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, pc)
+	# Gefahr-Rand am Haus, wenn Zombies nah sind
+	_draw_house_danger()
+	# Atmosphaere-Overlay (Gluehwuermchen/Sonnenstrahlen + Vignette) — nur ohne BG-Bild
+	if _scene_bg(night) == null: _draw_atmosphere(night)
 
 func _popup(x: float, y: float, text: String, col: Color) -> void:
 	popups.append({"x": x, "y": y, "text": text, "life": 1.1, "col": col})
@@ -1057,6 +1086,121 @@ func _draw_rain(rect: Rect2) -> void:
 		var a := (1.0 - life) * 0.30
 		var rr := 2.0 + life * 6.0
 		draw_arc(Vector2(sx, groundy), rr, PI, TAU, 8, Color(0.75, 0.85, 1.0, a), 1.0)
+
+# ============================================================
+# PROZEDURALE KULISSE (wenn kein eigenes BG-Bild hinterlegt ist)
+# Sanfter Farbverlauf-Himmel, Sonne/Mond, Wolken/Sterne, Huegel.
+# ============================================================
+func _draw_sky(night: bool) -> void:
+	var vp := get_viewport_rect().size
+	var top: Color
+	var bot: Color
+	if night:
+		top = Color(0.04, 0.06, 0.15); bot = Color(0.17, 0.14, 0.30)
+	else:
+		top = Color(0.40, 0.71, 0.98); bot = Color(0.80, 0.91, 0.99)
+	var bands := 26
+	var bh := vp.y / float(bands)
+	for i in range(bands):
+		var f := float(i) / float(bands - 1)
+		draw_rect(Rect2(0, i * bh, vp.x, bh + 1.0), top.lerp(bot, f))
+	if night:
+		# Mond oben rechts + weicher Halo
+		var mp := Vector2(vp.x * 0.83, vp.y * 0.19)
+		draw_circle(mp, 50, Color(0.95, 0.96, 0.85, 0.10))
+		draw_circle(mp, 38, Color(0.95, 0.96, 0.85, 0.16))
+		draw_circle(mp, 30, Color(0.94, 0.95, 0.88))
+		draw_circle(mp + Vector2(11, -5), 26, top.lerp(bot, 0.15))   # Sichel-Schatten
+		# Sterne (fester Seed -> kein Flackern, nur sanftes Funkeln)
+		var rng2 := RandomNumberGenerator.new(); rng2.seed = 909091
+		for i in range(72):
+			var sx := rng2.randf() * vp.x
+			var sy := rng2.randf() * vp.y * 0.52
+			var tw := 0.5 + 0.5 * sin(_anim_clock * 2.0 + float(i) * 1.7)
+			draw_circle(Vector2(sx, sy), 0.8 + tw * 0.9, Color(1, 1, 1, 0.30 + 0.45 * tw))
+	else:
+		# Sonne oben rechts mit weichem Glanz
+		var sp := Vector2(vp.x * 0.84, vp.y * 0.17)
+		draw_circle(sp, 64, Color(1, 0.95, 0.6, 0.10))
+		draw_circle(sp, 46, Color(1, 0.93, 0.5, 0.18))
+		draw_circle(sp, 32, Color(1, 0.95, 0.66))
+		# langsam driftende Wolken
+		for cd in [[0.18, 0.16, 1.0], [0.48, 0.10, 0.8], [0.66, 0.24, 1.15], [0.34, 0.30, 0.7]]:
+			var cx := fmod(cd[0] * vp.x + _anim_clock * 7.0 * cd[2], vp.x + 160.0) - 80.0
+			_cloud(cx, cd[1] * vp.y, cd[2])
+	# Boden/Feld am Horizont fuer Tiefe (unter dem Rasen-Sockel)
+	var horizon := min(vp.y * 0.5, float(Game.LAWN_Y) - 22.0)
+	var field := Color(0.11, 0.16, 0.12) if night else Color(0.33, 0.54, 0.27)
+	draw_rect(Rect2(0, horizon, vp.x, vp.y - horizon), field)
+	var hillcol := field.lightened(0.07)
+	for hx in [vp.x * 0.14, vp.x * 0.52, vp.x * 0.86]:
+		draw_circle(Vector2(hx, horizon + 34), 130, hillcol)
+
+func _cloud(x: float, y: float, s: float) -> void:
+	var col := Color(1, 1, 1, 0.72)
+	draw_circle(Vector2(x, y), 22 * s, col)
+	draw_circle(Vector2(x + 26 * s, y + 6 * s), 18 * s, col)
+	draw_circle(Vector2(x - 24 * s, y + 6 * s), 16 * s, col)
+	draw_circle(Vector2(x, y + 11 * s), 20 * s, col)
+
+# ---- Atmosphaere-Overlay: Gluehwuermchen (Nacht), Sonnenstrahlen (Tag), Vignette ----
+func _draw_atmosphere(night: bool) -> void:
+	var vp := get_viewport_rect().size
+	if night:
+		var rng3 := RandomNumberGenerator.new(); rng3.seed = 5150
+		for i in range(16):
+			var bx := rng3.randf() * vp.x
+			var by := vp.y * (0.30 + rng3.randf() * 0.55)
+			var dx := sin(_anim_clock * 0.7 + float(i) * 1.3) * 22.0
+			var dy := cos(_anim_clock * 0.5 + float(i) * 2.1) * 14.0
+			var glow := 0.4 + 0.6 * (0.5 + 0.5 * sin(_anim_clock * 3.0 + float(i)))
+			var fp := Vector2(bx + dx, by + dy)
+			draw_circle(fp, 4.5, Color(0.9, 1.0, 0.55, 0.10 * glow))
+			draw_circle(fp, 1.8, Color(0.95, 1.0, 0.6, 0.85 * glow))
+	else:
+		# weiche Sonnenstrahlen von oben rechts
+		var sp := Vector2(vp.x * 0.84, vp.y * 0.17)
+		for k in range(7):
+			var a := -2.4 + float(k) * 0.16 + sin(_anim_clock * 0.3) * 0.02
+			var d := Vector2(cos(a), sin(a))
+			var per := Vector2(-d.y, d.x) * (26.0 + k * 2.0)
+			var far := sp + d * 900.0
+			draw_colored_polygon(PackedVector2Array([sp - per * 0.15, far - per, far + per]), Color(1.0, 0.96, 0.7, 0.035))
+	# Vignette: sanftes Abdunkeln der Raender (nachts staerker)
+	var va := 0.34 if night else 0.20
+	var edge := 46.0
+	draw_rect(Rect2(0, 0, vp.x, edge), Color(0, 0, 0, va * 0.7))
+	draw_rect(Rect2(0, vp.y - edge - 72, vp.x, edge + 72), Color(0, 0, 0, va))
+	draw_rect(Rect2(0, 0, edge, vp.y), Color(0, 0, 0, va * 0.6))
+	draw_rect(Rect2(vp.x - edge, 0, edge, vp.y), Color(0, 0, 0, va * 0.6))
+
+# ---- Grasbueschel + kleine Blueten an der Vorderkante des Rasens ----
+func _draw_grass_deco(lx: float, ly: float, lw: float, lh: float, night: bool) -> void:
+	var basey := ly + lh + 4.0
+	var gcol := Color(0.20, 0.42, 0.18) if night else Color(0.34, 0.62, 0.26)
+	var rng4 := RandomNumberGenerator.new(); rng4.seed = 3737
+	var n := int(lw / 26.0)
+	for i in range(n):
+		var gx := lx + 8.0 + float(i) * 26.0 + rng4.randf() * 6.0
+		var sway := sin(_anim_clock * 1.4 + float(i)) * 2.2
+		for b in range(3):
+			var off := (float(b) - 1.0) * 3.2
+			draw_line(Vector2(gx + off, basey), Vector2(gx + off + sway * (0.5 + 0.3 * b), basey - 10.0 - b), gcol, 2.0)
+		if i % 4 == 0:
+			var fcol := Color(1.0, 0.8, 0.35) if (i % 8 == 0) else Color(1.0, 0.5, 0.7)
+			draw_circle(Vector2(gx + sway, basey - 12.0), 2.6, fcol)
+
+# ---- Gefahr: leuchtender roter Rand am Haus (links), wenn ein Zombie nah ist ----
+func _draw_house_danger() -> void:
+	var nearest := 9999.0
+	for z in zombies:
+		if z.get("dying", false): continue
+		nearest = min(nearest, float(z.x) - float(Game.LAWN_X))
+	if nearest > Game.CELL * 2.2: return
+	var t := 1.0 - clamp(nearest / (Game.CELL * 2.2), 0.0, 1.0)
+	var pulse := 0.5 + 0.5 * sin(_anim_clock * 8.0)
+	var a := (0.15 + 0.30 * t) * (0.6 + 0.4 * pulse)
+	draw_rect(Rect2(Game.LAWN_X - 20, Game.LAWN_Y - 10, 26, rows * Game.CELL + 40), Color(1.0, 0.15, 0.1, a))
 
 # ---- T-Shirt der Liebespaar-Zombies: kleines Herz + "him"/"her" (+ Wut-Dampf wenn sauer) ----
 func _draw_shirt(cx: float, cy: float, shirt: String, angry: bool) -> void:
@@ -1283,19 +1427,29 @@ func _draw_sun_icon(cx: float, cy: float, r: float) -> void:
 		var sd := r * 2.8
 		draw_texture_rect(tex, Rect2(cx - sd * 0.5, cy - sd * 0.5, sd, sd), false)
 		return
+	var pulse := 1.0 + 0.08 * sin(_anim_clock * 4.0 + cx * 0.05) + beat_pulse * 0.12
+	var rr := r * pulse
+	draw_circle(ctr, rr * 1.7, Color(1, 0.9, 0.3, 0.12))          # weiter Glow
+	draw_circle(ctr, rr * 1.3, Color(1, 0.9, 0.3, 0.20))
 	for i in range(12):
-		var a := deg_to_rad(i * 30.0)
+		var a := deg_to_rad(i * 30.0 + _anim_clock * 22.0)         # langsam rotierende Strahlen
 		var d := Vector2(cos(a), sin(a))
-		draw_line(ctr + d * r * 0.95, ctr + d * r * 1.55, Color(1, 0.8, 0.2), 3.0)
-	draw_circle(ctr, r * 1.3, Color(1, 0.9, 0.3, 0.20))
-	draw_circle(ctr, r, Color(1, 0.82, 0.15))
-	draw_circle(ctr, r, Color(0.95, 0.6, 0.1), false, 2.5)
-	_face(cx, cy, r * 0.95, "happy", Color(0.6, 0.35, 0.05))
-	draw_circle(ctr + Vector2(-r * 0.4, -r * 0.4), r * 0.22, Color(1, 1, 0.85, 0.6))
+		draw_line(ctr + d * rr * 0.95, ctr + d * rr * 1.55, Color(1, 0.8, 0.2), 3.0)
+	draw_circle(ctr, rr, Color(1, 0.82, 0.15))
+	draw_circle(ctr, rr, Color(0.95, 0.6, 0.1), false, 2.5)
+	_face(cx, cy, rr * 0.95, "happy", Color(0.6, 0.35, 0.05))
+	draw_circle(ctr + Vector2(-rr * 0.4, -rr * 0.4), rr * 0.22, Color(1, 1, 0.85, 0.6))
 
 func _hp_bar(cx: float, y: float, frac: float, c: Color) -> void:
 	if frac >= 1.0: return
 	frac = clamp(frac, 0.0, 1.0)
 	var w := 46.0
-	draw_rect(Rect2(cx - w/2.0, y, w, 5), Color(0,0,0,0.5))
-	draw_rect(Rect2(cx - w/2.0, y, w * frac, 5), c)
+	var x := cx - w / 2.0
+	draw_rect(Rect2(x - 1, y - 1, w + 2, 7), Color(0, 0, 0, 0.6))      # Rahmen
+	draw_rect(Rect2(x, y, w, 5), Color(0.12, 0.14, 0.13, 0.9))         # Hintergrund
+	# Farbe nach Gesundheit: bei niedrigem Stand Richtung Gelb/Rot
+	var fill := c
+	if frac < 0.55: fill = c.lerp(Color(1.0, 0.82, 0.2), (0.55 - frac) / 0.55)
+	if frac < 0.25: fill = Color(0.95, 0.33, 0.24)
+	draw_rect(Rect2(x, y, w * frac, 5), fill)
+	draw_rect(Rect2(x, y, w * frac, 2), Color(1, 1, 1, 0.18))          # Glanzlinie
