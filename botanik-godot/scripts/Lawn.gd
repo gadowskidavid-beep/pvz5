@@ -1277,6 +1277,23 @@ func _draw_sky(night: bool) -> void:
 	var hillcol := field.lightened(0.07)
 	for hx in [vp.x * 0.14, vp.x * 0.52, vp.x * 0.86]:
 		draw_circle(Vector2(hx, horizon + 34), 130, hillcol)
+	# ferne Silhouetten fuer Tiefe: Baeume am Tag, Grabsteine in der Nacht
+	var silc := field.darkened(0.4)
+	var rngS := RandomNumberGenerator.new(); rngS.seed = 8123
+	var baseY := horizon + 16.0
+	for i in range(9):
+		var sxp := 40.0 + float(i) * (vp.x / 9.0) + rngS.randf() * 30.0
+		if night:
+			var gw := 14.0 + rngS.randf() * 8.0
+			var gh := 20.0 + rngS.randf() * 14.0
+			draw_rect(Rect2(sxp - gw * 0.5, baseY - gh, gw, gh), silc)
+			draw_circle(Vector2(sxp, baseY - gh), gw * 0.5, silc)
+		else:
+			var th := 24.0 + rngS.randf() * 18.0
+			draw_rect(Rect2(sxp - 3, baseY - th, 6, th), silc)
+			draw_circle(Vector2(sxp, baseY - th), 13.0 + rngS.randf() * 6.0, silc)
+	# sanfter Dunst am Horizont
+	draw_rect(Rect2(0, horizon - 6, vp.x, 16), Color(0.9, 0.93, 0.96, 0.06 if night else 0.11))
 
 # ---- Fallende Umgebungspartikel: Blaetter (Tag), Schnee (bei Frost) ----
 func _draw_ambient_fall(night: bool, vp: Vector2) -> void:
