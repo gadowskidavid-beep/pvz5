@@ -33,6 +33,7 @@ var strike_t := 0.0        # Timer fuer Gewitter-Blitze
 var shake_t := 0.0
 var shake_dur := 0.0
 var shake_mag := 0.0
+var sky_flash := 0.0        # kurzer Himmel-Aufhellblitz bei Gewitter
 
 func _ready() -> void:
 	rng.randomize()
@@ -222,6 +223,7 @@ func _storm_strike() -> void:
 	var t = alive[rng.randi() % alive.size()]
 	t.hp -= 70.0
 	fx.append({"t": "bolt", "x": t.x, "y": float(Game.LAWN_Y - 50), "x2": t.x, "y2": t.y, "life": 0.28})
+	sky_flash = 0.15   # Himmel zuckt kurz hell auf
 
 func add_shake(mag: float, dur: float) -> void:
 	shake_mag = max(shake_mag, mag)
@@ -557,6 +559,7 @@ func _update(dt: float) -> void:
 		z["_lhp"] = z.hp
 		if float(z.get("flash", 0.0)) > 0.0:
 			z["flash"] = max(0.0, float(z.flash) - dt)
+	if sky_flash > 0.0: sky_flash = max(0.0, sky_flash - dt)
 
 func _lane_has(p) -> bool:
 	var maxx := 1.0e9
@@ -842,10 +845,8 @@ func _draw() -> void:
 	draw_rect(Rect2(lx - 7, ly + lh, lw + 14, 10), Color(0, 0, 0, 0.30))  # Schatten an der Vorderkante
 	if bg == null and wo.night: draw_rect(lawn_rect, Color(0.08,0.12,0.25,0.30))
 	if wo.get("roof", false): draw_rect(lawn_rect, Color(0.5,0.35,0.18,0.14))
-	# Wetter-Overlay
-	if weather == "nebel": draw_rect(lawn_rect, Color(0.82, 0.84, 0.88, 0.24))
-	elif weather == "frost": draw_rect(lawn_rect, Color(0.55, 0.72, 1.0, 0.15))
-	elif weather == "gewitter": draw_rect(lawn_rect, Color(0.12, 0.12, 0.28, 0.22))
+	# Wetter-Overlay (animiert)
+	_draw_weather(lawn_rect)
 	draw_rect(Rect2(Game.LAWN_X - 14, Game.LAWN_Y, 9, rows * Game.CELL), Color(0.42,0.32,0.62))
 	# Tiefe: sanfter Verlauf (oben heller, unten dunkler)
 	var _lh := rows * Game.CELL
@@ -1050,6 +1051,27 @@ func _draw_bolt(a: Vector2, b: Vector2, al: float) -> void:
 		prev = pt
 	draw_circle(b, 6.0 * al + 2.0, Color(1.0, 1.0, 0.8, al))          # Einschlag-Flash
 	draw_circle(b, 11.0 * al, Color(0.7, 0.85, 1.0, al * 0.3))
+
+# ---- Animiertes Wetter-Overlay ueber dem Rasen ----
+func _draw_weather(rect: Rect2) -> void:
+	if weather == "nebel":
+		draw_rect(rect, Color(0.82, 0.84, 0.88, 0.18))
+		# treibende Nebelschwaden
+		for i in range(4):
+			var yy := rect.position.y + rect.size.y * (0.12 + 0.24 * float(i))
+			var off := fmod(_anim_clock * (14.0 + float(i) * 5.0) + float(i) * 140.0, rect.size.x + 280.0) - 140.0
+			draw_rect(Rect2(rect.position.x + off, yy, 240.0, 34.0), Color(0.92, 0.94, 0.98, 0.10))
+	elif weather == "frost":
+		draw_rect(rect, Color(0.55, 0.72, 1.0, 0.13))
+		# treibende Eispartikel
+		for i in range(16):
+			var px := rect.position.x + fmod(float(i) * 97.0 + _anim_clock * 12.0, rect.size.x)
+			var py := rect.position.y + fmod(float(i) * 53.0 + _anim_clock * 24.0, rect.size.y)
+			draw_circle(Vector2(px, py), 1.6, Color(0.85, 0.95, 1.0, 0.5))
+	elif weather == "gewitter":
+		draw_rect(rect, Color(0.10, 0.10, 0.26, 0.28))
+		if sky_flash > 0.0:
+			draw_rect(rect, Color(0.90, 0.92, 1.0, 0.35 * clamp(sky_flash / 0.15, 0.0, 1.0)))
 
 # ---- Gesicht: zwei Augen + Mund (mood: happy/neutral/angry) ----
 func _face(cx: float, cy: float, s: float, mood: String, eyecol := Color(0.1, 0.1, 0.12)) -> void:
