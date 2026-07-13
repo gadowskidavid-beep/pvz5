@@ -12,7 +12,13 @@ const TRACKS := {
 	"night": "res://Musik/Nighttheme1.mp3",
 }
 
+# Sound-Effekte (optional) — sobald die Datei existiert, wird sie gespielt; sonst still.
+const SFX := {
+	"thunder": "res://Musik/thunder.mp3",
+}
+
 var _player: AudioStreamPlayer
+var _sfx: AudioStreamPlayer
 var _current_path := ""
 var volume_db := -6.0
 var muted := false
@@ -21,6 +27,20 @@ func _ready() -> void:
 	_player = AudioStreamPlayer.new()
 	add_child(_player)
 	_player.volume_db = volume_db
+	_sfx = AudioStreamPlayer.new()
+	add_child(_sfx)
+
+# Spielt einen kurzen Sound-Effekt (kein Loop). Fehlt die Datei -> still, kein Crash.
+func play_sfx(key: String) -> void:
+	var path: String = str(SFX.get(key, ""))
+	if path == "" or not ResourceLoader.exists(path): return
+	var s = load(path)
+	if s == null: return
+	if s is AudioStreamMP3: s.loop = false
+	elif s is AudioStreamOggVorbis: s.loop = false
+	_sfx.stream = s
+	_sfx.volume_db = -80.0 if muted else volume_db
+	_sfx.play()
 
 # Spielt den Track fuer den Key. Gibt true zurueck, wenn ein NEUER Track gestartet wurde.
 func play_key(key: String) -> bool:

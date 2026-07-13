@@ -219,14 +219,41 @@ func weather_name() -> String:
 func weather_hud() -> String:
 	return "" if weather == "klar" else "  ·  " + weather_name()
 
+# Eine Pflanze hat "BlitzEvolution" (Blitz-Ast geskillt) oder ist die Stahlnuss -> Blitzableiter
+func _is_lightning_rod(p) -> bool:
+	var s = p.s
+	if float(s.get("lightning_rod", 0.0)) > 0.0: return true
+	if str(p.get("element", "")) == "b": return true          # Blitz-Evolution
+	if s.get("effects", []).has("chain"): return true          # Kettenblitz
+	if float(s.get("zap", 0.0)) > 0.0: return true             # Blitzstrahl (Sonne)
+	if float(s.get("aimbot", 0.0)) > 0.0: return true          # Katze (Blitzpad)
+	return false
+
 func _storm_strike() -> void:
-	var alive := []
-	for z in zombies:
-		if z.hp > 0: alive.append(z)
-	if alive.is_empty(): return
-	var t = alive[rng.randi() % alive.size()]
-	t.hp -= 70.0
-	fx.append({"t": "bolt", "x": t.x, "y": float(Game.LAWN_Y - 50), "x2": t.x, "y2": t.y, "life": 0.28})
+	if plants.is_empty(): return
+	# Blitzableiter (Blitz-Evolution/Stahlnuss) ziehen den Blitz an sich
+	var rods := []
+	for p in plants:
+		if _is_lightning_rod(p): rods.append(p)
+	var harmless := not rods.is_empty()
+	var tgt = rods[rng.randi() % rods.size()] if harmless else plants[rng.randi() % plants.size()]
+	# Optik + Sound
+	fx.append({"t": "bolt", "x": tgt.x, "y": float(Game.LAWN_Y - 70), "x2": tgt.x, "y2": tgt.y, "life": 0.3})
+	fx.append({"t": "flash", "life": 0.22, "col": Color(0.8, 0.9, 1.0)})
+	Music.play_sfx("thunder")
+	if harmless:
+		# Ableiter faengt den Blitz harmlos + entlaedt ihn in nahe Zombies
+		fx.append({"t": "boom", "x": tgt.x, "y": tgt.y, "life": 0.25})
+		for z in zombies:
+			if z.hp > 0 and Vector2(z.x, z.y).distance_to(Vector2(tgt.x, tgt.y)) < Game.CELL * 2.2:
+				z.hp -= 70.0
+				fx.append({"t": "bolt", "x": tgt.x, "y": tgt.y, "x2": z.x, "y2": z.y, "life": 0.2})
+		msg = "Blitzableiter faengt den Blitz!"; msg_t = 1.3
+	else:
+		tgt.hp -= 120.0
+		fx.append({"t": "boom", "x": tgt.x, "y": tgt.y, "life": 0.3})
+		msg = "Blitz schlaegt in eine Pflanze ein!"; msg_t = 1.3
+		if tgt.hp <= 0: _plant_dies(tgt)
 
 func _end_wave() -> void:
 	if Game.wave >= 100:
@@ -318,10 +345,10 @@ func _update(dt: float) -> void:
 		var val := int(round(25 * (0.5 if night else 1.0)))
 		suns.append({"x": x, "y": float(Game.LAWN_Y - 10), "ty": Game.LAWN_Y + 50 + rng.randf() * (rows * Game.CELL - 120), "vy": 70.0, "value": val, "falling": true, "life": 12.0})
 	# Wetter: Gewitter schlaegt Blitze auf Zombies (Blitz-Synergie)
-	if weather == "gewitter" and not zombies.is_empty():
+	if weather == "gewitter" and not plants.is_empty():
 		strike_t -= dt
 		if strike_t <= 0:
-			strike_t = rng.randf_range(1.8, 3.0)
+			strike_t = rng.randf_range(6.0, 11.0)   # seltener als frueher
 			_storm_strike()
 	# Wellensteuerung
 	if Game.phase == "fight":
@@ -343,8 +370,8 @@ func _update(dt: float) -> void:
 		if hazard_timer <= 0:
 			hazard_timer = rng.randf_range(BAL.HAZARD_MIN, BAL.HAZARD_MAX)
 			var ph = plants[rng.randi() % plants.size()]
-			if float(ph.s.get("lightning_rod", 0.0)) > 0.0:
-				# Stahlnuss = Blitzableiter: leitet den Umwelt-Blitz harmlos ab
+			if _is_lightning_rod(ph):
+				# Blitzableiter (Blitz-Evolution/Stahlnuss): leitet den Umwelt-Blitz harmlos ab
 				fx.append({"t": "boom", "x": ph.x, "y": ph.y, "life": 0.2})
 				msg = "Blitz abgeleitet!"; msg_t = 1.0
 			else:
@@ -801,7 +828,7 @@ func _place(col: int, row: int) -> void:
 	Game.sun -= s.cost
 	var x = Game.LAWN_X + col * Game.CELL + Game.CELL / 2.0
 	var y = Game.LAWN_Y + row * Game.CELL + Game.CELL / 2.0
-	plants.append({"ck": ck, "arch": s.arch, "row": row, "col": col, "x": x, "y": y, "hp": float(s.hp), "maxhp": float(s.hp), "s": s, "t": 0.0, "fuse": (0.7 if s.arch == "bomb" else 0.0), "done": false})
+	plants.append({"ck": ck, "arch": s.arch, "row": row, "col": col, "x": x, "y": y, "hp": float(s.hp), "maxhp": float(s.hp), "s": s, "t": 0.0, "fuse": (0.7 if s.arch == "bomb" else 0.0), "done": false, "element": Game.seed_element(slot)})
 	# Intuitiver Start: die allererste gesetzte Pflanze startet Welle 1
 	if Game.wave == 0 and Game.phase == "prep":
 		start_wave()
