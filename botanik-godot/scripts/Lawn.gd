@@ -98,17 +98,20 @@ func _scene_bg(night: bool) -> Texture2D:
 	var key := "night" if night else "day"
 	if _bg_cache.has(key): return _bg_cache[key]
 	var tex: Texture2D = null
-	var direct := "res://assets/sprites/bg/%s.png" % key
-	if ResourceLoader.exists(direct):
-		tex = load(direct)
-	else:
+	# Direkte Kandidaten — deckt day.png.jpg, night.png, .jpeg, .webp ab
+	for ext in [".png", ".png.jpg", ".jpg", ".jpeg", ".webp"]:
+		var cand := "res://assets/sprites/bg/%s%s" % [key, ext]
+		if ResourceLoader.exists(cand):
+			tex = load(cand); break
+	# Fallback: Ordner scannen (auch jpg/jpeg/webp, nicht nur png)
+	if tex == null:
 		var da := DirAccess.open("res://assets/sprites/bg")
 		var any_tex: Texture2D = null
 		var match_tex: Texture2D = null
 		if da != null:
 			for f in da.get_files():
 				var low := f.to_lower()
-				if not low.ends_with(".png"): continue
+				if not (low.ends_with(".png") or low.ends_with(".jpg") or low.ends_with(".jpeg") or low.ends_with(".webp")): continue
 				var p := "res://assets/sprites/bg/" + f
 				if any_tex == null: any_tex = load(p)
 				var is_night := low.find("graveyard") != -1 or low.find("night") != -1 or low.find("nacht") != -1 or low.find("dark") != -1
@@ -123,6 +126,15 @@ func _start_dying(z) -> void:
 	if not z.get("dropped", false): _kill(z)
 	z["dying"] = true
 	z["die_t"] = 0.0
+	# Liebespaar: stirbt einer, wird der Partner sauer und rennt los
+	var partner = z.get("partner", null)
+	if partner != null and not partner.get("dying", false) and float(partner.get("hp", 0.0)) > 0.0:
+		partner["enraged"] = true
+		partner["partner"] = null      # Link loesen (kein Zirkelbezug)
+		fx.append({"t": "boom", "x": partner.x, "y": partner.y - 20, "life": 0.3})
+		Music.play_sfx("rage", 0.3)
+		msg = "Ein Renn-Zombie hat seinen Partner verloren — jetzt rennt er wuetend!"; msg_t = 1.8
+	z["partner"] = null
 
 func _die_dur(z) -> float:
 	var df := _zombie_anim(str(z.kind), "dying")
@@ -140,6 +152,7 @@ func reset_run() -> void:
 		mowers.append({"row": r, "x": float(Game.LAWN_X - 30), "active": false, "used": false})
 	sky_timer = 5.0; to_spawn = 0; idle_timer = 6.0; hazard_timer = 9.0
 	weather = "klar"; strike_t = 0.0
+	Music.set_rain(false)
 	msg = "Pflanze eine Sonnenblume, um die erste Welle zu starten!"; msg_t = 6.0
 
 # Reihen nachziehen, wenn neue freigeschaltet wurden (mid-run kaufbar)
@@ -170,6 +183,7 @@ func start_wave() -> void:
 		var bk := Game.boss_key_for_wave(Game.wave)
 		_spawn(bk)   # Boss kommt SOFORT — waehrend du im Umbruch neu baust
 		fx.append({"t": "flash", "life": 0.35, "col": Color(1.0, 0.92, 0.8)})
+		Music.play_sfx("boss_spawn", 1.0)
 		to_spawn += int(Game.ZTYPES[bk].get("summon", 0))
 		var wo := world_of(Game.wave)
 		if umbruch:
@@ -199,13 +213,14 @@ func _do_umbruch() -> void:
 func _roll_weather() -> void:
 	# Erste Welle & Boss-Wellen bleiben klar
 	if Game.wave <= 1 or BAL.is_boss_wave(Game.wave):
-		weather = "klar"; strike_t = 2.0; return
+		weather = "klar"; strike_t = 2.0; Music.set_rain(false); return
 	var r := rng.randf()
 	if r < 0.45: weather = "klar"
 	elif r < 0.63: weather = "gewitter"
 	elif r < 0.81: weather = "nebel"
 	else: weather = "frost"
-	strike_t = 2.0
+	strike_t = rng.randf_range(12.0, 22.0)   # erster Blitz kommt nicht sofort
+	Music.set_rain(weather == "gewitter")    # Regen-Sound nur bei Gewitter
 	if weather != "klar":
 		msg = "Wetter: %s!" % weather_name(); msg_t = 2.2
 
@@ -269,13 +284,12 @@ func _end_wave() -> void:
 		for m in mowers: m.used = false; m.active = false; m.x = float(Game.LAWN_X - 30)
 	msg = "Welle %d geschafft! +%d FP" % [Game.wave, Game.wave]; msg_t = 2.0
 
-func _spawn(kind: String) -> void:
+func _make_zombie(kind: String) -> Dictionary:
 	var b = Game.ZTYPES[kind]
-	Game.seen[kind] = true
 	var row := rng.randi() % rows
 	var hp_mul := 1.0 + Game.wave * BAL.Z_HP_PER_WAVE + pow(Game.wave, BAL.Z_HP_POW) * BAL.Z_HP_POW_MUL
 	var hp := float(b.hp) * hp_mul
-	zombies.append({
+	return {
 		"kind": kind, "row": row, "x": float(Game.LAWN_X + Game.COLS * Game.CELL + 20),
 		"y": Game.LAWN_Y + row * Game.CELL + Game.CELL / 2.0,
 		"hp": hp, "maxhp": hp, "speed": float(b.speed) * (1.0 + Game.wave * BAL.Z_SPD_PER_WAVE),
@@ -286,8 +300,26 @@ func _spawn(kind: String) -> void:
 		"slow": 0.0, "burn": 0.0, "poison": 0.0, "dropped": false, "switched": false,
 		"element": str(b.get("element", "")), "ability_t": 0.0,
 		"fly": b.get("fly", false), "rage": b.get("rage", false),
-		"shield": float(b.get("shield", 0.0)), "maxshield": float(b.get("shield", 0.0))
-	})
+		"shield": float(b.get("shield", 0.0)), "maxshield": float(b.get("shield", 0.0)),
+		"enraged": false, "shirt": "", "partner": null
+	}
+
+func _spawn(kind: String) -> void:
+	Game.seen[kind] = true
+	var z1 = _make_zombie(kind)
+	zombies.append(z1)
+	# Renn-Zombie kommt als LIEBESPAAR: zwei Partner (Shirt "him"/"her"),
+	# stirbt einer, wird der andere sauer und rennt los.
+	if kind == "sprinter":
+		z1["shirt"] = "him"
+		var z2 = _make_zombie(kind)
+		z2["shirt"] = "her"
+		z2["row"] = z1.row
+		z2["y"] = z1.y
+		z2["x"] = float(z1.x) + Game.CELL * 0.85   # laeuft direkt hinter dem Partner
+		z1["partner"] = z2
+		z2["partner"] = z1
+		zombies.append(z2)
 
 func _spawn_one() -> void:
 	var act := world_of(Game.wave)
@@ -348,7 +380,7 @@ func _update(dt: float) -> void:
 	if weather == "gewitter" and not plants.is_empty():
 		strike_t -= dt
 		if strike_t <= 0:
-			strike_t = rng.randf_range(6.0, 11.0)   # seltener als frueher
+			strike_t = rng.randf_range(16.0, 30.0)   # seltenes, cooles Ereignis
 			_storm_strike()
 	# Wellensteuerung
 	if Game.phase == "fight":
@@ -460,6 +492,7 @@ func _update(dt: float) -> void:
 					z["shield"] = float(z.shield) - pe.dmg   # Schild absorbiert frontale Erbsen
 				else:
 					z.hp -= pe.dmg; _apply_fx(z, pe.effects, pe.dmg)
+				Music.play_sfx("pea_hit", 0.09)
 				pe.hit.append(z)
 				if int(pe.pierce) > 0:
 					pe.pierce = int(pe.pierce) - 1
@@ -507,6 +540,7 @@ func _update(dt: float) -> void:
 				_apply_fx(z, p.s.effects, float(p.s.dmg))
 		if tgt != null and z.vault and not z.jumped and float(tgt.s.get("tall", 0.0)) <= 0.0:
 			z.x = tgt.x - Game.CELL * 0.55; z.jumped = true
+			Music.play_sfx("jump", 0.2)
 		elif tgt != null and z.smash:
 			# Smasher/Boss zerschmettert die Pflanze sofort -> Meta muss sich anpassen
 			var px = tgt.x; var py = tgt.y
@@ -546,8 +580,11 @@ func _update(dt: float) -> void:
 			if tgt.hp <= 0: _plant_dies(tgt)
 		else:
 			var spd: float = z.speed
-			# Renn-Zombie: je weniger HP, desto schneller (bis +130%)
-			if z.get("rage", false): spd = float(z.speed) * (1.0 + (1.0 - z.hp / z.maxhp) * 1.3)
+			if str(z.kind) == "sprinter":
+				# Liebespaar bummelt gemuetlich (0.6x) - bis der Partner stirbt, dann Vollgas (2.0x)
+				spd = float(z.speed) * (2.0 if z.get("enraged", false) else 0.6)
+			elif z.get("rage", false):
+				spd = float(z.speed) * (1.0 + (1.0 - z.hp / z.maxhp) * 1.3)
 			z.x -= spd * sl * dt
 		if z.x < Game.LAWN_X + 10:
 			if not _mow(z.row):
@@ -588,6 +625,7 @@ func _lane_has(p) -> bool:
 	return false
 
 func _shoot(p) -> void:
+	Music.play_sfx("shoot_pea")
 	var s = p.s
 	var ex := int(s.get("extra_lanes", 0))
 	_spawn_pea(p, p.row, s)
@@ -606,6 +644,7 @@ func _beam(p) -> void:
 	fx.append({"t": "beam", "x": p.x, "y": p.y, "life": 0.12})
 
 func _fume(p) -> void:
+	Music.play_sfx("shoot_shroom")
 	var s = p.s
 	var gm := float(p.get("gm", 1.0))
 	var reach = p.x + (s.range if s.range > 0 else 2.6) * Game.CELL
@@ -614,6 +653,7 @@ func _fume(p) -> void:
 	fx.append({"t": "fume", "x": p.x, "y": p.y, "w": (s.range if s.range > 0 else 2.6) * Game.CELL, "life": 0.2})
 
 func _lob(p) -> void:
+	Music.play_sfx("shoot_shroom")
 	var s = p.s
 	var tx = p.x + 4 * Game.CELL
 	var best := 1.0e9
@@ -772,6 +812,8 @@ func _kill(z) -> void:
 
 func _lose() -> void:
 	Game.phase = "dead"
+	Music.set_rain(false)
+	Music.play_sfx("dead", 1.0)
 	msg = "Überrannt!"; msg_t = 4.0
 
 # ---- Eingabe ----
@@ -792,6 +834,7 @@ func lawn_click(pos: Vector2) -> void:
 		if pos.distance_to(Vector2(suns[i].x, suns[i].y)) < 30:
 			var sv: int = int(suns[i].value)
 			_popup(suns[i].x, suns[i].y, "+%d" % sv, Color(1, 0.9, 0.35))
+			Music.play_sfx("collect_sun")
 			Game.sun += sv; suns.remove_at(i); return
 	var col := int((pos.x - Game.LAWN_X) / Game.CELL)
 	var row := int((pos.y - Game.LAWN_Y) / Game.CELL)
@@ -919,6 +962,7 @@ func _draw() -> void:
 	for z in zombies:
 		var zc: Color = z.col
 		if z.slow > 0: zc = zc.lerp(Color(0.6,0.8,1), 0.4)
+		if z.get("enraged", false): zc = zc.lerp(Color(1.0, 0.25, 0.15), 0.5)   # wuetend -> rot
 		var sz = 60 if z.boss else 40
 		var zy: float = z.y
 		if z.get("fly", false): zy = z.y - Game.CELL * 0.32   # Ballon schwebt hoeher
@@ -938,6 +982,8 @@ func _draw() -> void:
 		var ix = z.x + sz*0.4
 		if z.burn > 0: draw_circle(Vector2(ix, zy - sz*0.5), 4, Color(1,0.5,0.1))
 		if z.poison > 0: draw_circle(Vector2(ix, zy - sz*0.5 + 10), 4, Color(0.6,0.9,0.3))
+		if str(z.get("shirt", "")) != "" and not z.get("dying", false):
+			_draw_shirt(z.x, zy + sz * 0.08, str(z.shirt), z.get("enraged", false))
 	# Boss-Lebensbalken oben am Bildschirm
 	for bz in zombies:
 		if bz.boss and bz.hp > 0:
@@ -996,6 +1042,18 @@ func _draw_rain(rect: Rect2) -> void:
 		var a := (1.0 - life) * 0.30
 		var rr := 2.0 + life * 6.0
 		draw_arc(Vector2(sx, groundy), rr, PI, TAU, 8, Color(0.75, 0.85, 1.0, a), 1.0)
+
+# ---- T-Shirt der Liebespaar-Zombies: kleines Herz + "him"/"her" (+ Wut-Dampf wenn sauer) ----
+func _draw_shirt(cx: float, cy: float, shirt: String, angry: bool) -> void:
+	var hc := Color(1.0, 0.2, 0.2) if angry else Color(1.0, 0.30, 0.45)
+	draw_circle(Vector2(cx - 3.0, cy - 2.0), 2.4, hc)
+	draw_circle(Vector2(cx + 3.0, cy - 2.0), 2.4, hc)
+	draw_colored_polygon(PackedVector2Array([Vector2(cx - 5.2, cy - 1.0), Vector2(cx + 5.2, cy - 1.0), Vector2(cx, cy + 5.0)]), hc)
+	if _font != null:
+		draw_string(_font, Vector2(cx - 14.0, cy + 20.0), ("him" if shirt == "him" else "her"), HORIZONTAL_ALIGNMENT_CENTER, 28, 10, Color(1, 1, 1))
+	if angry:
+		draw_line(Vector2(cx - 11, cy - 16), Vector2(cx - 14, cy - 22), Color(1, 0.4, 0.3, 0.85), 2.0)
+		draw_line(Vector2(cx + 11, cy - 16), Vector2(cx + 14, cy - 22), Color(1, 0.4, 0.3, 0.85), 2.0)
 
 # ---- Gesicht: zwei Augen + Mund (mood: happy/neutral/angry) ----
 func _face(cx: float, cy: float, s: float, mood: String, eyecol := Color(0.1, 0.1, 0.12)) -> void:
