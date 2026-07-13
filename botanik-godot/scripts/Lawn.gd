@@ -1187,14 +1187,26 @@ func _draw() -> void:
 			draw_string(_font, pos, str(pu.text), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, pc)
 	# Platzier-Vorschau (Geist der gewaehlten Pflanze / Schaufel-Markierung)
 	_draw_ghost()
-	# Kill-Combo-Anzeige (mittig ueber dem Feld, pulsiert leicht)
+	# Kill-Combo-Anzeige (mittig ueber dem Feld, mit Ablauf-Balken)
+	var _fcx := Game.LAWN_X + Game.COLS * Game.CELL * 0.5
 	if combo >= 3 and _font != null:
 		var ctxt := "COMBO x%d" % combo
 		var cc := Color(1.0, 0.72, 0.28).lerp(Color(1.0, 0.4, 0.2), clamp(float(combo) / 25.0, 0.0, 1.0))
-		var fsz := int(20 + 6.0 * clamp(combo_t / COMBO_WINDOW, 0.0, 1.0))
-		var cpos := Vector2(Game.LAWN_X + Game.COLS * Game.CELL * 0.5 - float(ctxt.length()) * 6.0, 106.0)
+		var frac := clamp(combo_t / COMBO_WINDOW, 0.0, 1.0)
+		var fsz := int(20 + 6.0 * frac)
+		var cpos := Vector2(_fcx - float(ctxt.length()) * 6.0, 106.0)
 		draw_string_outline(_font, cpos, ctxt, HORIZONTAL_ALIGNMENT_LEFT, -1, fsz, 5, Color(0, 0, 0, 0.7))
 		draw_string(_font, cpos, ctxt, HORIZONTAL_ALIGNMENT_LEFT, -1, fsz, cc)
+		# Ablauf-Balken (zeigt, wie lange der Combo noch haelt)
+		var barw := 120.0
+		draw_rect(Rect2(_fcx - barw * 0.5, 114.0, barw, 5.0), Color(0, 0, 0, 0.5))
+		draw_rect(Rect2(_fcx - barw * 0.5, 114.0, barw * frac, 5.0), cc)
+	# Auto-Modus: Countdown bis zur naechsten Welle
+	if Game.auto_wave and Game.phase == "prep" and Game.wave >= 1 and _font != null:
+		var atxt := "Auto: naechste Welle in %ds" % int(ceil(max(0.0, auto_wave_t)))
+		var apos := Vector2(_fcx - 108.0, 132.0)
+		draw_string_outline(_font, apos, atxt, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, 4, Color(0, 0, 0, 0.7))
+		draw_string(_font, apos, atxt, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(0.6, 1.0, 0.7))
 	# Anmarsch-Warnung: pulsierende Pfeile am rechten Rand, solange Zombies nachkommen
 	_draw_incoming()
 	# Gefahr-Rand am Haus, wenn Zombies nah sind
