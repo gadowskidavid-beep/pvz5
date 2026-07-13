@@ -1195,6 +1195,8 @@ func _draw() -> void:
 		var cpos := Vector2(Game.LAWN_X + Game.COLS * Game.CELL * 0.5 - float(ctxt.length()) * 6.0, 106.0)
 		draw_string_outline(_font, cpos, ctxt, HORIZONTAL_ALIGNMENT_LEFT, -1, fsz, 5, Color(0, 0, 0, 0.7))
 		draw_string(_font, cpos, ctxt, HORIZONTAL_ALIGNMENT_LEFT, -1, fsz, cc)
+	# Anmarsch-Warnung: pulsierende Pfeile am rechten Rand, solange Zombies nachkommen
+	_draw_incoming()
 	# Gefahr-Rand am Haus, wenn Zombies nah sind
 	_draw_house_danger()
 	# Atmosphaere-Overlay (Gluehwuermchen/Sonnenstrahlen + Vignette) — nur ohne BG-Bild
@@ -1391,6 +1393,16 @@ func _draw_ghost() -> void:
 		var tc := Color(1, 0.95, 0.6) if affordable else Color(1, 0.5, 0.45)
 		draw_string_outline(_font, Vector2(cxp - 10, cyp + 6), ct, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, 4, Color(0, 0, 0, 0.7))
 		draw_string(_font, Vector2(cxp - 10, cyp + 6), ct, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, tc)
+
+# ---- Anmarsch-Warnung: pulsierende Pfeile am rechten Feldrand, wenn noch Zombies kommen ----
+func _draw_incoming() -> void:
+	if Game.phase != "fight" or to_spawn <= 0: return
+	var rx := Game.LAWN_X + Game.COLS * Game.CELL + 6.0
+	var pulse := 0.5 + 0.5 * sin(_anim_clock * 6.0)
+	var a := 0.25 + 0.4 * pulse
+	for r in range(rows):
+		var ry := Game.LAWN_Y + r * Game.CELL + Game.CELL * 0.5
+		draw_colored_polygon(PackedVector2Array([Vector2(rx + 15, ry - 9), Vector2(rx + 15, ry + 9), Vector2(rx, ry)]), Color(1.0, 0.28, 0.2, a))
 
 # ---- Gefahr: leuchtender roter Rand am Haus (links), wenn ein Zombie nah ist ----
 func _draw_house_danger() -> void:

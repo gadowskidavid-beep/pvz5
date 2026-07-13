@@ -138,7 +138,11 @@ func _process(_delta: float) -> void:
 	fp_lbl.text = "FP  %s" % _fmt(Game.fp)
 	coin_lbl.text = "Muenzen  %s" % _fmt(Game.coins)
 	brain_lbl.text = "Skulls  %s" % _fmt(Game.brains)
-	wave_lbl.text = "Welle %d / 100%s" % [Game.wave, lawn.weather_hud()]
+	var _boss_in := _next_boss() - Game.wave
+	if _boss_in > 0 and Game.wave < 100:
+		wave_lbl.text = "Welle %d / 100%s  ·  Boss in %d" % [Game.wave, lawn.weather_hud(), _boss_in]
+	else:
+		wave_lbl.text = "Welle %d / 100%s" % [Game.wave, lawn.weather_hud()]
 	wave_bar.queue_redraw()
 	if d_fp != null: d_fp.text = "%d FP" % Game.fp
 	msg_lbl.text = str(lawn.msg) if lawn.msg_t > 0 else ""
