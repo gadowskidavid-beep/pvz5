@@ -17,6 +17,7 @@ var root: Control
 # HUD
 var sun_lbl: Label
 var fp_lbl: Label
+var coin_lbl: Label
 var brain_lbl: Label
 var wave_lbl: Label
 var wave_bar: Control
@@ -109,9 +110,10 @@ func _process(_delta: float) -> void:
 		_tree_needs_rebuild = false
 		_rebuild_drawer()
 	# HUD lebt jedes Frame (Spiel laeuft weiter, egal ob Drawer offen)
-	sun_lbl.text = "Sonne  %d" % int(Game.sun)
-	fp_lbl.text = "FP  %d" % Game.fp
-	brain_lbl.text = "Skulls  %d" % Game.brains
+	sun_lbl.text = "Sonne  %s" % _fmt(int(Game.sun))
+	fp_lbl.text = "FP  %s" % _fmt(Game.fp)
+	coin_lbl.text = "Muenzen  %s" % _fmt(Game.coins)
+	brain_lbl.text = "Skulls  %s" % _fmt(Game.brains)
 	wave_lbl.text = "Welle %d / 100%s" % [Game.wave, lawn.weather_hud()]
 	wave_bar.queue_redraw()
 	if d_fp != null: d_fp.text = "%d FP" % Game.fp
@@ -186,6 +188,7 @@ func _build_hud() -> void:
 	root.add_child(pills)
 	sun_lbl = _hud_pill(pills, COL_GOLD)
 	fp_lbl = _hud_pill(pills, COL_CYAN)
+	coin_lbl = _hud_pill(pills, Color(0.95, 0.66, 0.22))
 	brain_lbl = _hud_pill(pills, COL_PINK)
 	# kleine Navigation
 	var nav := HBoxContainer.new()
@@ -260,6 +263,13 @@ func _next_boss() -> int:
 	for m in [25, 50, 75, 100]:
 		if Game.wave < m: return m
 	return 100
+
+# Kompakte Zahlen: ab 10k -> "12.3k", ab 1M -> "1.2M"
+func _fmt(n: int) -> String:
+	var a: int = abs(n)
+	if a >= 1000000: return "%.1fM" % (float(n) / 1000000.0)
+	if a >= 10000: return "%.1fk" % (float(n) / 1000.0)
+	return str(n)
 
 # Nav-Handler
 func _open_alm() -> void: open_overlay("almanac")
@@ -783,6 +793,7 @@ func _tree_node(canvas, center: Vector2, title: String, subtitle: String, cost: 
 	if cb.is_valid(): btn.pressed.connect(cb)
 	else: btn.disabled = true
 	btn.mouse_entered.connect(_tree_show_info.bind(title, subtitle, cost, show_cost, state))
+	btn.mouse_exited.connect(_tree_hide_info)
 	holder.add_child(btn)
 	var box := VBoxContainer.new()
 	box.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -866,7 +877,7 @@ func _tree_show_info(title: String, subtitle: String, cost: int, show_cost: bool
 	if _tree_info_panel == null or not is_instance_valid(_tree_info_panel):
 		_tree_info_panel = PanelContainer.new()
 		_tree_info_panel.add_theme_stylebox_override("panel", _sb(Color(0.07, 0.10, 0.08, 0.95), Color(0.30, 0.55, 0.38), 2, 12, 12))
-		_tree_info_panel.position = Vector2(SCREEN_W - 300, 62)
+		_tree_info_panel.position = Vector2(20, DRAWER_H - 120)
 		_tree_info_panel.custom_minimum_size = Vector2(276, 0)
 		_tree_info_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var v := VBoxContainer.new()
@@ -888,6 +899,7 @@ func _tree_show_info(title: String, subtitle: String, cost: int, show_cost: bool
 	_tree_info_panel.visible = true
 	_ti_title.text = title
 	_ti_desc.text = subtitle
+	_tree_info_panel.position = Vector2(20, DRAWER_H - 120)
 	if state == "owned" or state == "root" or state == "legend_owned":
 		_ti_title.modulate = Color(0.6, 0.95, 0.65)
 		_ti_meta.text = "Erforscht ✓"
@@ -900,6 +912,10 @@ func _tree_show_info(title: String, subtitle: String, cost: int, show_cost: bool
 		_ti_title.modulate = Color(0.75, 0.8, 0.78)
 		_ti_meta.text = ("Gesperrt — erforsche zuerst den vorherigen Skill (%d FP)" % cost) if show_cost else "Gesperrt — erforsche zuerst den vorherigen Skill"
 		_ti_meta.modulate = Color(0.6, 0.65, 0.62)
+
+func _tree_hide_info() -> void:
+	if _tree_info_panel != null and is_instance_valid(_tree_info_panel):
+		_tree_info_panel.visible = false
 
 func _pill_bg(state: String) -> Color:
 	if state.begins_with("legend"): return Color(0.25, 0.15, 0.35)
@@ -1291,6 +1307,24 @@ func _card_icon(grid, kind: String, col: Color, title: String, desc: String) -> 
 	hb.add_child(v)
 	grid.add_child(pc)
 
+# Karte mit gezeichnetem Zombie-Portraet (Zombie-Buch)
+func _card_zomb(grid, kind: String, col: Color, title: String, desc: String) -> void:
+	var pc := PanelContainer.new()
+	pc.add_theme_stylebox_override("panel", _sb(Color(0.13, 0.09, 0.10), Color(0.42, 0.24, 0.28), 2, 12, 10))
+	var hb := HBoxContainer.new(); hb.add_theme_constant_override("separation", 10)
+	pc.add_child(hb)
+	var ic := ZombiePortrait.new(); ic.kind = kind; ic.col = col
+	ic.custom_minimum_size = Vector2(56, 56)
+	hb.add_child(ic)
+	var v := VBoxContainer.new()
+	var tl := Label.new(); tl.text = title; tl.add_theme_font_size_override("font_size", 17); tl.modulate = Color(1, 0.62, 0.62)
+	v.add_child(tl)
+	var dl := Label.new(); dl.text = desc; dl.add_theme_font_size_override("font_size", 12); dl.modulate = Color(0.82, 0.75, 0.72)
+	dl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; dl.custom_minimum_size = Vector2(220, 0)
+	v.add_child(dl)
+	hb.add_child(v)
+	grid.add_child(pc)
+
 func _card(grid, title: String, desc: String, btn_text: String, enabled: bool, cb: Callable) -> void:
 	var pc := PanelContainer.new()
 	pc.custom_minimum_size = Vector2(176, 0)
@@ -1534,9 +1568,10 @@ func _build_zombiebook(vb) -> void:
 		var z = Game.ZTYPES[zk]
 		if Game.seen.has(zk):
 			var extra := ""
-			if z.get("boss", false): extra = "  BOSS (Gehirne!)"
+			if z.get("boss", false): extra = "  BOSS (Skulls!)"
 			elif z.get("vault", false): extra = "  springt"
-			_card(g, z.n, "HP %d  Schaden %d%s" % [int(z.hp), int(z.dmg), extra], "", false, Callable())
+			elif z.get("carrier", false): extra = "  Skull-Traeger"
+			_card_zomb(g, str(zk), z.col, str(z.n), "HP %d  Schaden %d%s" % [int(z.hp), int(z.dmg), extra])
 		else:
 			_card(g, "???", "Noch nicht begegnet", "", false, Callable())
 
@@ -1946,3 +1981,46 @@ class NodeIcon extends Control:
 			draw_line(c + Vector2(0, r * 0.6), c + Vector2(0, -r * 0.3), col, 2.2)
 			draw_circle(c + Vector2(-r * 0.32, -r * 0.35), r * 0.32, col.lightened(0.2))
 			draw_circle(c + Vector2(r * 0.32, -r * 0.35), r * 0.32, col.lightened(0.2))
+
+
+
+# ================================================================
+# ZOMBIE-PORTRAET — gezeichnete Mini-Icons fuers Zombie-Buch
+# ================================================================
+class ZombiePortrait extends Control:
+	var kind := ""
+	var col := Color(0.5, 0.55, 0.5)
+	func _draw() -> void:
+		var c := size * 0.5
+		var s: float = min(size.x, size.y) * 0.5
+		var is_boss := kind == "miniboss" or kind == "boss_a" or kind == "boss_b" or kind == "boss_c" or kind == "megaboss"
+		if is_boss:
+			draw_circle(c, s * 1.02, Color(col.r, col.g, col.b, 0.22))
+		# Torso
+		draw_rect(Rect2(c.x - s * 0.42, c.y - s * 0.52, s * 0.84, s * 1.04), Color(0.06, 0.06, 0.09))
+		draw_rect(Rect2(c.x - s * 0.38, c.y - s * 0.48, s * 0.76, s * 0.96), col)
+		# rote Augen
+		draw_circle(c + Vector2(-s * 0.16, -s * 0.16), s * 0.10, Color(0.95, 0.95, 0.88))
+		draw_circle(c + Vector2(s * 0.16, -s * 0.16), s * 0.10, Color(0.95, 0.95, 0.88))
+		draw_circle(c + Vector2(-s * 0.16, -s * 0.16), s * 0.05, Color(0.8, 0.12, 0.12))
+		draw_circle(c + Vector2(s * 0.16, -s * 0.16), s * 0.05, Color(0.8, 0.12, 0.12))
+		# Kopf-Aufsatz / Merkmal je Typ
+		match kind:
+			"cone":
+				draw_colored_polygon(PackedVector2Array([c + Vector2(-s * 0.3, -s * 0.5), c + Vector2(s * 0.3, -s * 0.5), c + Vector2(0, -s * 0.98)]), Color(0.88, 0.46, 0.14))
+			"bucket":
+				draw_rect(Rect2(c.x - s * 0.32, c.y - s * 0.9, s * 0.64, s * 0.44), Color(0.72, 0.74, 0.78))
+			"brainz":
+				draw_circle(c + Vector2(0, -s * 0.62), s * 0.24, Color(0.86, 0.5, 1.0))
+			"shield":
+				draw_rect(Rect2(c.x - s * 0.66, c.y - s * 0.42, s * 0.16, s * 0.84), Color(0.62, 0.78, 0.96))
+			"balloon":
+				draw_circle(c + Vector2(0, -s * 0.92), s * 0.28, Color(0.92, 0.5, 0.55))
+				draw_line(c + Vector2(0, -s * 0.64), c + Vector2(0, -s * 0.4), Color(0.3, 0.3, 0.3), 1.5)
+			"flag":
+				draw_line(c + Vector2(s * 0.34, -s * 0.5), c + Vector2(s * 0.34, -s * 0.98), Color(0.25, 0.18, 0.12), 2.0)
+				draw_colored_polygon(PackedVector2Array([c + Vector2(s * 0.34, -s * 0.98), c + Vector2(s * 0.66, -s * 0.86), c + Vector2(s * 0.34, -s * 0.74)]), Color(0.82, 0.22, 0.26))
+			"sprinter":
+				for i in range(3):
+					var ly := c.y - s * 0.2 + float(i) * s * 0.24
+					draw_line(Vector2(c.x + s * 0.5, ly), Vector2(c.x + s * 0.95, ly), Color(0.92, 0.42, 0.36, 0.7), 2.0)
