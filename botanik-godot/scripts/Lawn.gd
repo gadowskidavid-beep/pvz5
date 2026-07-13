@@ -98,17 +98,20 @@ func _scene_bg(night: bool) -> Texture2D:
 	var key := "night" if night else "day"
 	if _bg_cache.has(key): return _bg_cache[key]
 	var tex: Texture2D = null
-	var direct := "res://assets/sprites/bg/%s.png" % key
-	if ResourceLoader.exists(direct):
-		tex = load(direct)
-	else:
+	# Direkte Kandidaten — deckt day.png.jpg, night.png, .jpeg, .webp ab
+	for ext in [".png", ".png.jpg", ".jpg", ".jpeg", ".webp"]:
+		var cand := "res://assets/sprites/bg/%s%s" % [key, ext]
+		if ResourceLoader.exists(cand):
+			tex = load(cand); break
+	# Fallback: Ordner scannen (auch jpg/jpeg/webp, nicht nur png)
+	if tex == null:
 		var da := DirAccess.open("res://assets/sprites/bg")
 		var any_tex: Texture2D = null
 		var match_tex: Texture2D = null
 		if da != null:
 			for f in da.get_files():
 				var low := f.to_lower()
-				if not low.ends_with(".png"): continue
+				if not (low.ends_with(".png") or low.ends_with(".jpg") or low.ends_with(".jpeg") or low.ends_with(".webp")): continue
 				var p := "res://assets/sprites/bg/" + f
 				if any_tex == null: any_tex = load(p)
 				var is_night := low.find("graveyard") != -1 or low.find("night") != -1 or low.find("nacht") != -1 or low.find("dark") != -1
@@ -149,6 +152,7 @@ func reset_run() -> void:
 		mowers.append({"row": r, "x": float(Game.LAWN_X - 30), "active": false, "used": false})
 	sky_timer = 5.0; to_spawn = 0; idle_timer = 6.0; hazard_timer = 9.0
 	weather = "klar"; strike_t = 0.0
+	Music.set_rain(false)
 	msg = "Pflanze eine Sonnenblume, um die erste Welle zu starten!"; msg_t = 6.0
 
 # Reihen nachziehen, wenn neue freigeschaltet wurden (mid-run kaufbar)
@@ -209,13 +213,14 @@ func _do_umbruch() -> void:
 func _roll_weather() -> void:
 	# Erste Welle & Boss-Wellen bleiben klar
 	if Game.wave <= 1 or BAL.is_boss_wave(Game.wave):
-		weather = "klar"; strike_t = 2.0; return
+		weather = "klar"; strike_t = 2.0; Music.set_rain(false); return
 	var r := rng.randf()
 	if r < 0.45: weather = "klar"
 	elif r < 0.63: weather = "gewitter"
 	elif r < 0.81: weather = "nebel"
 	else: weather = "frost"
-	strike_t = 2.0
+	strike_t = rng.randf_range(12.0, 22.0)   # erster Blitz kommt nicht sofort
+	Music.set_rain(weather == "gewitter")    # Regen-Sound nur bei Gewitter
 	if weather != "klar":
 		msg = "Wetter: %s!" % weather_name(); msg_t = 2.2
 
@@ -375,7 +380,7 @@ func _update(dt: float) -> void:
 	if weather == "gewitter" and not plants.is_empty():
 		strike_t -= dt
 		if strike_t <= 0:
-			strike_t = rng.randf_range(6.0, 11.0)   # seltener als frueher
+			strike_t = rng.randf_range(16.0, 30.0)   # seltenes, cooles Ereignis
 			_storm_strike()
 	# Wellensteuerung
 	if Game.phase == "fight":
@@ -807,6 +812,7 @@ func _kill(z) -> void:
 
 func _lose() -> void:
 	Game.phase = "dead"
+	Music.set_rain(false)
 	Music.play_sfx("dead", 1.0)
 	msg = "Überrannt!"; msg_t = 4.0
 
