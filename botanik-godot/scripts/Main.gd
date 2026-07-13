@@ -76,6 +76,9 @@ var info_node := ""       # aktuell gewaehlter Knoten (im aktuellen Baum)
 var _keep_scroll_next := false
 var _scroll_keep := Vector2.ZERO
 var _scroll_restore_frames := 0
+# HUD-Sync: erkennt Auswahl-Aenderungen (z.B. per Tastatur) und aktualisiert die Karten
+var _last_place_slot := -99
+var _last_shovel := false
 
 const SCREEN_W := 1152
 const SCREEN_H := 648
@@ -124,6 +127,11 @@ func _process(_delta: float) -> void:
 		d_treewrap.scroll_vertical = int(_scroll_keep.y)
 		_scroll_restore_frames -= 1
 	# HUD lebt jedes Frame (Spiel laeuft weiter, egal ob Drawer offen)
+	# Auswahl-Aenderung (Tastatur/Chain-Leiste) -> Samen-Karten neu hervorheben
+	if Game.place_slot != _last_place_slot or Game.shovel != _last_shovel:
+		_last_place_slot = Game.place_slot
+		_last_shovel = Game.shovel
+		refresh_seeds()
 	sun_display.amount = int(Game.sun)
 	sun_display.queue_redraw()
 	fp_lbl.text = "FP  %s" % _fmt(Game.fp)

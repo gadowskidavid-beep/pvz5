@@ -41,6 +41,10 @@ const COMBO_WINDOW := 2.6   # Sekunden bis der Combo verfaellt
 # Screen-Shake (nur die Spielwelt, nicht das HUD)
 var _shake := 0.0
 var _shake_mag := 0.0
+var _mouse := Vector2(-999, -999)   # Mausposition fuer die Platzier-Vorschau
+# Lauf-Statistik (fuer den Todes-/Sieg-Bildschirm)
+var run_kills := 0
+var best_combo := 0
 
 func _ready() -> void:
 	rng.randomize()
@@ -167,6 +171,8 @@ func reset_run() -> void:
 	for r in range(rows):
 		mowers.append({"row": r, "x": float(Game.LAWN_X - 30), "active": false, "used": false})
 	sky_timer = 5.0; to_spawn = 0; idle_timer = 6.0; hazard_timer = 9.0
+	combo = 0; combo_t = 0.0; run_kills = 0; best_combo = 0
+	_shake = 0.0; _shake_mag = 0.0; position = Vector2.ZERO
 	weather = "klar"; strike_t = 0.0
 	Music.set_rain(false)
 	msg = "Pflanze eine Sonnenblume, um die erste Welle zu starten!"; msg_t = 6.0
@@ -859,6 +865,8 @@ func _kill(z) -> void:
 	# Kill-Combo hochzaehlen — schnelle Kills hintereinander geben mehr Belohnung
 	combo += 1
 	combo_t = COMBO_WINDOW
+	run_kills += 1
+	best_combo = max(best_combo, combo)
 	var cmult := 1.0 + 0.04 * float(min(combo, 25))   # bis zu +100% bei Combo 25
 	if combo >= 3:
 		_popup(z.x, z.y - 30, "Combo x%d" % combo, Color(1.0, 0.62, 0.2))
@@ -884,10 +892,13 @@ func _lose() -> void:
 	Game.phase = "dead"
 	Music.set_rain(false)
 	Music.play_sfx("dead", 1.0)
-	msg = "Überrannt!"; msg_t = 4.0
+	msg = "Überrannt!  Kills: %d · Bester Combo: x%d" % [run_kills, best_combo]; msg_t = 5.0
 
 # ---- Eingabe ----
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_mouse = event.position
+		return
 	if Game.paused: return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		lawn_click(event.position)
@@ -895,6 +906,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.keycode == KEY_SPACE or event.keycode == KEY_ENTER:
 			if Game.phase == "won": reset_run()
 			else: start_wave()
+		elif event.keycode == KEY_X:
+			if Game.has("u_shovel"):
+				Game.shovel = not Game.shovel
+				if Game.shovel: Game.place_slot = -1
+		elif event.keycode == KEY_H:
+			if Game.has("u_hammer"):
+				Game.place_slot = -1; Game.shovel = false
+		elif event.keycode >= KEY_1 and event.keycode <= KEY_9:
+			var idx := int(event.keycode) - int(KEY_1)
+			if idx < Game.slot_count() and Game.seed_chain(idx) != "":
+				Game.place_slot = idx; Game.shovel = false
 
 # ---- Klick-Steuerung ----
 func lawn_click(pos: Vector2) -> void:
@@ -909,10 +931,15 @@ func lawn_click(pos: Vector2) -> void:
 	var col := int((pos.x - Game.LAWN_X) / Game.CELL)
 	var row := int((pos.y - Game.LAWN_Y) / Game.CELL)
 	if col < 0 or col >= Game.COLS or row < 0 or row >= rows: return
-	# Schaufel
+	# Schaufel: Pflanze entfernen + 50% Sonne zurueck
 	if Game.shovel:
 		for p in plants:
-			if p.col == col and p.row == row: plants.erase(p); return
+			if p.col == col and p.row == row:
+				var refund := int(round(float(p.s.get("cost", 0)) * 0.5))
+				if refund > 0:
+					Game.sun += refund
+					_popup(p.x, p.y - 10, "+%d" % refund, Color(1, 0.9, 0.4))
+				plants.erase(p); return
 		return
 	# Hammer/Faust (kein Samen gewählt) — nur wenn freigeschaltet
 	if Game.place_slot < 0:
@@ -1105,6 +1132,8 @@ func _draw() -> void:
 			var pos := Vector2(float(pu.x) - 12.0, float(pu.y))
 			draw_string_outline(_font, pos, str(pu.text), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 4, Color(0, 0, 0, a * 0.8))
 			draw_string(_font, pos, str(pu.text), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, pc)
+	# Platzier-Vorschau (Geist der gewaehlten Pflanze / Schaufel-Markierung)
+	_draw_ghost()
 	# Kill-Combo-Anzeige (mittig ueber dem Feld, pulsiert leicht)
 	if combo >= 3 and _font != null:
 		var ctxt := "COMBO x%d" % combo
@@ -1247,6 +1276,45 @@ func _draw_grass_deco(lx: float, ly: float, lw: float, lh: float, night: bool) -
 		if i % 4 == 0:
 			var fcol := Color(1.0, 0.8, 0.35) if (i % 8 == 0) else Color(1.0, 0.5, 0.7)
 			draw_circle(Vector2(gx + sway, basey - 12.0), 2.6, fcol)
+
+# ---- Platzier-Vorschau: zeigt, wo die Pflanze landet (gruen = ok, rot = belegt/zu teuer) ----
+func _draw_ghost() -> void:
+	if Game.paused or Game.phase == "won" or Game.phase == "dead": return
+	if _mouse.x < 0.0: return
+	var col := int((_mouse.x - Game.LAWN_X) / Game.CELL)
+	var row := int((_mouse.y - Game.LAWN_Y) / Game.CELL)
+	if col < 0 or col >= Game.COLS or row < 0 or row >= rows: return
+	var cellrect := Rect2(Game.LAWN_X + col * Game.CELL, Game.LAWN_Y + row * Game.CELL, Game.CELL, Game.CELL)
+	var cxp := Game.LAWN_X + col * Game.CELL + Game.CELL / 2.0
+	var cyp := Game.LAWN_Y + row * Game.CELL + Game.CELL / 2.0
+	# Schaufel-Modus: Pflanze unter dem Cursor rot markieren
+	if Game.shovel:
+		for p in plants:
+			if p.col == col and p.row == row:
+				draw_rect(cellrect, Color(1.0, 0.3, 0.2, 0.20))
+				draw_rect(cellrect, Color(1.0, 0.45, 0.35, 0.85), false, 2.0)
+				return
+		return
+	if Game.place_slot < 0: return
+	var ck := Game.seed_chain(Game.place_slot)
+	if ck == "": return
+	var occupied := false
+	for p in plants:
+		if p.col == col and p.row == row: occupied = true; break
+	var s = Game.seed_stats(Game.place_slot)
+	var affordable: bool = Game.sun >= int(s.cost)
+	var okp := (not occupied) and affordable
+	var gc: Color = Game.CHASSIS[ck].col
+	var edge := Color(0.5, 1.0, 0.55) if okp else Color(1.0, 0.35, 0.28)
+	draw_rect(cellrect, Color(edge.r, edge.g, edge.b, 0.12))
+	draw_rect(cellrect, Color(edge.r, edge.g, edge.b, 0.85), false, 2.0)
+	if okp:
+		draw_circle(Vector2(cxp, cyp), 22.0, Color(gc.r, gc.g, gc.b, 0.38))   # Pflanzen-Geist
+	if _font != null:
+		var ct := "%d" % int(s.cost)
+		var tc := Color(1, 0.95, 0.6) if affordable else Color(1, 0.5, 0.45)
+		draw_string_outline(_font, Vector2(cxp - 10, cyp + 6), ct, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, 4, Color(0, 0, 0, 0.7))
+		draw_string(_font, Vector2(cxp - 10, cyp + 6), ct, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, tc)
 
 # ---- Gefahr: leuchtender roter Rand am Haus (links), wenn ein Zombie nah ist ----
 func _draw_house_danger() -> void:
