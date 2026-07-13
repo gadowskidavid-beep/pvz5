@@ -219,14 +219,41 @@ func weather_name() -> String:
 func weather_hud() -> String:
 	return "" if weather == "klar" else "  ·  " + weather_name()
 
+# Eine Pflanze hat "BlitzEvolution" (Blitz-Ast geskillt) oder ist die Stahlnuss -> Blitzableiter
+func _is_lightning_rod(p) -> bool:
+	var s = p.s
+	if float(s.get("lightning_rod", 0.0)) > 0.0: return true
+	if str(p.get("element", "")) == "b": return true          # Blitz-Evolution
+	if s.get("effects", []).has("chain"): return true          # Kettenblitz
+	if float(s.get("zap", 0.0)) > 0.0: return true             # Blitzstrahl (Sonne)
+	if float(s.get("aimbot", 0.0)) > 0.0: return true          # Katze (Blitzpad)
+	return false
+
 func _storm_strike() -> void:
-	var alive := []
-	for z in zombies:
-		if z.hp > 0: alive.append(z)
-	if alive.is_empty(): return
-	var t = alive[rng.randi() % alive.size()]
-	t.hp -= 70.0
-	fx.append({"t": "bolt", "x": t.x, "y": float(Game.LAWN_Y - 50), "x2": t.x, "y2": t.y, "life": 0.28})
+	if plants.is_empty(): return
+	# Blitzableiter (Blitz-Evolution/Stahlnuss) ziehen den Blitz an sich
+	var rods := []
+	for p in plants:
+		if _is_lightning_rod(p): rods.append(p)
+	var harmless := not rods.is_empty()
+	var tgt = rods[rng.randi() % rods.size()] if harmless else plants[rng.randi() % plants.size()]
+	# Optik + Sound
+	fx.append({"t": "bolt", "x": tgt.x, "y": float(Game.LAWN_Y - 70), "x2": tgt.x, "y2": tgt.y, "life": 0.3})
+	fx.append({"t": "flash", "life": 0.22, "col": Color(0.8, 0.9, 1.0)})
+	Music.play_sfx("thunder")
+	if harmless:
+		# Ableiter faengt den Blitz harmlos + entlaedt ihn in nahe Zombies
+		fx.append({"t": "boom", "x": tgt.x, "y": tgt.y, "life": 0.25})
+		for z in zombies:
+			if z.hp > 0 and Vector2(z.x, z.y).distance_to(Vector2(tgt.x, tgt.y)) < Game.CELL * 2.2:
+				z.hp -= 70.0
+				fx.append({"t": "bolt", "x": tgt.x, "y": tgt.y, "x2": z.x, "y2": z.y, "life": 0.2})
+		msg = "Blitzableiter faengt den Blitz!"; msg_t = 1.3
+	else:
+		tgt.hp -= 120.0
+		fx.append({"t": "boom", "x": tgt.x, "y": tgt.y, "life": 0.3})
+		msg = "Blitz schlaegt in eine Pflanze ein!"; msg_t = 1.3
+		if tgt.hp <= 0: _plant_dies(tgt)
 
 func _end_wave() -> void:
 	if Game.wave >= 100:
@@ -309,18 +336,19 @@ func _update(dt: float) -> void:
 		beat_pulse = 1.0
 	if beat_pulse > 0.0: beat_pulse = max(0.0, beat_pulse - dt / 0.16)
 	var wo := world_of(Game.wave)
-	# Himmels-Sonne
+	var night := BAL.is_night_wave(Game.wave)
+	# Himmels-Sonne (nachts seltener & weniger)
 	sky_timer -= dt
 	if sky_timer <= 0:
-		sky_timer = (8.0 + rng.randf() * 4.0) * (1.7 if wo.night else 1.0)
+		sky_timer = (8.0 + rng.randf() * 4.0) * (1.7 if night else 1.0)
 		var x := Game.LAWN_X + 40 + rng.randf() * (Game.COLS * Game.CELL - 80)
-		var val := int(round(25 * (0.5 if wo.night else 1.0)))
+		var val := int(round(25 * (0.5 if night else 1.0)))
 		suns.append({"x": x, "y": float(Game.LAWN_Y - 10), "ty": Game.LAWN_Y + 50 + rng.randf() * (rows * Game.CELL - 120), "vy": 70.0, "value": val, "falling": true, "life": 12.0})
 	# Wetter: Gewitter schlaegt Blitze auf Zombies (Blitz-Synergie)
-	if weather == "gewitter" and not zombies.is_empty():
+	if weather == "gewitter" and not plants.is_empty():
 		strike_t -= dt
 		if strike_t <= 0:
-			strike_t = rng.randf_range(1.8, 3.0)
+			strike_t = rng.randf_range(6.0, 11.0)   # seltener als frueher
 			_storm_strike()
 	# Wellensteuerung
 	if Game.phase == "fight":
@@ -342,8 +370,8 @@ func _update(dt: float) -> void:
 		if hazard_timer <= 0:
 			hazard_timer = rng.randf_range(BAL.HAZARD_MIN, BAL.HAZARD_MAX)
 			var ph = plants[rng.randi() % plants.size()]
-			if float(ph.s.get("lightning_rod", 0.0)) > 0.0:
-				# Stahlnuss = Blitzableiter: leitet den Umwelt-Blitz harmlos ab
+			if _is_lightning_rod(ph):
+				# Blitzableiter (Blitz-Evolution/Stahlnuss): leitet den Umwelt-Blitz harmlos ab
 				fx.append({"t": "boom", "x": ph.x, "y": ph.y, "life": 0.2})
 				msg = "Blitz abgeleitet!"; msg_t = 1.0
 			else:
@@ -800,7 +828,7 @@ func _place(col: int, row: int) -> void:
 	Game.sun -= s.cost
 	var x = Game.LAWN_X + col * Game.CELL + Game.CELL / 2.0
 	var y = Game.LAWN_Y + row * Game.CELL + Game.CELL / 2.0
-	plants.append({"ck": ck, "arch": s.arch, "row": row, "col": col, "x": x, "y": y, "hp": float(s.hp), "maxhp": float(s.hp), "s": s, "t": 0.0, "fuse": (0.7 if s.arch == "bomb" else 0.0), "done": false})
+	plants.append({"ck": ck, "arch": s.arch, "row": row, "col": col, "x": x, "y": y, "hp": float(s.hp), "maxhp": float(s.hp), "s": s, "t": 0.0, "fuse": (0.7 if s.arch == "bomb" else 0.0), "done": false, "element": Game.seed_element(slot)})
 	# Intuitiver Start: die allererste gesetzte Pflanze startet Welle 1
 	if Game.wave == 0 and Game.phase == "prep":
 		start_wave()
@@ -808,9 +836,10 @@ func _place(col: int, row: int) -> void:
 # ---- Zeichnen ----
 func _draw() -> void:
 	var wo := world_of(Game.wave)
+	var night := BAL.is_night_wave(Game.wave)
 	var lawn_rect := Rect2(Game.LAWN_X, Game.LAWN_Y, Game.COLS * Game.CELL, rows * Game.CELL)
-	# --- Hintergrund-Kulisse (Tag/Nacht, Full-Screen-Backdrop) ---
-	var bg := _scene_bg(bool(wo.night))
+	# --- Hintergrund-Kulisse (Tag/Nacht folgt dem Zyklus, Full-Screen-Backdrop) ---
+	var bg := _scene_bg(night)
 	if bg != null:
 		var vp := get_viewport_rect().size
 		draw_texture_rect(bg, Rect2(0, 0, vp.x, vp.y), false)
@@ -834,12 +863,14 @@ func _draw() -> void:
 	for r in range(rows + 1):
 		draw_line(Vector2(lx, ly + r * Game.CELL), Vector2(lx + lw, ly + r * Game.CELL), Color(0, 0, 0, 0.13), 1.0)
 	draw_rect(Rect2(lx - 7, ly + lh, lw + 14, 10), Color(0, 0, 0, 0.30))  # Schatten an der Vorderkante
-	if bg == null and wo.night: draw_rect(lawn_rect, Color(0.08,0.12,0.25,0.30))
+	if bg == null and night: draw_rect(lawn_rect, Color(0.08,0.12,0.25,0.30))
 	if wo.get("roof", false): draw_rect(lawn_rect, Color(0.5,0.35,0.18,0.14))
 	# Wetter-Overlay
 	if weather == "nebel": draw_rect(lawn_rect, Color(0.82, 0.84, 0.88, 0.24))
 	elif weather == "frost": draw_rect(lawn_rect, Color(0.55, 0.72, 1.0, 0.15))
-	elif weather == "gewitter": draw_rect(lawn_rect, Color(0.12, 0.12, 0.28, 0.22))
+	elif weather == "gewitter":
+		draw_rect(lawn_rect, Color(0.12, 0.12, 0.28, 0.22))
+		_draw_rain(lawn_rect)
 	draw_rect(Rect2(Game.LAWN_X - 14, Game.LAWN_Y, 9, rows * Game.CELL), Color(0.42,0.32,0.62))
 	# Tiefe: sanfter Verlauf (oben heller, unten dunkler)
 	var _lh := rows * Game.CELL
@@ -944,6 +975,27 @@ func _popup(x: float, y: float, text: String, col: Color) -> void:
 
 func _shadow(cx: float, cy: float, r: float) -> void:
 	draw_circle(Vector2(cx, cy + r * 0.7), r * 0.85, Color(0, 0, 0, 0.20))
+
+# ---- Leichter Regen (bei Gewitter): schraege Tropfen + kleine Aufschlag-Kringel am Boden ----
+func _draw_rain(rect: Rect2) -> void:
+	var t := _anim_clock
+	var rng2 := RandomNumberGenerator.new()
+	rng2.seed = 424242                       # fester Seed -> ruhiger, gleichmaessiger Regen
+	var groundy := rect.position.y + rect.size.y - 3.0
+	# fallende Tropfen (leicht schraeg)
+	for i in range(40):
+		var bx := rect.position.x + rng2.randf() * rect.size.x
+		var spd := 260.0 + rng2.randf() * 130.0
+		var ph := rng2.randf()
+		var yy := rect.position.y + fmod(ph * rect.size.y + t * spd, rect.size.y)
+		draw_line(Vector2(bx, yy), Vector2(bx - 2.5, yy + 13.0), Color(0.70, 0.80, 1.0, 0.22), 1.0)
+	# kleine Aufschlag-Kringel (sanft aufploppend, an festen Stellen)
+	for j in range(7):
+		var sx := rect.position.x + rng2.randf() * rect.size.x
+		var life := fmod(t * 1.5 + rng2.randf(), 1.0)   # 0..1 Zyklus je Stelle
+		var a := (1.0 - life) * 0.30
+		var rr := 2.0 + life * 6.0
+		draw_arc(Vector2(sx, groundy), rr, PI, TAU, 8, Color(0.75, 0.85, 1.0, a), 1.0)
 
 # ---- Gesicht: zwei Augen + Mund (mood: happy/neutral/angry) ----
 func _face(cx: float, cy: float, s: float, mood: String, eyecol := Color(0.1, 0.1, 0.12)) -> void:

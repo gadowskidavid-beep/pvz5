@@ -89,6 +89,14 @@ static func act_of(w: int) -> Dictionary:
 	return ACTS[act_index(w)]
 static func is_boss_wave(w: int) -> bool:
 	return BOSS_WAVES.has(w)
+
+# ---- Tag/Nacht-Zyklus ----
+# Die ersten DAY_WAVES Wellen jedes 25er-Aktes sind Tag, danach Nacht bis zum Boss.
+# Bsp: 1-10 Tag, 11-25 Nacht, 26-35 Tag, 36-50 Nacht, ...
+const DAY_WAVES := 10
+static func is_night_wave(w: int) -> bool:
+	if w <= 0: return false
+	return ((w - 1) % ACT_SIZE) >= DAY_WAVES
 static func boss_key(w: int) -> String:
 	var idx := BOSS_WAVES.find(w)
 	return BOSS_KEYS[idx] if idx >= 0 else ""
