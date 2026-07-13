@@ -29,12 +29,22 @@ var msg_t := 0.0
 # ---- Wetter ----
 var weather := "klar"      # klar / gewitter / nebel / frost
 var strike_t := 0.0        # Timer fuer Gewitter-Blitze
+# ---- Rhythmus (Beat-synchrones Schiessen + Pflanzen-Bounce) ----
+var beat_interval := 0.469  # Sekunden pro Beat (aus BPM, in _ready gesetzt)
+var beat_t := 0.0           # Zeit seit letztem Beat
+var beat_pulse := 0.0       # 1.0 auf dem Beat, klingt schnell ab (fuer Bounce)
 
 func _ready() -> void:
 	rng.randomize()
 	_font = ThemeDB.fallback_font
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST   # scharfe Pixel-Art (kein Blur)
+	beat_interval = 60.0 / max(1.0, BAL.MUSIC_BPM)
 	reset_run()
+
+# Setzt den Takt-Zaehler zurueck (spaeter vom Musikplayer beim Song-Start aufgerufen -> Beat 1 = Downbeat)
+func reset_beat() -> void:
+	beat_t = 0.0
+	beat_pulse = 1.0
 
 # Laedt ein Sprite, falls vorhanden (sonst null -> gezeichneter Fallback). Ergebnis wird gecacht.
 func _tex(path: String) -> Texture2D:
@@ -290,6 +300,14 @@ func _process(delta: float) -> void:
 
 func _update(dt: float) -> void:
 	_anim_clock += dt
+	# Rhythmus-Takt: beat_now ist genau in dem Frame true, in dem ein Beat faellt
+	beat_t += dt
+	var beat_now := false
+	if beat_t >= beat_interval:
+		beat_t -= beat_interval
+		beat_now = true
+		beat_pulse = 1.0
+	if beat_pulse > 0.0: beat_pulse = max(0.0, beat_pulse - dt / 0.16)
 	var wo := world_of(Game.wave)
 	# Himmels-Sonne
 	sky_timer -= dt
@@ -338,6 +356,7 @@ func _update(dt: float) -> void:
 	var expired: Array = []   # abgelaufene Nacht-Pilze (erst nach der Schleife entfernen)
 	for p in plants:
 		var s = p.s
+		if float(p.get("recoil", 0.0)) > 0.0: p["recoil"] = max(0.0, float(p.recoil) - dt / 0.14)
 		if float(s.get("regen", 0.0)) > 0.0 and p.hp < p.maxhp:
 			p.hp = min(p.maxhp, p.hp + float(s.regen) * dt)
 		# Vom Eisboss eingefroren: Pflanze macht nichts, bis sie auftaut
@@ -383,13 +402,13 @@ func _update(dt: float) -> void:
 		if p.arch == "sun":
 			if p.t >= s.interval: p.t = 0.0; suns.append({"x": p.x + rng.randf_range(-8,8), "y": p.y, "ty": p.y, "vy": 0.0, "value": int(s.amount * float(p.get("gm", 1.0))), "falling": false, "life": 12.0})
 		elif p.arch == "shooter":
-			if p.t >= s.shot_int and _lane_has(p): p.t = 0.0; _shoot(p)
+			if p.t >= s.shot_int and (beat_now or not BAL.RHYTHM_SHOOT) and _lane_has(p): p.t = 0.0; _shoot(p); p["recoil"] = 1.0
 		elif p.arch == "beam":
-			if p.t >= s.shot_int and _lane_has(p): p.t = 0.0; _beam(p)
+			if p.t >= s.shot_int and (beat_now or not BAL.RHYTHM_SHOOT) and _lane_has(p): p.t = 0.0; _beam(p); p["recoil"] = 1.0
 		elif p.arch == "fume":
-			if p.t >= s.shot_int and _lane_has(p): p.t = 0.0; _fume(p)
+			if p.t >= s.shot_int and (beat_now or not BAL.RHYTHM_SHOOT) and _lane_has(p): p.t = 0.0; _fume(p); p["recoil"] = 1.0
 		elif p.arch == "lobber":
-			if p.t >= s.shot_int and _lane_has(p): p.t = 0.0; _lob(p)
+			if p.t >= s.shot_int and (beat_now or not BAL.RHYTHM_SHOOT) and _lane_has(p): p.t = 0.0; _lob(p); p["recoil"] = 1.0
 	for rp in revived:
 		plants.append(rp)
 		fx.append({"t": "boom", "x": rp.x, "y": rp.y, "life": 0.3})
@@ -837,9 +856,11 @@ func _draw() -> void:
 		# Nacht-Pilze pulsieren/wachsen sichtbar mit ihrer Staerke
 		var pr := 28.0
 		if p.has("gm"): pr = 24.0 + 6.0 * (float(p.gm) - 1.0) / max(0.01, BAL.SHROOM_GROWTH_MAX - 1.0)
-		var pby: float = p.y + sin(float(p.t) * 2.2) * 1.5             # sanftes Wippen
+		pr *= 1.0 + beat_pulse * 0.10                                 # Beat-Bounce: Pflanze "atmet" im Takt
+		var rk := float(p.get("recoil", 0.0)) * 6.0                   # Rueckstoss beim Schuss (kurz nach links)
+		var pby: float = p.y + sin(float(p.t) * 2.2) * 1.5            # sanftes Wippen
 		_shadow(p.x, p.y, pr)
-		_draw_plant(p, col, pr, p.x, pby)
+		_draw_plant(p, col, pr, p.x - rk, pby)
 		# Element-Aura: der gewaehlte Skill-Ast ist auf dem Rasen sichtbar
 		var es: Dictionary = p.s
 		var ar := pr + 5.0 + sin(float(p.t) * 4.0) * 1.5
