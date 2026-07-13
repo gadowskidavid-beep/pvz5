@@ -841,7 +841,9 @@ func _draw() -> void:
 	# Wetter-Overlay
 	if weather == "nebel": draw_rect(lawn_rect, Color(0.82, 0.84, 0.88, 0.24))
 	elif weather == "frost": draw_rect(lawn_rect, Color(0.55, 0.72, 1.0, 0.15))
-	elif weather == "gewitter": draw_rect(lawn_rect, Color(0.12, 0.12, 0.28, 0.22))
+	elif weather == "gewitter":
+		draw_rect(lawn_rect, Color(0.12, 0.12, 0.28, 0.22))
+		_draw_rain(lawn_rect)
 	draw_rect(Rect2(Game.LAWN_X - 14, Game.LAWN_Y, 9, rows * Game.CELL), Color(0.42,0.32,0.62))
 	# Tiefe: sanfter Verlauf (oben heller, unten dunkler)
 	var _lh := rows * Game.CELL
@@ -946,6 +948,27 @@ func _popup(x: float, y: float, text: String, col: Color) -> void:
 
 func _shadow(cx: float, cy: float, r: float) -> void:
 	draw_circle(Vector2(cx, cy + r * 0.7), r * 0.85, Color(0, 0, 0, 0.20))
+
+# ---- Leichter Regen (bei Gewitter): schraege Tropfen + kleine Aufschlag-Kringel am Boden ----
+func _draw_rain(rect: Rect2) -> void:
+	var t := _anim_clock
+	var rng2 := RandomNumberGenerator.new()
+	rng2.seed = 424242                       # fester Seed -> ruhiger, gleichmaessiger Regen
+	var groundy := rect.position.y + rect.size.y - 3.0
+	# fallende Tropfen (leicht schraeg)
+	for i in range(40):
+		var bx := rect.position.x + rng2.randf() * rect.size.x
+		var spd := 260.0 + rng2.randf() * 130.0
+		var ph := rng2.randf()
+		var yy := rect.position.y + fmod(ph * rect.size.y + t * spd, rect.size.y)
+		draw_line(Vector2(bx, yy), Vector2(bx - 2.5, yy + 13.0), Color(0.70, 0.80, 1.0, 0.22), 1.0)
+	# kleine Aufschlag-Kringel (sanft aufploppend, an festen Stellen)
+	for j in range(7):
+		var sx := rect.position.x + rng2.randf() * rect.size.x
+		var life := fmod(t * 1.5 + rng2.randf(), 1.0)   # 0..1 Zyklus je Stelle
+		var a := (1.0 - life) * 0.30
+		var rr := 2.0 + life * 6.0
+		draw_arc(Vector2(sx, groundy), rr, PI, TAU, 8, Color(0.75, 0.85, 1.0, a), 1.0)
 
 # ---- Gesicht: zwei Augen + Mund (mood: happy/neutral/angry) ----
 func _face(cx: float, cy: float, s: float, mood: String, eyecol := Color(0.1, 0.1, 0.12)) -> void:
