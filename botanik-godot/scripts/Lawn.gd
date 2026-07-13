@@ -29,6 +29,10 @@ var msg_t := 0.0
 # ---- Wetter ----
 var weather := "klar"      # klar / gewitter / nebel / frost
 var strike_t := 0.0        # Timer fuer Gewitter-Blitze
+# ---- Screenshake (Boss-Auftritt / Rasen-Umbruch) ----
+var shake_t := 0.0
+var shake_dur := 0.0
+var shake_mag := 0.0
 
 func _ready() -> void:
 	rng.randomize()
@@ -159,6 +163,8 @@ func start_wave() -> void:
 	if BAL.is_boss_wave(Game.wave):
 		var bk := Game.boss_key_for_wave(Game.wave)
 		_spawn(bk)   # Boss kommt SOFORT — waehrend du im Umbruch neu baust
+		add_shake(14.0, 0.5)
+		fx.append({"t": "flash", "life": 0.5, "col": Game.ZTYPES[bk].col})
 		to_spawn += int(Game.ZTYPES[bk].get("summon", 0))
 		var wo := world_of(Game.wave)
 		if umbruch:
@@ -183,6 +189,7 @@ func _do_umbruch() -> void:
 	var wo := world_of(Game.wave)
 	msg = "DER RASEN BRICHT UM — %s!  +%d Sonne erstattet · %d s Schonfrist" % [str(wo.name), int(back), int(BAL.UMBRUCH_GRACE)]
 	msg_t = float(BAL.UMBRUCH_GRACE)
+	add_shake(11.0, 0.7)
 
 func _roll_weather() -> void:
 	# Erste Welle & Boss-Wellen bleiben klar
@@ -215,6 +222,11 @@ func _storm_strike() -> void:
 	var t = alive[rng.randi() % alive.size()]
 	t.hp -= 70.0
 	fx.append({"t": "bolt", "x": t.x, "y": float(Game.LAWN_Y - 50), "x2": t.x, "y2": t.y, "life": 0.28})
+
+func add_shake(mag: float, dur: float) -> void:
+	shake_mag = max(shake_mag, mag)
+	shake_dur = max(shake_dur, dur)
+	shake_t = max(shake_t, dur)
 
 func _end_wave() -> void:
 	if Game.wave >= 100:
@@ -284,6 +296,12 @@ func _process(delta: float) -> void:
 	if not Game.paused and Game.phase != "won" and Game.phase != "dead":
 		_update(delta)
 	if msg_t > 0: msg_t -= delta
+	if shake_t > 0.0:
+		shake_t -= delta
+		var f: float = clamp(shake_t / max(0.01, shake_dur), 0.0, 1.0)
+		position = Vector2(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0)) * shake_mag * f
+	elif position != Vector2.ZERO:
+		position = Vector2.ZERO
 	queue_redraw()
 
 func _update(dt: float) -> void:
@@ -921,6 +939,11 @@ func _draw() -> void:
 				var dir := Vector2(cos(ang), sin(ang))
 				draw_line(Vector2(e.x, e.y) + dir * 3.0, Vector2(e.x, e.y) + dir * (4.0 + 12.0 * (1.0 - sa)), Color(scol.r, scol.g, scol.b, sa), 2.0)
 			draw_circle(Vector2(e.x, e.y), 4.0 * sa + 1.0, Color(1, 1, 1, sa))
+		elif e.t == "flash":
+			var vp := get_viewport_rect().size
+			var fla: float = clamp(float(e.life) / 0.5, 0.0, 1.0)
+			var flc: Color = e.get("col", Color(1, 1, 1))
+			draw_rect(Rect2(-30, -30, vp.x + 60, vp.y + 60), Color(flc.r, flc.g, flc.b, 0.30 * fla))
 	# Schwebende Zahlen (+Sonne etc.)
 	if _font != null:
 		for pu in popups:
@@ -1141,6 +1164,35 @@ func _draw_zombie(z, zc: Color, sz: float, zx: float, zy: float) -> void:
 	for k in range(3):
 		var mx := zx - sz * 0.15 + k * sz * 0.15
 		draw_line(Vector2(mx, my), Vector2(mx + sz * 0.07, my - sz * 0.09), Color(0.1, 0.05, 0.05), 1.5)  # Zaehne
+	_zombie_gear(z, sz, zx, zy)
+
+# ---- Unterscheidbare Kopf-Aufsaetze/Props je Zombie-Typ (nur gezeichneter Fallback) ----
+func _zombie_gear(z, sz: float, zx: float, zy: float) -> void:
+	var top := zy - sz * 0.55
+	match str(z.kind):
+		"cone":   # orangenes Verkehrshuetchen
+			draw_colored_polygon(PackedVector2Array([Vector2(zx - sz * 0.30, top + sz * 0.02), Vector2(zx + sz * 0.30, top + sz * 0.02), Vector2(zx, top - sz * 0.52)]), Color(0.88, 0.46, 0.14))
+			draw_line(Vector2(zx - sz * 0.20, top - sz * 0.16), Vector2(zx + sz * 0.16, top - sz * 0.20), Color(1, 1, 1, 0.6), 2.0)
+		"bucket":   # Metall-Eimer
+			draw_rect(Rect2(zx - sz * 0.33, top - sz * 0.44, sz * 0.66, sz * 0.48), Color(0.72, 0.74, 0.78))
+			draw_rect(Rect2(zx - sz * 0.33, top - sz * 0.44, sz * 0.66, sz * 0.10), Color(0.86, 0.88, 0.92))
+			draw_rect(Rect2(zx - sz * 0.33, top - sz * 0.44, sz * 0.66, sz * 0.48), Color(0.40, 0.42, 0.46), false, 2.0)
+		"brainz":   # leuchtendes Gehirn
+			draw_circle(Vector2(zx, top - sz * 0.12), sz * 0.32, Color(0.82, 0.42, 0.98, 0.22))
+			draw_circle(Vector2(zx, top - sz * 0.10), sz * 0.20, Color(0.86, 0.50, 1.0))
+			draw_circle(Vector2(zx - sz * 0.08, top - sz * 0.13), sz * 0.09, Color(1, 0.78, 1.0))
+		"flag":   # Fahne
+			draw_line(Vector2(zx + sz * 0.32, top + sz * 0.05), Vector2(zx + sz * 0.32, top - sz * 0.50), Color(0.25, 0.18, 0.12), 2.0)
+			draw_colored_polygon(PackedVector2Array([Vector2(zx + sz * 0.32, top - sz * 0.50), Vector2(zx + sz * 0.66, top - sz * 0.40), Vector2(zx + sz * 0.32, top - sz * 0.30)]), Color(0.82, 0.22, 0.26))
+		"vaulter":   # Sprungstange
+			draw_line(Vector2(zx - sz * 0.45, zy + sz * 0.45), Vector2(zx + sz * 0.25, zy - sz * 0.75), Color(0.72, 0.60, 0.40), 3.0)
+		"sprinter":   # Geschwindigkeits-Linien
+			for i in range(3):
+				var ly := zy - sz * 0.20 + float(i) * sz * 0.22
+				draw_line(Vector2(zx + sz * 0.50, ly), Vector2(zx + sz * 0.90, ly), Color(0.92, 0.42, 0.36, 0.55), 2.0)
+		"brute":   # finstere Augenbrauen
+			draw_line(Vector2(zx - sz * 0.30, top + sz * 0.14), Vector2(zx - sz * 0.05, top + sz * 0.06), Color(0.08, 0.04, 0.06), 3.0)
+			draw_line(Vector2(zx + sz * 0.30, top + sz * 0.14), Vector2(zx + sz * 0.05, top + sz * 0.06), Color(0.08, 0.04, 0.06), 3.0)
 
 # ---- Richtige Sonne: Strahlen + Glow + Gesicht ----
 func _draw_sun_icon(cx: float, cy: float, r: float) -> void:
