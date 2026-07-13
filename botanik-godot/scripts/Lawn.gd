@@ -870,6 +870,7 @@ func _draw() -> void:
 		var zc: Color = z.col
 		if z.slow > 0: zc = zc.lerp(Color(0.6,0.8,1), 0.4)
 		if float(z.get("flash", 0.0)) > 0.0: zc = zc.lightened(0.55)
+		if z.burn > 0: zc = zc.lerp(Color(1.0, 0.5, 0.2), 0.22)
 		var sz = 60 if z.boss else 40
 		var zy: float = z.y
 		if z.get("fly", false): zy = z.y - Game.CELL * 0.32   # Ballon schwebt hoeher
@@ -882,9 +883,8 @@ func _draw() -> void:
 			# Schild vorne (links, Richtung Pflanzen)
 			draw_rect(Rect2(z.x - sz*0.62, zy - sz*0.5, 7, sz*1.0), Color(0.62,0.78,0.96,0.9))
 		_hp_bar(z.x, zy - sz*0.62, z.hp / z.maxhp, Color(0.9,0.3,0.3))
-		var ix = z.x + sz*0.4
-		if z.burn > 0: draw_circle(Vector2(ix, zy - sz*0.5), 4, Color(1,0.5,0.1))
-		if z.poison > 0: draw_circle(Vector2(ix, zy - sz*0.5 + 10), 4, Color(0.6,0.9,0.3))
+		if z.burn > 0: _draw_flames(z.x, zy + sz * 0.5, sz * 0.9, sz * 1.15, z.x * 0.05)
+		if z.poison > 0: _draw_poison(z.x - sz * 0.34, zy - sz * 0.5, sz * 0.5, z.x * 0.07)
 	# Boss-Lebensbalken oben am Bildschirm
 	for bz in zombies:
 		if bz.boss and bz.hp > 0:
@@ -965,6 +965,36 @@ func _elem_badge(cx: float, cy: float, el: String, ecol: Color, s: float) -> voi
 		"u":
 			draw_rect(Rect2(cx - s * 0.18, cy - s * 0.8, s * 0.36, s * 1.6), ecol)
 			draw_rect(Rect2(cx - s * 0.6, cy - s * 0.25, s * 1.2, s * 0.36), ecol)
+
+# ---- Brennender Zombie: zuengelnde, flackernde Flammen ----
+func _draw_flames(cx: float, base_y: float, w: float, h: float, phase: float) -> void:
+	# warmer Glow hinter/um den Koerper
+	draw_circle(Vector2(cx, base_y - h * 0.4), w * 0.6, Color(1.0, 0.5, 0.15, 0.14))
+	var n := 5
+	for i in range(n):
+		var fx0 := cx - w * 0.5 + w * (float(i) + 0.5) / float(n)
+		var flick: float = 0.5 + 0.5 * sin(_anim_clock * 12.0 + float(i) * 1.7 + phase)
+		var fh := h * (0.55 + 0.45 * flick)
+		var sway := sin(_anim_clock * 7.0 + float(i) * 2.1 + phase) * w * 0.07
+		var tip := Vector2(fx0 + sway, base_y - fh)
+		# aeussere orange Flamme
+		draw_colored_polygon(PackedVector2Array([Vector2(fx0 - w * 0.11, base_y), Vector2(fx0 + w * 0.11, base_y), tip]), Color(1.0, 0.42, 0.10, 0.55))
+		# innere gelbe Flamme
+		var tip2 := Vector2(fx0 + sway * 0.6, base_y - fh * 0.62)
+		draw_colored_polygon(PackedVector2Array([Vector2(fx0 - w * 0.055, base_y), Vector2(fx0 + w * 0.055, base_y), tip2]), Color(1.0, 0.85, 0.32, 0.75))
+	# aufsteigende Funken
+	for k in range(3):
+		var sp: float = fposmod(_anim_clock * 1.4 + float(k) * 0.37 + phase, 1.0)
+		var spx := cx + sin(_anim_clock * 3.0 + float(k) * 2.0) * w * 0.35
+		draw_circle(Vector2(spx, base_y - h * (0.6 + sp * 0.7)), 1.6, Color(1.0, 0.75, 0.3, 1.0 - sp))
+
+# ---- Vergifteter Zombie: aufsteigende, blubbernde Giftwolke ----
+func _draw_poison(cx: float, top_y: float, w: float, phase: float) -> void:
+	for k in range(3):
+		var bob := sin(_anim_clock * 3.0 + float(k) * 2.1 + phase) * 3.0
+		var ox := (float(k) - 1.0) * w * 0.28
+		var rr := 4.5 - float(k) * 0.7
+		draw_circle(Vector2(cx + ox, top_y - float(k) * 6.0 + bob), rr, Color(0.55, 0.88, 0.32, 0.45))
 
 # ---- Gesicht: zwei Augen + Mund (mood: happy/neutral/angry) ----
 func _face(cx: float, cy: float, s: float, mood: String, eyecol := Color(0.1, 0.1, 0.12)) -> void:
