@@ -15,7 +15,7 @@ var ui: CanvasLayer
 var root: Control
 
 # HUD
-var sun_lbl: Label
+var sun_lbl: Button
 var fp_lbl: Label
 var coin_lbl: Label
 var brain_lbl: Label
@@ -193,7 +193,7 @@ func _build_hud() -> void:
 	pills.position = Vector2(14, 10)
 	pills.add_theme_constant_override("separation", 8)
 	root.add_child(pills)
-	sun_lbl = _hud_pill(pills, COL_GOLD)
+	sun_lbl = _hud_sun_button(pills)   # Sonne = anklickbar -> Skill-Trees aller Chains
 	fp_lbl = _hud_pill(pills, COL_CYAN)
 	coin_lbl = _hud_pill(pills, Color(0.95, 0.66, 0.22))
 	brain_lbl = _hud_pill(pills, COL_PINK)
@@ -248,6 +248,26 @@ func _hud_pill(parent, col: Color) -> Label:
 	var l := Label.new(); l.text = "0"; l.modulate = col; l.add_theme_font_size_override("font_size", 16)
 	pc.add_child(l); parent.add_child(pc)
 	return l
+
+# Sonne-Anzeige als Button: zeigt die Sonne UND oeffnet die Skill-Trees (Garage + alle Chains)
+func _hud_sun_button(parent) -> Button:
+	var b := Button.new()
+	b.add_theme_stylebox_override("normal", _sb(Color(0.10, 0.11, 0.09), COL_GOLD, 2, 12, 6))
+	b.add_theme_stylebox_override("hover", _sb(Color(0.18, 0.15, 0.07), COL_GOLD, 2, 12, 6))
+	b.add_theme_stylebox_override("pressed", _sb(Color(0.10, 0.09, 0.05), COL_GOLD, 2, 12, 6))
+	b.add_theme_color_override("font_color", COL_GOLD)
+	b.add_theme_color_override("font_hover_color", Color(1, 0.95, 0.6))
+	b.add_theme_font_size_override("font_size", 16)
+	b.text = "0"
+	b.tooltip_text = "Skill-Trees oeffnen (Garage + alle Chains)"
+	b.pressed.connect(_open_skilltrees)
+	parent.add_child(b)
+	return b
+
+func _open_skilltrees() -> void:
+	_tree_sel = "spiel"   # Labor-Tab: Garage + alle Chains freischalten/leveln
+	if not drawer_open: _toggle_drawer()
+	else: _rebuild_drawer()
 
 func _nav(parent, text: String, cb: Callable) -> void:
 	var b := Button.new(); b.text = text; b.pressed.connect(cb)
@@ -333,10 +353,29 @@ func refresh_seeds() -> void:
 			card.pressed.connect(_edit_slot_open.bind(i))
 		else:
 			var s = Game.seed_stats(i)
-			card.text = "%s\nSonne %d · Lv%d" % [Game.CHASSIS[ck].n, int(s.cost), _plant_level(i)]
+			card.text = ""   # kein Name -> stattdessen Bild
 			if Game.place_slot == i and not Game.shovel:
 				card.add_theme_stylebox_override("normal", _sb(Color(0.2, 0.45, 0.28), Color(0.6, 1, 0.7), 3, 8))
-				card.add_theme_color_override("font_color", Color(1, 1, 0.85))
+			# Pflanzen-Bild (Portrait), nach Element eingefaerbt
+			var pcol: Color = Game.CHASSIS[ck].col
+			match Game.seed_element(i):
+				"e": pcol = pcol.lerp(Color(0.35, 0.65, 1.0), 0.5)
+				"f": pcol = pcol.lerp(Color(1.0, 0.30, 0.15), 0.5)
+				"b": pcol = pcol.lerp(Color(0.35, 1.0, 0.55), 0.5)
+				"u": pcol = pcol.lerp(Color(0.62, 0.35, 0.95), 0.45)
+			var port := Portrait.new(); port.kind = ck; port.col = pcol
+			port.position = Vector2(4, 4); port.size = Vector2(46, 46)
+			port.custom_minimum_size = Vector2(46, 46)
+			port.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			card.add_child(port)
+			# kleine Kosten/Level rechts
+			var info := Label.new()
+			info.text = "%d\nLv%d" % [int(s.cost), _plant_level(i)]
+			info.position = Vector2(56, 8)
+			info.add_theme_font_size_override("font_size", 12)
+			info.modulate = Color(1, 0.96, 0.72)
+			info.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			card.add_child(info)
 			card.pressed.connect(_pick_slot.bind(i))
 		seed_box.add_child(card)
 

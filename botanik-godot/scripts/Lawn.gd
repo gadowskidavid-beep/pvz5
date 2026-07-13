@@ -949,6 +949,7 @@ func _draw() -> void:
 		var pby: float = p.y + sin(float(p.t) * 2.2) * 1.5            # sanftes Wippen
 		_shadow(p.x, p.y, pr)
 		_draw_plant(p, col, pr, p.x - rk, pby)
+		_draw_evo(p, p.x - rk, pby, pr)
 		# Element-Aura: der gewaehlte Skill-Ast ist auf dem Rasen sichtbar
 		var es: Dictionary = p.s
 		var ar := pr + 5.0 + sin(float(p.t) * 4.0) * 1.5
@@ -965,13 +966,13 @@ func _draw() -> void:
 		if p.has("age"):
 			var lifeleft: float = clamp(1.0 - float(p.age) / BAL.SHROOM_LIFESPAN, 0.0, 1.0)
 			_hp_bar(p.x, p.y - 34, lifeleft, Color(0.72, 0.5, 0.95))
-	# Erbsen
+	# Erbsen / Projektile — je Element eingefaerbt & geformt
 	for pe in peas:
+		var py2: float = pe.y
 		if pe.get("lob", false):
 			var arc = sin(PI * pe.pt) * Game.CELL * 0.7
-			draw_circle(Vector2(pe.x, Game.LAWN_Y + pe.row * Game.CELL + Game.CELL/2.0 - arc), 8, Color(0.6,0.9,0.4))
-		else:
-			draw_circle(Vector2(pe.x, pe.y), 6, Color(0.62,0.95,0.4))
+			py2 = Game.LAWN_Y + pe.row * Game.CELL + Game.CELL/2.0 - arc
+		_draw_projectile(pe.x, py2, pe.get("effects", []))
 	# Zombies
 	for z in zombies:
 		var zc: Color = z.col
@@ -1069,6 +1070,46 @@ func _draw_shirt(cx: float, cy: float, shirt: String, angry: bool) -> void:
 		draw_line(Vector2(cx - 11, cy - 16), Vector2(cx - 14, cy - 22), Color(1, 0.4, 0.3, 0.85), 2.0)
 		draw_line(Vector2(cx + 11, cy - 16), Vector2(cx + 14, cy - 22), Color(1, 0.4, 0.3, 0.85), 2.0)
 
+# ---- Evolutions-Extras auf der Pflanze (Blitz-Plasma-Glimmen / Untod: 2 kleine Koepfe) ----
+func _draw_evo(p, cx: float, cy: float, pr: float) -> void:
+	var el := str(p.get("element", ""))
+	if el == "b":
+		var pulse: float = 0.5 + 0.5 * sin(_anim_clock * 6.0 + cx * 0.05)
+		draw_circle(Vector2(cx, cy), pr * (1.12 + 0.12 * pulse), Color(0.4, 1.0, 0.55, 0.10 + 0.10 * pulse))
+		for k in range(3):
+			var a := _anim_clock * 5.0 + float(k) * TAU / 3.0
+			draw_circle(Vector2(cx + cos(a) * pr * 1.05, cy + sin(a) * pr * 1.05), 2.0, Color(0.75, 1.0, 0.8, 0.9))
+	elif el == "u" and (str(p.arch) == "shooter" or str(p.arch) == "beam"):
+		# Untod-Evolution: zwei kleine Koepfe wachsen nach
+		var hc: Color = Game.CHASSIS[p.ck].col
+		var hy := cy - pr * 0.72
+		for hx in [cx - pr * 0.5, cx + pr * 0.5]:
+			draw_circle(Vector2(hx, hy), pr * 0.26, hc.darkened(0.2))
+			draw_circle(Vector2(hx - pr * 0.09, hy - pr * 0.02), pr * 0.05, Color(0.9, 0.2, 0.2))
+			draw_circle(Vector2(hx + pr * 0.09, hy - pr * 0.02), pr * 0.05, Color(0.9, 0.2, 0.2))
+
+# ---- Projektil je Element: Feuer=Flammen-Welle, Blitz=Plasma, Eis=blau, Gift=gruen ----
+func _draw_projectile(x: float, y: float, effects) -> void:
+	if effects.has("burn"):
+		draw_circle(Vector2(x, y), 8.0, Color(1.0, 0.5, 0.12, 0.30))
+		var t := _anim_clock * 22.0 + x * 0.2
+		var pts := PackedVector2Array()
+		for i in range(5):
+			pts.append(Vector2(x - 8.0 + float(i) * 4.0, y + sin(t + float(i) * 1.1) * 3.0))
+		draw_polyline(pts, Color(1.0, 0.78, 0.25), 3.0)
+		draw_colored_polygon(PackedVector2Array([Vector2(x - 5, y + 3), Vector2(x + 5, y + 3), Vector2(x + 2, y - 6)]), Color(1.0, 0.45, 0.1))
+	elif effects.has("chain"):
+		draw_circle(Vector2(x, y), 8.0, Color(0.4, 1.0, 0.5, 0.30))
+		draw_circle(Vector2(x, y), 4.0, Color(0.78, 1.0, 0.82))
+		draw_line(Vector2(x - 6, y - 3), Vector2(x + 5, y + 2), Color(0.6, 1.0, 0.6), 1.5)
+	elif effects.has("slow"):
+		draw_circle(Vector2(x, y), 6.0, Color(0.5, 0.8, 1.0))
+		draw_circle(Vector2(x - 2, y - 2), 1.6, Color(1, 1, 1, 0.9))
+	elif effects.has("poison"):
+		draw_circle(Vector2(x, y), 6.0, Color(0.6, 0.9, 0.35))
+	else:
+		draw_circle(Vector2(x, y), 6.0, Color(0.62, 0.95, 0.4))
+
 # ---- Gesicht: zwei Augen + Mund (mood: happy/neutral/angry) ----
 func _face(cx: float, cy: float, s: float, mood: String, eyecol := Color(0.1, 0.1, 0.12)) -> void:
 	var ex := s * 0.42
@@ -1091,6 +1132,12 @@ func _face(cx: float, cy: float, s: float, mood: String, eyecol := Color(0.1, 0.
 func _draw_plant(p, col: Color, pr: float, cx: float, cy: float) -> void:
 	var ck := str(p.ck)
 	var arch := str(p.arch)
+	# Element-Evolution faerbt den Koerper: Eis=blau, Feuer=rot, Blitz=Plasma-gruen, Untod=lila
+	match str(p.get("element", "")):
+		"e": col = col.lerp(Color(0.35, 0.65, 1.0), 0.60)
+		"f": col = col.lerp(Color(1.0, 0.30, 0.15), 0.60)
+		"b": col = col.lerp(Color(0.35, 1.0, 0.55), 0.55)
+		"u": col = col.lerp(Color(0.62, 0.35, 0.95), 0.50)
 	# Eigenes Sprite? -> zeichnen und fertig
 	var tex := _tex("res://assets/sprites/plants/%s.png" % ck)
 	if tex != null:
