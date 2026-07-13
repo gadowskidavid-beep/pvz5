@@ -561,7 +561,7 @@ func _update(dt: float) -> void:
 			else:
 				# keine Nachbar-Lane frei -> normal fressen
 				tgt.hp -= z.dmg * dt
-				if tgt.hp <= 0: _plant_dies(tgt)
+				if tgt.hp <= 0: _plant_dies(tgt, true)   # vom Zombie gefressen
 		elif tgt != null:
 			Music.play_sfx("eating", 0.5)   # gedrosselt -> ruhiges Kau-Geraeusch
 			tgt.hp -= z.dmg * dt
@@ -578,7 +578,7 @@ func _update(dt: float) -> void:
 			# Eisnuss: verlangsamt Angreifer
 			if float(tgt.s.get("chill", 0.0)) > 0.0:
 				z.slow = max(z.slow, 1.5)
-			if tgt.hp <= 0: _plant_dies(tgt)
+			if tgt.hp <= 0: _plant_dies(tgt, true)   # vom Zombie gefressen
 		else:
 			var spd: float = z.speed
 			if str(z.kind) == "sprinter":
@@ -700,8 +700,8 @@ func _chain(z, dmg) -> void:
 
 # ---- Element-Effekte der Sonnenblume ----
 
-func _plant_dies(p) -> void:
-	Music.play_sfx("plant_died")
+func _plant_dies(p, eaten := false) -> void:
+	if eaten: Music.play_sfx("plant_died")   # nur wenn ein Zombie sie gefressen hat
 	# Feuerblume: entzuendet beim Tod Zombies in der Naehe (Zuenderholz = groesser)
 	var fd := float(p.s.get("fire_death", 0.0))
 	if fd > 0.0:
