@@ -15,7 +15,7 @@ var ui: CanvasLayer
 var root: Control
 
 # HUD
-var sun_lbl: Button
+var sun_display: SunDisplay
 var fp_lbl: Label
 var coin_lbl: Label
 var brain_lbl: Label
@@ -23,7 +23,8 @@ var wave_lbl: Label
 var wave_bar: Control
 var msg_lbl: Label
 var wave_btn: Button
-var seed_box: HBoxContainer
+var seed_box: VBoxContainer
+var seed_panel: Panel
 var tool_ham: Button
 var tool_sho: Button
 
@@ -111,7 +112,8 @@ func _process(_delta: float) -> void:
 		_tree_needs_rebuild = false
 		_rebuild_drawer()
 	# HUD lebt jedes Frame (Spiel laeuft weiter, egal ob Drawer offen)
-	sun_lbl.text = "Sonne  %s" % _fmt(int(Game.sun))
+	sun_display.amount = int(Game.sun)
+	sun_display.queue_redraw()
 	fp_lbl.text = "FP  %s" % _fmt(Game.fp)
 	coin_lbl.text = "Muenzen  %s" % _fmt(Game.coins)
 	brain_lbl.text = "Skulls  %s" % _fmt(Game.brains)
@@ -188,18 +190,26 @@ func _build_hud() -> void:
 	topbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	topbar.add_theme_stylebox_override("panel", _sb(Color(0.07, 0.09, 0.13, 0.96), Color(0.28, 0.45, 0.36), 2, 0, 0))
 	root.add_child(topbar)
-	# Waehrungs-Pills oben links
+	# Grosse Sonne oben links: zeigt die Sonnen-Zahl UND oeffnet per Klick die Skill-Trees
+	sun_display = SunDisplay.new()
+	sun_display.position = Vector2(10, 12)
+	sun_display.size = Vector2(68, 68)
+	sun_display.custom_minimum_size = Vector2(68, 68)
+	sun_display.mouse_filter = Control.MOUSE_FILTER_STOP
+	sun_display.tooltip_text = "Skill-Trees oeffnen (Garage + alle Chains)"
+	sun_display.setup(_open_skilltrees)
+	root.add_child(sun_display)
+	# Waehrungs-Pills (FP / Muenzen / Skulls) rechts neben der Sonne
 	var pills := HBoxContainer.new()
-	pills.position = Vector2(14, 10)
+	pills.position = Vector2(88, 10)
 	pills.add_theme_constant_override("separation", 8)
 	root.add_child(pills)
-	sun_lbl = _hud_sun_button(pills)   # Sonne = anklickbar -> Skill-Trees aller Chains
 	fp_lbl = _hud_pill(pills, COL_CYAN)
 	coin_lbl = _hud_pill(pills, Color(0.95, 0.66, 0.22))
 	brain_lbl = _hud_pill(pills, COL_PINK)
 	# kleine Navigation
 	var nav := HBoxContainer.new()
-	nav.position = Vector2(14, 46)
+	nav.position = Vector2(88, 48)
 	nav.add_theme_constant_override("separation", 5)
 	root.add_child(nav)
 	_nav(nav, "Menue", _open_menu)
@@ -248,21 +258,6 @@ func _hud_pill(parent, col: Color) -> Label:
 	var l := Label.new(); l.text = "0"; l.modulate = col; l.add_theme_font_size_override("font_size", 16)
 	pc.add_child(l); parent.add_child(pc)
 	return l
-
-# Sonne-Anzeige als Button: zeigt die Sonne UND oeffnet die Skill-Trees (Garage + alle Chains)
-func _hud_sun_button(parent) -> Button:
-	var b := Button.new()
-	b.add_theme_stylebox_override("normal", _sb(Color(0.10, 0.11, 0.09), COL_GOLD, 2, 12, 6))
-	b.add_theme_stylebox_override("hover", _sb(Color(0.18, 0.15, 0.07), COL_GOLD, 2, 12, 6))
-	b.add_theme_stylebox_override("pressed", _sb(Color(0.10, 0.09, 0.05), COL_GOLD, 2, 12, 6))
-	b.add_theme_color_override("font_color", COL_GOLD)
-	b.add_theme_color_override("font_hover_color", Color(1, 0.95, 0.6))
-	b.add_theme_font_size_override("font_size", 16)
-	b.text = "0"
-	b.tooltip_text = "Skill-Trees oeffnen (Garage + alle Chains)"
-	b.pressed.connect(_open_skilltrees)
-	parent.add_child(b)
-	return b
 
 func _open_skilltrees() -> void:
 	_tree_sel = "spiel"   # Labor-Tab: Garage + alle Chains freischalten/leveln
@@ -315,9 +310,23 @@ func _build_bottom() -> void:
 	botbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	botbar.add_theme_stylebox_override("panel", _sb(Color(0.07, 0.09, 0.13, 0.96), Color(0.28, 0.45, 0.36), 2, 0, 0))
 	root.add_child(botbar)
-	# Pflanzen-Karten links
-	seed_box = HBoxContainer.new()
-	seed_box.position = Vector2(12, SCREEN_H - 60)
+	# Pflanzen-Karten in einer sauberen Spalte links am Bildschirmrand
+	seed_panel = Panel.new()
+	seed_panel.position = Vector2(8, 92)
+	seed_panel.size = Vector2(140, 8)
+	seed_panel.custom_minimum_size = Vector2(140, 8)
+	seed_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	seed_panel.add_theme_stylebox_override("panel", _sb(Color(0.06, 0.09, 0.12, 0.92), Color(0.30, 0.48, 0.38), 2, 12, 0))
+	root.add_child(seed_panel)
+	var seed_hdr := Label.new()
+	seed_hdr.text = "SAMEN"
+	seed_hdr.position = Vector2(20, 98)
+	seed_hdr.add_theme_font_size_override("font_size", 13)
+	seed_hdr.add_theme_color_override("font_color", Color(0.75, 0.95, 0.78))
+	seed_hdr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(seed_hdr)
+	seed_box = VBoxContainer.new()
+	seed_box.position = Vector2(16, 120)
 	seed_box.add_theme_constant_override("separation", 6)
 	root.add_child(seed_box)
 	# Werkzeuge rechts
@@ -342,9 +351,10 @@ func refresh_seeds() -> void:
 	for c in seed_box.get_children():
 		c.queue_free()
 	# Ein Kaertchen je Samen-Slot
-	for i in range(Game.slot_count()):
+	var _slots := Game.slot_count()
+	for i in range(_slots):
 		var card := Button.new()
-		card.custom_minimum_size = Vector2(112, 52)
+		card.custom_minimum_size = Vector2(124, 58)
 		card.add_theme_font_size_override("font_size", 12)
 		var ck: String = Game.seed_chain(i)
 		if ck == "":
@@ -378,6 +388,11 @@ func refresh_seeds() -> void:
 			card.add_child(info)
 			card.pressed.connect(_pick_slot.bind(i))
 		seed_box.add_child(card)
+	# Hintergrund-Panel an die Spaltenhoehe anpassen
+	if seed_panel:
+		var h := 34.0 + float(_slots) * 64.0
+		seed_panel.size = Vector2(140, h)
+		seed_panel.custom_minimum_size = Vector2(140, h)
 
 func _plant_level(slot: int) -> int:
 	var n := 0
@@ -2087,3 +2102,48 @@ class ZombiePortrait extends Control:
 				for i in range(3):
 					var ly := c.y - s * 0.2 + float(i) * s * 0.24
 					draw_line(Vector2(c.x + s * 0.5, ly), Vector2(c.x + s * 0.95, ly), Color(0.92, 0.42, 0.36, 0.7), 2.0)
+
+
+# ================================================================
+# SONNE OBEN LINKS — echte gezeichnete Sonne mit Zahl drin,
+# klickbar -> oeffnet die Skill-Trees (Garage + alle Chains)
+# ================================================================
+class SunDisplay extends Control:
+	var amount := 0
+	var _cb: Callable
+	var _t := 0.0
+	func setup(cb: Callable) -> void:
+		_cb = cb
+	func _process(delta: float) -> void:
+		_t += delta
+		queue_redraw()
+	func _gui_input(e: InputEvent) -> void:
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			if _cb.is_valid():
+				_cb.call()
+	func _draw() -> void:
+		var c := size * 0.5
+		var r: float = min(size.x, size.y) * 0.34
+		var pulse := 1.0 + 0.06 * sin(_t * 2.2)
+		# weicher Glow
+		draw_circle(c, r * 1.7 * pulse, Color(1.0, 0.85, 0.25, 0.14))
+		draw_circle(c, r * 1.35 * pulse, Color(1.0, 0.82, 0.22, 0.18))
+		# Strahlen
+		for i in range(12):
+			var a := deg_to_rad(i * 30.0 + _t * 18.0)
+			var d := Vector2(cos(a), sin(a))
+			draw_line(c + d * r * 1.02, c + d * r * 1.42 * pulse, Color(1.0, 0.86, 0.28), 2.4)
+		# Sonnen-Koerper
+		draw_circle(c, r * 1.04, Color(1.0, 0.72, 0.12))
+		draw_circle(c, r * 0.94, Color(1.0, 0.84, 0.24))
+		draw_circle(c - Vector2(r * 0.28, r * 0.28), r * 0.34, Color(1.0, 0.95, 0.55, 0.8))
+		# Zahl mittig
+		var f := ThemeDB.fallback_font
+		var txt := str(amount)
+		var fs := 20
+		if txt.length() >= 4: fs = 15
+		elif txt.length() == 3: fs = 17
+		var tw := f.get_string_size(txt, HORIZONTAL_ALIGNMENT_CENTER, -1, fs)
+		var pos := c - tw * 0.5 + Vector2(0, tw.y * 0.32)
+		draw_string_outline(f, pos, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0.35, 0.2, 0.02))
+		draw_string(f, pos, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(1, 1, 1))

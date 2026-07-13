@@ -1072,21 +1072,27 @@ func _draw_shirt(cx: float, cy: float, shirt: String, angry: bool) -> void:
 
 # ---- Evolutions-Extras auf der Pflanze (Blitz-Plasma-Glimmen / Untod: 2 kleine Koepfe) ----
 func _draw_evo(p, cx: float, cy: float, pr: float) -> void:
-	var el := str(p.get("element", ""))
-	if el == "b":
+	var s = p.s
+	# Blitz-Plasma-Glimmen: nur wenn die Blitz-Faehigkeit wirklich da ist
+	if s.get("effects", []).has("chain") or float(s.get("zap", 0.0)) > 0.0 or float(s.get("aimbot", 0.0)) > 0.0 or float(s.get("lightning_rod", 0.0)) > 0.0:
 		var pulse: float = 0.5 + 0.5 * sin(_anim_clock * 6.0 + cx * 0.05)
 		draw_circle(Vector2(cx, cy), pr * (1.12 + 0.12 * pulse), Color(0.4, 1.0, 0.55, 0.10 + 0.10 * pulse))
 		for k in range(3):
 			var a := _anim_clock * 5.0 + float(k) * TAU / 3.0
 			draw_circle(Vector2(cx + cos(a) * pr * 1.05, cy + sin(a) * pr * 1.05), 2.0, Color(0.75, 1.0, 0.8, 0.9))
-	elif el == "u" and (str(p.arch) == "shooter" or str(p.arch) == "beam"):
-		# Untod-Evolution: zwei kleine Koepfe wachsen nach
+	# Extra-Koepfe: nur wenn der Schuetze wirklich mehrere Reihen beschiesst (extra_lanes)
+	var ex := int(s.get("extra_lanes", 0))
+	if ex >= 1 and (str(p.arch) == "shooter" or str(p.arch) == "beam"):
 		var hc: Color = Game.CHASSIS[p.ck].col
-		var hy := cy - pr * 0.72
-		for hx in [cx - pr * 0.5, cx + pr * 0.5]:
-			draw_circle(Vector2(hx, hy), pr * 0.26, hc.darkened(0.2))
-			draw_circle(Vector2(hx - pr * 0.09, hy - pr * 0.02), pr * 0.05, Color(0.9, 0.2, 0.2))
-			draw_circle(Vector2(hx + pr * 0.09, hy - pr * 0.02), pr * 0.05, Color(0.9, 0.2, 0.2))
+		var hy := cy - pr * 0.66
+		var n := clampi(ex, 1, 2)
+		for k in range(n):
+			var off := pr * (0.42 + 0.34 * float(k))
+			for hx in [cx - off, cx + off]:
+				draw_circle(Vector2(hx, hy), pr * 0.24, hc.darkened(0.15))
+				draw_circle(Vector2(hx, hy), pr * 0.24, hc.darkened(0.45), false, 1.5)
+				draw_circle(Vector2(hx - pr * 0.08, hy - pr * 0.02), pr * 0.045, Color(0.9, 0.2, 0.2))
+				draw_circle(Vector2(hx + pr * 0.08, hy - pr * 0.02), pr * 0.045, Color(0.9, 0.2, 0.2))
 
 # ---- Projektil je Element: Feuer=Flammen-Welle, Blitz=Plasma, Eis=blau, Gift=gruen ----
 func _draw_projectile(x: float, y: float, effects) -> void:
@@ -1132,12 +1138,17 @@ func _face(cx: float, cy: float, s: float, mood: String, eyecol := Color(0.1, 0.
 func _draw_plant(p, col: Color, pr: float, cx: float, cy: float) -> void:
 	var ck := str(p.ck)
 	var arch := str(p.arch)
-	# Element-Evolution faerbt den Koerper: Eis=blau, Feuer=rot, Blitz=Plasma-gruen, Untod=lila
-	match str(p.get("element", "")):
-		"e": col = col.lerp(Color(0.35, 0.65, 1.0), 0.60)
-		"f": col = col.lerp(Color(1.0, 0.30, 0.15), 0.60)
-		"b": col = col.lerp(Color(0.35, 1.0, 0.55), 0.55)
-		"u": col = col.lerp(Color(0.62, 0.35, 0.95), 0.50)
+	# Skin faerbt sich erst, wenn die Element-FAEHIGKEIT wirklich freigeschaltet ist
+	# (nicht schon beim ersten Schaden-Knoten in der Richtung)
+	var _es = p.s
+	if _es.get("effects", []).has("burn") or float(_es.get("contact_dmg", 0.0)) > 0.0 or float(_es.get("fire_death", 0.0)) > 0.0:
+		col = col.lerp(Color(1.0, 0.30, 0.15), 0.60)     # Feuer
+	elif _es.get("effects", []).has("slow") or float(_es.get("chill", 0.0)) > 0.0:
+		col = col.lerp(Color(0.35, 0.65, 1.0), 0.60)     # Eis
+	elif _es.get("effects", []).has("chain") or float(_es.get("zap", 0.0)) > 0.0 or float(_es.get("aimbot", 0.0)) > 0.0 or float(_es.get("lightning_rod", 0.0)) > 0.0:
+		col = col.lerp(Color(0.35, 1.0, 0.55), 0.55)     # Blitz
+	elif _es.get("effects", []).has("poison") or float(_es.get("necro", 0.0)) > 0.0 or float(_es.get("lane_switch", 0.0)) > 0.0:
+		col = col.lerp(Color(0.62, 0.35, 0.95), 0.50)    # Untod
 	# Eigenes Sprite? -> zeichnen und fertig
 	var tex := _tex("res://assets/sprites/plants/%s.png" % ck)
 	if tex != null:
