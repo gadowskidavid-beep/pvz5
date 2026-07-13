@@ -148,8 +148,6 @@ func pres_max(k: String) -> bool: return pres_lvl(k) >= int(PRESTIGE[k].max)
 func pres_cost(k: String) -> int:
 	var p = PRESTIGE[k]
 	return int(ceil(p.base * pow(p.g, pres_lvl(k))))
-func field_lanes() -> int:
-	return (1 if has("f_lane2") else 0) + (1 if has("f_lane3") else 0)
 const LANE_MAX := 5
 func lanes_count() -> int:
 	return clampi(1 + lanes_bought, 1, LANE_MAX)   # Start = 1 Reihe, bis 5 mit FP freischaltbar
@@ -194,8 +192,7 @@ func fp_mul() -> float: return res_mul("r_fp")
 func loot_chance() -> float: return min(0.9, 0.08 * res_lvl("r_loot"))   # Chance auf doppelte FP-Beute
 func has_click_coin() -> bool: return has("e_clickcoin")
 func mower_fix() -> bool: return has("f_mowerfix")
-func risk_level() -> int: return 0
-func reward_mul() -> float: return 1.0   # Zombie-Risiko-Regler gestrichen
+func reward_mul() -> float: return 1.0   # Zombie-Risiko-Regler gestrichen (Multiplikator bleibt neutral)
 func idle_cap() -> int: return 1 + lure          # max. Zombies zwischen den Wellen
 func lure_max() -> bool: return lure >= 5
 func lure_cost() -> int: return int(ceil(18 * pow(1.7, lure)))

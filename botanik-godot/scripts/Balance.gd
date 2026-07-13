@@ -9,7 +9,6 @@ const ACT_SIZE := 25          # Wellen pro Rasen
 const FINAL_WAVE := 100
 const BOSS_WAVES := [25, 50, 75, 100]
 const MINIBOSS_WAVE := 9      # kleiner Extra-Boss zum Kennenlernen
-const MAX_CHAINS := 3         # (nicht mehr genutzt)
 
 # ---- Wellen-Menge (Anzahl Zombies) ----
 const WAVE_BASE := 4

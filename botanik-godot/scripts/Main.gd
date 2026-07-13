@@ -679,9 +679,6 @@ func _rebuild_info() -> void:
 func _build_tree_canvas(parent) -> void:
 	var nodes := _n_nodes()
 	if nodes.is_empty(): return
-	var branches := []
-	if _tree_mode == "slot":
-		branches = BAL.PLANT_TREES.get(Game.seed_chain(_tree_ref), {}).get("branches", [])
 	var minc := 0.0
 	var maxc := 0.0
 	var maxr := 0.0
@@ -719,11 +716,6 @@ func _build_tree_canvas(parent) -> void:
 	_tree_seen_nodes = {}
 	_tree_snap_ready = false
 	parent.add_child(canvas)
-	for br in branches:
-		var lb := Label.new(); lb.text = str(br[1]).to_upper(); lb.modulate = Color(0.68, 0.78, 0.71, 0.85)
-		lb.add_theme_font_size_override("font_size", int(max(9, 12 * z)))
-		lb.position = Vector2(ox + float(br[0]) * sx - 34 * z, oy + 46 * z)
-		canvas.add_child(lb)
 	for id in nodes:
 		var nd = nodes[id]
 		if not _node_visible(nodes, id): continue   # im Nebel -> noch nicht klickbar
@@ -1261,11 +1253,6 @@ func _wood_sb(bg: Color, border: Color) -> StyleBoxFlat:
 	s.set_corner_radius_all(9)
 	s.set_content_margin_all(10)
 	return s
-
-func _menu_btn(parent, text: String, cb: Callable) -> void:
-	var b := Button.new(); b.text = text; b.custom_minimum_size = Vector2(340, 48)
-	b.add_theme_font_size_override("font_size", 19); b.pressed.connect(cb)
-	parent.add_child(b)
 
 func _grid(parent, cols: int) -> GridContainer:
 	var g := GridContainer.new(); g.columns = cols
