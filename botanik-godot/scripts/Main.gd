@@ -23,6 +23,7 @@ var wave_lbl: Label
 var wave_bar: Control
 var msg_lbl: Label
 var wave_btn: Button
+var speed_btn: Button
 var seed_box: HBoxContainer
 var tool_ham: Button
 var tool_sho: Button
@@ -90,10 +91,11 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	# HUD lebt jedes Frame (Spiel laeuft weiter, egal ob Drawer offen)
-	sun_lbl.text = "Sonne  %d" % int(Game.sun)
-	fp_lbl.text = "FP  %d" % Game.fp
-	coin_lbl.text = "Muenzen  %d" % Game.coins
-	brain_lbl.text = "Skulls  %d" % Game.brains
+	sun_lbl.text = "Sonne  %s" % _fmt(int(Game.sun))
+	fp_lbl.text = "FP  %s" % _fmt(Game.fp)
+	coin_lbl.text = "Muenzen  %s" % _fmt(Game.coins)
+	brain_lbl.text = "Skulls  %s" % _fmt(Game.brains)
+	if speed_btn != null: speed_btn.text = "Tempo %dx" % int(round(Engine.time_scale))
 	wave_lbl.text = "Welle %d / 100%s" % [Game.wave, lawn.weather_hud()]
 	wave_bar.queue_redraw()
 	if d_fp != null: d_fp.text = "%d FP" % Game.fp
@@ -214,6 +216,20 @@ func _build_hud() -> void:
 	wave_btn.add_theme_color_override("font_color", Color(0.15, 0.09, 0.02))
 	wave_btn.pressed.connect(_on_wave)
 	root.add_child(wave_btn)
+	# Spieltempo-Umschalter (1x/2x/3x) - QoL fuer den Idle-Loop
+	speed_btn = Button.new()
+	speed_btn.custom_minimum_size = Vector2(84, 38)
+	speed_btn.position = Vector2(SCREEN_W - 336, 58)
+	speed_btn.add_theme_font_size_override("font_size", 15)
+	speed_btn.tooltip_text = "Spieltempo umschalten (1x / 2x / 3x)"
+	speed_btn.pressed.connect(_cycle_speed)
+	root.add_child(speed_btn)
+
+func _cycle_speed() -> void:
+	var s := int(round(Engine.time_scale))
+	if s < 1: s = 1
+	s = s % 3 + 1   # 1 -> 2 -> 3 -> 1
+	Engine.time_scale = float(s)
 
 func _hud_pill(parent, col: Color) -> Label:
 	var pc := PanelContainer.new()
@@ -253,6 +269,13 @@ func _next_boss() -> int:
 	for m in [25, 50, 75, 100]:
 		if Game.wave < m: return m
 	return 100
+
+# Kompakte Zahlen: ab 10k -> "12.3k", ab 1M -> "1.2M"
+func _fmt(n: int) -> String:
+	var a: int = abs(n)
+	if a >= 1000000: return "%.1fM" % (float(n) / 1000000.0)
+	if a >= 10000: return "%.1fk" % (float(n) / 1000.0)
+	return str(n)
 
 # Nav-Handler
 func _open_alm() -> void: open_overlay("almanac")
