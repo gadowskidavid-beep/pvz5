@@ -23,6 +23,7 @@ var wave_lbl: Label
 var wave_bar: Control
 var msg_lbl: Label
 var wave_btn: Button
+var speed_btn: Button
 var seed_box: VBoxContainer
 var seed_panel: Panel
 var chain_bar: HBoxContainer      # Chain-Schnellwahl rund um die Sonne
@@ -228,6 +229,14 @@ func _build_hud() -> void:
 	_nav(nav, "Almanach", _open_alm)
 	_nav(nav, "Buch", _open_zom)
 	_nav(nav, "Dev", _open_dev)
+	# Spiel-Tempo (Fast-Forward fuer Idle): 1x / 2x / 3x
+	speed_btn = Button.new()
+	speed_btn.text = "%dx" % Game.game_speed
+	speed_btn.custom_minimum_size = Vector2(46, 0)
+	speed_btn.tooltip_text = "Spiel-Tempo umschalten (1x / 2x / 3x)"
+	speed_btn.add_theme_color_override("font_color", Color(1, 0.9, 0.4))
+	speed_btn.pressed.connect(_cycle_speed)
+	nav.add_child(speed_btn)
 	# Meldung mittig
 	msg_lbl = Label.new()
 	msg_lbl.position = Vector2(SCREEN_W / 2.0 - 200, 44)
@@ -425,6 +434,9 @@ func _open_zom() -> void: open_overlay("zombiebook")
 func _open_shop() -> void: open_overlay("shop")
 func _open_menu() -> void: open_overlay("menu")
 func _open_dev() -> void: open_overlay("dev")
+func _cycle_speed() -> void:
+	Game.game_speed = Game.game_speed % 3 + 1
+	if speed_btn != null: speed_btn.text = "%dx" % Game.game_speed
 
 # ================= UNTERE LEISTE =================
 func _build_bottom() -> void:

@@ -34,6 +34,13 @@ var beat_interval := 0.469  # Sekunden pro Beat (aus BPM, in _ready gesetzt)
 var beat_t := 0.0           # Zeit seit letztem Beat
 var beat_pulse := 0.0       # 1.0 auf dem Beat, klingt schnell ab (fuer Bounce)
 var _boss_seen := false     # Boss-Auftritt: einmaliger Screen-Flash
+# Kill-Combo: schnelle Kills hintereinander erhoehen die Belohnung
+var combo := 0
+var combo_t := 0.0
+const COMBO_WINDOW := 2.6   # Sekunden bis der Combo verfaellt
+# Screen-Shake (nur die Spielwelt, nicht das HUD)
+var _shake := 0.0
+var _shake_mag := 0.0
 
 func _ready() -> void:
 	rng.randomize()
@@ -127,6 +134,13 @@ func _start_dying(z) -> void:
 	if not z.get("dropped", false): _kill(z)
 	z["dying"] = true
 	z["die_t"] = 0.0
+	# Truemmer-Partikel beim Sterben (fliegen auseinander, fallen)
+	var gcol: Color = z.get("col", Color(0.6, 0.7, 0.5))
+	var gn := 8 if z.get("boss", false) else 5
+	for _gi in range(gn):
+		var ang := rng.randf() * TAU
+		var spd := 60.0 + rng.randf() * 130.0
+		fx.append({"t": "gib", "x": float(z.x), "y": float(z.y) - 18.0, "vx": cos(ang) * spd, "vy": sin(ang) * spd - 90.0, "life": 0.5 + rng.randf() * 0.35, "col": gcol, "sz": 2.5 + rng.randf() * 2.8})
 	# Liebespaar: stirbt einer, wird der Partner sauer und rennt los
 	var partner = z.get("partner", null)
 	if partner != null and not partner.get("dying", false) and float(partner.get("hp", 0.0)) > 0.0:
@@ -365,12 +379,31 @@ func item(name: String) -> void:
 
 func _process(delta: float) -> void:
 	if not Game.paused and Game.phase != "won" and Game.phase != "dead":
-		_update(delta)
+		# Fast-Forward: die Simulation mehrfach pro Frame laufen lassen (stabile Schritte)
+		var steps: int = clampi(int(Game.game_speed), 1, 3)
+		for _i in range(steps):
+			_update(delta)
 	if msg_t > 0: msg_t -= delta
+	# Screen-Shake abklingen lassen und auf die Spielwelt anwenden (HUD bleibt ruhig)
+	if _shake > 0.0:
+		_shake = max(0.0, _shake - delta / 0.35)
+		var amp := _shake_mag * _shake
+		position = Vector2(randf_range(-amp, amp), randf_range(-amp, amp))
+	elif position != Vector2.ZERO:
+		position = Vector2.ZERO
 	queue_redraw()
+
+# Screen-Shake ausloesen (Groesse = Pixel-Ausschlag)
+func _add_shake(mag: float) -> void:
+	_shake_mag = max(_shake_mag, mag)
+	_shake = 1.0
 
 func _update(dt: float) -> void:
 	_anim_clock += dt
+	# Kill-Combo verfaellt, wenn zu lange kein Zombie stirbt
+	if combo > 0:
+		combo_t -= dt
+		if combo_t <= 0.0: combo = 0
 	# Rhythmus-Takt: beat_now ist genau in dem Frame true, in dem ein Beat faellt
 	beat_t += dt
 	var beat_now := false
@@ -386,6 +419,7 @@ func _update(dt: float) -> void:
 			boss_now = true; break
 	if boss_now and not _boss_seen:
 		fx.append({"t": "flash", "col": Color(1.0, 0.2, 0.15), "life": 0.6})
+		_add_shake(12.0)
 		_boss_seen = true
 	elif not boss_now:
 		_boss_seen = false
@@ -633,6 +667,11 @@ func _update(dt: float) -> void:
 	# Effekte
 	for i in range(fx.size() - 1, -1, -1):
 		fx[i].life -= dt
+		# Truemmer-Partikel (Zombie-Tod): fliegen mit Schwerkraft auseinander
+		if fx[i].t == "gib":
+			fx[i].x += float(fx[i].vx) * dt
+			fx[i].y += float(fx[i].vy) * dt
+			fx[i].vy = float(fx[i].vy) + 520.0 * dt
 		if fx[i].life <= 0: fx.remove_at(i)
 	# Schwebende Zahlen steigen auf und verblassen
 	for i in range(popups.size() - 1, -1, -1):
@@ -817,11 +856,18 @@ func _mow(row: int) -> bool:
 func _kill(z) -> void:
 	if z.dropped: return
 	z.dropped = true
-	var rew := Game.reward_mul()
+	# Kill-Combo hochzaehlen — schnelle Kills hintereinander geben mehr Belohnung
+	combo += 1
+	combo_t = COMBO_WINDOW
+	var cmult := 1.0 + 0.04 * float(min(combo, 25))   # bis zu +100% bei Combo 25
+	if combo >= 3:
+		_popup(z.x, z.y - 30, "Combo x%d" % combo, Color(1.0, 0.62, 0.2))
+	var rew := Game.reward_mul() * cmult
 	if z.boss:
 		var b := int(max(1, round((z.brain + int(Game.wave / 5.0)) * Game.brain_mul() * rew)))
 		Game.brains += b; Game.save_game()
 		fx.append({"t": "boom", "x": z.x, "y": z.y, "life": 0.4})
+		_add_shake(9.0)
 		msg = "Boss besiegt! +%d Skulls" % b; msg_t = 2.5
 	elif z.get("carrier", false) and int(z.get("brain", 0)) > 0:
 		var bc := int(max(1, round(z.brain * Game.brain_mul() * rew)))
@@ -1043,6 +1089,10 @@ func _draw() -> void:
 		elif e.t == "fume": draw_rect(Rect2(e.x, e.y - Game.CELL*0.4, e.w, Game.CELL*0.8), Color(0.6,0.6,0.6, e.life/0.2*0.5))
 		elif e.t == "splat": draw_circle(Vector2(e.x, e.y), 11, Color(0.7,0.95,0.5, e.life/0.2))
 		elif e.t == "bolt": draw_line(Vector2(e.x, e.y), Vector2(e.x2, e.y2), Color(1,0.95,0.4, e.life/0.2), 3)
+		elif e.t == "gib":
+			var ga: float = clamp(float(e.life) / 0.6, 0.0, 1.0)
+			var gc: Color = e.get("col", Color(0.6, 0.7, 0.5)); gc.a = ga
+			draw_circle(Vector2(e.x, e.y), float(e.get("sz", 3.0)), gc)
 		elif e.t == "flash":
 			var fc: Color = e.get("col", Color(1, 1, 1))
 			fc.a = clamp(float(e.life), 0.0, 1.0) * 0.55
@@ -1055,6 +1105,14 @@ func _draw() -> void:
 			var pos := Vector2(float(pu.x) - 12.0, float(pu.y))
 			draw_string_outline(_font, pos, str(pu.text), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, 4, Color(0, 0, 0, a * 0.8))
 			draw_string(_font, pos, str(pu.text), HORIZONTAL_ALIGNMENT_LEFT, -1, 18, pc)
+	# Kill-Combo-Anzeige (mittig ueber dem Feld, pulsiert leicht)
+	if combo >= 3 and _font != null:
+		var ctxt := "COMBO x%d" % combo
+		var cc := Color(1.0, 0.72, 0.28).lerp(Color(1.0, 0.4, 0.2), clamp(float(combo) / 25.0, 0.0, 1.0))
+		var fsz := int(20 + 6.0 * clamp(combo_t / COMBO_WINDOW, 0.0, 1.0))
+		var cpos := Vector2(Game.LAWN_X + Game.COLS * Game.CELL * 0.5 - float(ctxt.length()) * 6.0, 106.0)
+		draw_string_outline(_font, cpos, ctxt, HORIZONTAL_ALIGNMENT_LEFT, -1, fsz, 5, Color(0, 0, 0, 0.7))
+		draw_string(_font, cpos, ctxt, HORIZONTAL_ALIGNMENT_LEFT, -1, fsz, cc)
 	# Gefahr-Rand am Haus, wenn Zombies nah sind
 	_draw_house_danger()
 	# Atmosphaere-Overlay (Gluehwuermchen/Sonnenstrahlen + Vignette) — nur ohne BG-Bild
