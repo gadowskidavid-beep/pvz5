@@ -343,10 +343,16 @@ func _make_zombie(kind: String) -> Dictionary:
 		"enraged": false, "shirt": "", "partner": null
 	}
 
+func _spawn_poof(x: float, y: float) -> void:
+	for _k in range(5):
+		var a := rng.randf() * TAU
+		fx.append({"t": "gib", "x": x, "y": y - 10.0, "vx": cos(a) * 45.0, "vy": sin(a) * 30.0 - 20.0, "life": 0.4, "col": Color(0.55, 0.35, 0.7), "sz": 2.4 + rng.randf() * 1.5})
+
 func _spawn(kind: String) -> void:
 	Game.seen[kind] = true
 	var z1 = _make_zombie(kind)
 	zombies.append(z1)
+	_spawn_poof(float(z1.x), float(z1.y))
 	# Renn-Zombie kommt als LIEBESPAAR: zwei Partner (Shirt "him"/"her"),
 	# stirbt einer, wird der andere sauer und rennt los.
 	if kind == "sprinter":
@@ -956,7 +962,12 @@ func lawn_click(pos: Vector2) -> void:
 	for i in range(suns.size() - 1, -1, -1):
 		if pos.distance_to(Vector2(suns[i].x, suns[i].y)) < 30:
 			var sv: int = int(suns[i].value)
-			_popup(suns[i].x, suns[i].y, "+%d" % sv, Color(1, 0.9, 0.35))
+			var sxp := float(suns[i].x)
+			var syp := float(suns[i].y)
+			_popup(sxp, syp, "+%d" % sv, Color(1, 0.9, 0.35))
+			for _k in range(6):
+				var a := rng.randf() * TAU
+				fx.append({"t": "gib", "x": sxp, "y": syp, "vx": cos(a) * 70.0, "vy": sin(a) * 70.0 - 30.0, "life": 0.45, "col": Color(1.0, 0.92, 0.45), "sz": 2.4 + rng.randf() * 1.4})
 			Music.play_sfx("collect_sun")
 			Game.sun += sv; suns.remove_at(i); return
 	var col := int((pos.x - Game.LAWN_X) / Game.CELL)
