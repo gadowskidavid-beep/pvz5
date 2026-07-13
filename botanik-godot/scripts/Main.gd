@@ -145,7 +145,7 @@ func _process(_delta: float) -> void:
 	else:
 		_death_open = false
 	# Musik: Menue vs. Tag/Nacht - nur bei echtem Wechsel neu starten (+ Beat neu ausrichten)
-	var mkey := "menu" if overlays["menu"].panel.visible else ("night" if bool(BAL.act_of(Game.wave).night) else "day")
+	var mkey := "menu" if overlays["menu"].panel.visible else ("night" if BAL.is_night_wave(Game.wave) else "day")
 	if mkey != _music_key:
 		_music_key = mkey
 		if Music.play_key(mkey) and mkey != "menu":

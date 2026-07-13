@@ -309,12 +309,13 @@ func _update(dt: float) -> void:
 		beat_pulse = 1.0
 	if beat_pulse > 0.0: beat_pulse = max(0.0, beat_pulse - dt / 0.16)
 	var wo := world_of(Game.wave)
-	# Himmels-Sonne
+	var night := BAL.is_night_wave(Game.wave)
+	# Himmels-Sonne (nachts seltener & weniger)
 	sky_timer -= dt
 	if sky_timer <= 0:
-		sky_timer = (8.0 + rng.randf() * 4.0) * (1.7 if wo.night else 1.0)
+		sky_timer = (8.0 + rng.randf() * 4.0) * (1.7 if night else 1.0)
 		var x := Game.LAWN_X + 40 + rng.randf() * (Game.COLS * Game.CELL - 80)
-		var val := int(round(25 * (0.5 if wo.night else 1.0)))
+		var val := int(round(25 * (0.5 if night else 1.0)))
 		suns.append({"x": x, "y": float(Game.LAWN_Y - 10), "ty": Game.LAWN_Y + 50 + rng.randf() * (rows * Game.CELL - 120), "vy": 70.0, "value": val, "falling": true, "life": 12.0})
 	# Wetter: Gewitter schlaegt Blitze auf Zombies (Blitz-Synergie)
 	if weather == "gewitter" and not zombies.is_empty():
@@ -808,9 +809,10 @@ func _place(col: int, row: int) -> void:
 # ---- Zeichnen ----
 func _draw() -> void:
 	var wo := world_of(Game.wave)
+	var night := BAL.is_night_wave(Game.wave)
 	var lawn_rect := Rect2(Game.LAWN_X, Game.LAWN_Y, Game.COLS * Game.CELL, rows * Game.CELL)
-	# --- Hintergrund-Kulisse (Tag/Nacht, Full-Screen-Backdrop) ---
-	var bg := _scene_bg(bool(wo.night))
+	# --- Hintergrund-Kulisse (Tag/Nacht folgt dem Zyklus, Full-Screen-Backdrop) ---
+	var bg := _scene_bg(night)
 	if bg != null:
 		var vp := get_viewport_rect().size
 		draw_texture_rect(bg, Rect2(0, 0, vp.x, vp.y), false)
@@ -834,7 +836,7 @@ func _draw() -> void:
 	for r in range(rows + 1):
 		draw_line(Vector2(lx, ly + r * Game.CELL), Vector2(lx + lw, ly + r * Game.CELL), Color(0, 0, 0, 0.13), 1.0)
 	draw_rect(Rect2(lx - 7, ly + lh, lw + 14, 10), Color(0, 0, 0, 0.30))  # Schatten an der Vorderkante
-	if bg == null and wo.night: draw_rect(lawn_rect, Color(0.08,0.12,0.25,0.30))
+	if bg == null and night: draw_rect(lawn_rect, Color(0.08,0.12,0.25,0.30))
 	if wo.get("roof", false): draw_rect(lawn_rect, Color(0.5,0.35,0.18,0.14))
 	# Wetter-Overlay
 	if weather == "nebel": draw_rect(lawn_rect, Color(0.82, 0.84, 0.88, 0.24))

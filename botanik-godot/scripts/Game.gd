@@ -305,7 +305,7 @@ func buy_seed_slot() -> bool:
 # Umgebungs-Multiplikator: Nacht-Pflanzen stark bei Nacht, Tag-Pflanzen schwaecher nachts
 func env_mul(ck: String) -> float:
 	var env: String = str(CHASSIS[ck].get("env", "any"))
-	var night: bool = bool(BAL.act_of(wave).get("night", false))
+	var night: bool = BAL.is_night_wave(wave)
 	if env == "night": return 1.35 if night else 0.70
 	if env == "day": return 0.85 if night else 1.0
 	return 1.0
