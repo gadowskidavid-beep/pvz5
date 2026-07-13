@@ -34,6 +34,7 @@ var shake_t := 0.0
 var shake_dur := 0.0
 var shake_mag := 0.0
 var sky_flash := 0.0        # kurzer Himmel-Aufhellblitz bei Gewitter
+var _hover := Vector2(-1000, -1000)   # Mausposition fuer die Platzierungs-Vorschau
 
 func _ready() -> void:
 	rng.randomize()
@@ -135,7 +136,7 @@ func reset_run() -> void:
 		mowers.append({"row": r, "x": float(Game.LAWN_X - 30), "active": false, "used": false})
 	sky_timer = 5.0; to_spawn = 0; idle_timer = 6.0; hazard_timer = 9.0
 	weather = "klar"; strike_t = 0.0
-	msg = "Pflanze eine Sonnenblume, um die erste Welle zu starten!"; msg_t = 6.0
+	msg = "Sammle Sonne (anklicken) & setze unten Pflanzen - die erste Pflanze startet Welle 1.  (Leertaste = Welle)"; msg_t = 8.0
 
 # Reihen nachziehen, wenn neue freigeschaltet wurden (mid-run kaufbar)
 func _sync_rows() -> void:
@@ -243,6 +244,8 @@ func _end_wave() -> void:
 	if Game.mower_fix():
 		for m in mowers: m.used = false; m.active = false; m.x = float(Game.LAWN_X - 30)
 	msg = "Welle %d geschafft! +%d FP" % [Game.wave, Game.wave]; msg_t = 2.0
+	if Game.wave == 1:
+		msg = "Welle 1 geschafft!  Zieh unten die Skill-Trees hoch (Pfeil) und investiere FP in deine Pflanze."; msg_t = 5.0
 
 func _spawn(kind: String) -> void:
 	var b = Game.ZTYPES[kind]
@@ -556,6 +559,7 @@ func _update(dt: float) -> void:
 		var prev: float = float(z.get("_lhp", z.hp))
 		if not z.get("dying", false) and prev - float(z.hp) > 6.0:
 			z["flash"] = 0.14
+			_popup(z.x + rng.randf_range(-6.0, 6.0), z.y - 22.0, "-%d" % int(round(prev - float(z.hp))), Color(1.0, 0.6, 0.45))
 		z["_lhp"] = z.hp
 		if float(z.get("flash", 0.0)) > 0.0:
 			z["flash"] = max(0.0, float(z.flash) - dt)
@@ -757,6 +761,9 @@ func _lose() -> void:
 
 # ---- Eingabe ----
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_hover = event.position
+		return
 	if Game.paused: return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		lawn_click(event.position)
@@ -856,6 +863,19 @@ func _draw() -> void:
 	for m in mowers:
 		if m.used: continue
 		draw_rect(Rect2(m.x, Game.LAWN_Y + m.row * Game.CELL + Game.CELL * 0.55, 34, 20), Color(0.85,0.29,0.22))
+	# Platzierungs-Vorschau (Geist der gewaehlten Pflanze unter dem Cursor)
+	if not Game.paused and Game.place_slot >= 0 and not Game.shovel and Game.seed_chain(Game.place_slot) != "":
+		var hc := int((_hover.x - Game.LAWN_X) / Game.CELL)
+		var hr := int((_hover.y - Game.LAWN_Y) / Game.CELL)
+		if hc >= 0 and hc < Game.COLS and hr >= 0 and hr < rows:
+			var gcx := Game.LAWN_X + hc * Game.CELL + Game.CELL / 2.0
+			var gcy := Game.LAWN_Y + hr * Game.CELL + Game.CELL / 2.0
+			var pstats = Game.seed_stats(Game.place_slot)
+			var okc: bool = _tile_free(hr, hc) and Game.sun >= int(pstats.get("cost", 0))
+			var pgc: Color = Game.CHASSIS[Game.seed_chain(Game.place_slot)].col
+			draw_rect(Rect2(Game.LAWN_X + hc * Game.CELL, Game.LAWN_Y + hr * Game.CELL, Game.CELL, Game.CELL), Color(1, 1, 1, 0.10) if okc else Color(1, 0.3, 0.3, 0.12))
+			draw_circle(Vector2(gcx, gcy), 26.0, Color(pgc.r, pgc.g, pgc.b, 0.32 if okc else 0.16))
+			draw_arc(Vector2(gcx, gcy), 30.0, 0.0, TAU, 24, (Color(1, 1, 1, 0.40) if okc else Color(1, 0.45, 0.45, 0.40)), 2.0)
 	# Pflanzen
 	for p in plants:
 		var col: Color = Game.CHASSIS[p.ck].col
@@ -894,6 +914,9 @@ func _draw() -> void:
 		var zy: float = z.y
 		if z.get("fly", false): zy = z.y - Game.CELL * 0.32   # Ballon schwebt hoeher
 		_shadow(z.x, zy + sz * 0.5, sz * 0.5)
+		if z.boss:
+			var bap: float = 0.5 + 0.5 * sin(_anim_clock * 3.0)
+			draw_circle(Vector2(z.x, zy), sz * (1.05 + 0.12 * bap), Color(z.col.r, z.col.g, z.col.b, 0.10 + 0.10 * bap))
 		_draw_zombie(z, zc, float(sz), z.x, zy)
 		if z.get("fly", false):
 			draw_line(Vector2(z.x, zy - sz*0.55), Vector2(z.x, zy - sz*0.95), Color(0.25,0.25,0.25), 1.5)
