@@ -1058,7 +1058,7 @@ func _draw() -> void:
 	# Rasenmäher
 	for m in mowers:
 		if m.used: continue
-		draw_rect(Rect2(m.x, Game.LAWN_Y + m.row * Game.CELL + Game.CELL * 0.55, 34, 20), Color(0.85,0.29,0.22))
+		_draw_mower(m.x, Game.LAWN_Y + m.row * Game.CELL + Game.CELL * 0.55, m.get("active", false))
 	# Pflanzen
 	for p in plants:
 		var col: Color = Game.CHASSIS[p.ck].col
@@ -1207,6 +1207,22 @@ func _popup(x: float, y: float, text: String, col: Color) -> void:
 
 func _shadow(cx: float, cy: float, r: float) -> void:
 	draw_circle(Vector2(cx, cy + r * 0.7), r * 0.85, Color(0, 0, 0, 0.20))
+
+# ---- Rasenmaeher: Koerper, Griff, Raeder, rotierende Klinge (+ Staub wenn aktiv) ----
+func _draw_mower(x: float, y: float, active: bool) -> void:
+	var wob := (sin(_anim_clock * 20.0) * 1.0) if active else 0.0
+	draw_rect(Rect2(x, y, 32, 16), Color(0.85, 0.29, 0.22))
+	draw_rect(Rect2(x, y, 32, 5), Color(1.0, 0.55, 0.42, 0.7))          # Glanzstreifen
+	draw_line(Vector2(x + 30, y + 2), Vector2(x + 41, y - 9), Color(0.62, 0.62, 0.64), 2.5)   # Griff
+	draw_circle(Vector2(x + 7, y + 17 + wob), 5.0, Color(0.14, 0.14, 0.15))
+	draw_circle(Vector2(x + 25, y + 17 - wob), 5.0, Color(0.14, 0.14, 0.15))
+	draw_circle(Vector2(x + 7, y + 17 + wob), 2.0, Color(0.42, 0.42, 0.45))
+	draw_circle(Vector2(x + 25, y + 17 - wob), 2.0, Color(0.42, 0.42, 0.45))
+	if active:
+		var bl := 0.5 + 0.5 * sin(_anim_clock * 40.0)
+		draw_circle(Vector2(x + 34, y + 8), 6.0 + bl * 2.0, Color(0.85, 0.9, 0.95, 0.55))   # Klingen-Wirbel
+		for k in range(3):
+			draw_circle(Vector2(x - float(k) * 6.0, y + 14), 3.0 - float(k), Color(0.6, 0.55, 0.4, 0.4))  # Staub
 
 # ---- Leichter Regen (bei Gewitter): schraege Tropfen + kleine Aufschlag-Kringel am Boden ----
 func _draw_rain(rect: Rect2) -> void:
