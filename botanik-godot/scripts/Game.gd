@@ -439,16 +439,22 @@ func rebirth() -> void:
 func save_game() -> void:
 	var data := {"brains": brains, "prestige": prestige, "carry_coins": carry_coins, "seen": seen.keys(), "slots": unlocked_slots}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if f:
-		f.store_string(JSON.stringify(data))
-		f.close()
+	if f == null:
+		push_error("Botanik-Labor: Speichern fehlgeschlagen (%s), Fehlercode %d" % [SAVE_PATH, FileAccess.get_open_error()])
+		return
+	f.store_string(JSON.stringify(data))
+	f.close()
 func load_game() -> void:
 	if not FileAccess.file_exists(SAVE_PATH): return
 	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
-	if not f: return
+	if f == null:
+		push_error("Botanik-Labor: Laden fehlgeschlagen (%s), Fehlercode %d" % [SAVE_PATH, FileAccess.get_open_error()])
+		return
 	var txt := f.get_as_text(); f.close()
 	var data = JSON.parse_string(txt)
-	if typeof(data) != TYPE_DICTIONARY: return
+	if typeof(data) != TYPE_DICTIONARY:
+		push_warning("Botanik-Labor: Speicherstand beschaedigt oder leer - starte mit Standardwerten.")
+		return
 	brains = int(data.get("brains", 0))
 	unlocked_slots = int(data.get("slots", 3))
 	if data.has("prestige") and typeof(data.prestige) == TYPE_DICTIONARY: prestige = data.prestige
