@@ -17,6 +17,7 @@ var root: Control
 # HUD
 var sun_lbl: Label
 var fp_lbl: Label
+var coin_lbl: Label
 var brain_lbl: Label
 var wave_lbl: Label
 var wave_bar: Control
@@ -91,6 +92,7 @@ func _process(_delta: float) -> void:
 	# HUD lebt jedes Frame (Spiel laeuft weiter, egal ob Drawer offen)
 	sun_lbl.text = "Sonne  %d" % int(Game.sun)
 	fp_lbl.text = "FP  %d" % Game.fp
+	coin_lbl.text = "Muenzen  %d" % Game.coins
 	brain_lbl.text = "Skulls  %d" % Game.brains
 	wave_lbl.text = "Welle %d / 100%s" % [Game.wave, lawn.weather_hud()]
 	wave_bar.queue_redraw()
@@ -166,6 +168,7 @@ func _build_hud() -> void:
 	root.add_child(pills)
 	sun_lbl = _hud_pill(pills, COL_GOLD)
 	fp_lbl = _hud_pill(pills, COL_CYAN)
+	coin_lbl = _hud_pill(pills, Color(0.95, 0.66, 0.22))
 	brain_lbl = _hud_pill(pills, COL_PINK)
 	# kleine Navigation
 	var nav := HBoxContainer.new()

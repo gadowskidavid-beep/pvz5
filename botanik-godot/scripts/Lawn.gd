@@ -885,6 +885,7 @@ func _draw() -> void:
 		_hp_bar(z.x, zy - sz*0.62, z.hp / z.maxhp, Color(0.9,0.3,0.3))
 		if z.burn > 0: _draw_flames(z.x, zy + sz * 0.5, sz * 0.9, sz * 1.15, z.x * 0.05)
 		if z.poison > 0: _draw_poison(z.x - sz * 0.34, zy - sz * 0.5, sz * 0.5, z.x * 0.07)
+		if z.slow > 0: _draw_frost(z.x, zy, sz)
 	# Boss-Lebensbalken oben am Bildschirm
 	for bz in zombies:
 		if bz.boss and bz.hp > 0:
@@ -911,7 +912,7 @@ func _draw() -> void:
 		elif e.t == "beam": draw_line(Vector2(e.x, e.y), Vector2(Game.LAWN_X + Game.COLS*Game.CELL, e.y), Color(1,0.3,0.3, e.life/0.12), 5)
 		elif e.t == "fume": draw_rect(Rect2(e.x, e.y - Game.CELL*0.4, e.w, Game.CELL*0.8), Color(0.6,0.6,0.6, e.life/0.2*0.5))
 		elif e.t == "splat": draw_circle(Vector2(e.x, e.y), 11, Color(0.7,0.95,0.5, e.life/0.2))
-		elif e.t == "bolt": draw_line(Vector2(e.x, e.y), Vector2(e.x2, e.y2), Color(1,0.95,0.4, e.life/0.2), 3)
+		elif e.t == "bolt": _draw_bolt(Vector2(e.x, e.y), Vector2(e.x2, e.y2), float(e.life) / 0.22)
 		elif e.t == "spark":
 			var sa: float = clamp(float(e.life) / 0.18, 0.0, 1.0)
 			var scol: Color = e.get("col", Color(1, 1, 1))
@@ -995,6 +996,37 @@ func _draw_poison(cx: float, top_y: float, w: float, phase: float) -> void:
 		var ox := (float(k) - 1.0) * w * 0.28
 		var rr := 4.5 - float(k) * 0.7
 		draw_circle(Vector2(cx + ox, top_y - float(k) * 6.0 + bob), rr, Color(0.55, 0.88, 0.32, 0.45))
+
+# ---- Verlangsamter/vereister Zombie: Frost-Schimmer + kreisende Eiskristalle ----
+func _draw_frost(cx: float, cy: float, sz: float) -> void:
+	draw_circle(Vector2(cx, cy), sz * 0.62, Color(0.6, 0.85, 1.0, 0.12))
+	for i in range(3):
+		var ang := _anim_clock * 0.6 + float(i) * 2.09
+		var px := cx + cos(ang) * sz * 0.5
+		var py := cy - sz * 0.1 + sin(ang * 1.3) * sz * 0.3
+		var r := sz * 0.11
+		draw_colored_polygon(PackedVector2Array([Vector2(px, py - r), Vector2(px + r * 0.6, py), Vector2(px, py + r), Vector2(px - r * 0.6, py)]), Color(0.72, 0.9, 1.0, 0.75))
+		draw_line(Vector2(px - r * 0.6, py), Vector2(px + r * 0.6, py), Color(0.85, 0.95, 1.0, 0.55), 1.0)
+
+# ---- Elektrischer Blitz: gezackt, mit blauem Glow + Einschlag-Flash ----
+func _draw_bolt(a: Vector2, b: Vector2, al: float) -> void:
+	al = clamp(al, 0.0, 1.0)
+	var segs := 5
+	var dir := b - a
+	var perp := Vector2(-dir.y, dir.x).normalized()
+	var prev := a
+	for i in range(1, segs + 1):
+		var tt := float(i) / float(segs)
+		var base := a.lerp(b, tt)
+		var off := 0.0
+		if i < segs:
+			off = sin(_anim_clock * 45.0 + float(i) * 3.1 + a.x) * dir.length() * 0.06
+		var pt := base + perp * off
+		draw_line(prev, pt, Color(0.55, 0.8, 1.0, al * 0.45), 5.0)   # blauer Glow
+		draw_line(prev, pt, Color(1.0, 1.0, 0.75, al), 2.0)          # heller Kern
+		prev = pt
+	draw_circle(b, 6.0 * al + 2.0, Color(1.0, 1.0, 0.8, al))          # Einschlag-Flash
+	draw_circle(b, 11.0 * al, Color(0.7, 0.85, 1.0, al * 0.3))
 
 # ---- Gesicht: zwei Augen + Mund (mood: happy/neutral/angry) ----
 func _face(cx: float, cy: float, s: float, mood: String, eyecol := Color(0.1, 0.1, 0.12)) -> void:
