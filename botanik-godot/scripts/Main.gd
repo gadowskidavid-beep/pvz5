@@ -53,6 +53,7 @@ var _dtween: Tween
 var overlays := {}
 var _nav_return := ""
 var _death_open := false
+var _music_key := ""      # aktueller Musik-Kontext (menu/day/night)
 
 # Skill-Tree Zustand
 var _tree_sel := "seed"   # aktueller Tab: "seed" | "element" | "spiel" | "zombies"
@@ -143,6 +144,12 @@ func _process(_delta: float) -> void:
 			open_overlay("death")
 	else:
 		_death_open = false
+	# Musik: Menue vs. Tag/Nacht - nur bei echtem Wechsel neu starten (+ Beat neu ausrichten)
+	var mkey := "menu" if overlays["menu"].panel.visible else ("night" if bool(BAL.act_of(Game.wave).night) else "day")
+	if mkey != _music_key:
+		_music_key = mkey
+		if Music.play_key(mkey) and mkey != "menu":
+			lawn.reset_beat()
 
 # ================= THEME =================
 func _make_theme() -> Theme:
@@ -1420,6 +1427,17 @@ func _build_options(vb) -> void:
 	_big(vb, "OPTIONEN", 28, Color(0.8, 0.9, 1))
 	_header(vb, "Steuerung: Linksklick = Sonne sammeln / Pflanze setzen / Zombie schlagen (Hammer).", Color(0.75, 0.85, 0.78))
 	_header(vb, "Leertaste = Welle starten.  Unten der Pfeil oeffnet die Skill-Trees.", Color(0.75, 0.85, 0.78))
+	_spacer(vb, 12)
+	_header(vb, "Musik", COL_ACCENT)
+	var mrow := HBoxContainer.new(); mrow.add_theme_constant_override("separation", 12)
+	var mlbl := Label.new(); mlbl.text = "Lautstaerke"; mlbl.custom_minimum_size = Vector2(120, 0)
+	var msl := HSlider.new(); msl.min_value = -40.0; msl.max_value = 6.0; msl.step = 1.0; msl.value = Music.volume_db
+	msl.custom_minimum_size = Vector2(300, 24)
+	msl.value_changed.connect(func(v): Music.set_volume(v))
+	mrow.add_child(mlbl); mrow.add_child(msl); vb.add_child(mrow)
+	var mute := CheckButton.new(); mute.text = "Musik stumm"; mute.button_pressed = Music.muted
+	mute.toggled.connect(func(on): Music.set_muted(on))
+	vb.add_child(mute)
 	_spacer(vb, 12)
 	_header(vb, "Skulls & Prestige zuruecksetzen (kann nicht rueckgaengig gemacht werden):", Color(1, 0.6, 0.6))
 	var b := Button.new(); b.text = "Kompletten Fortschritt loeschen"; b.custom_minimum_size = Vector2(320, 40)
