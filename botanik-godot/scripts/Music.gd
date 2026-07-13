@@ -24,6 +24,9 @@ const SFX := {
 	"jump":          "res://Musik/Soundeffect/JumpingZombieEffect.mp3",
 	"rage":          "res://Musik/Soundeffect/AngryzombieMode.mp3",
 	"dead":          "res://Musik/Soundeffect/phasmophobia-sound-board-effects-16-sound-effects-player-dying-sound-effect.mp3",
+	"plant":         "res://Musik/Soundeffect/Plant Planted.mp3",
+	"plant_died":    "res://Musik/Soundeffect/PlantdiedFromZombie.mp3",
+	"eating":        "res://Musik/Soundeffect/Zombie Eating plant.mp3",
 }
 
 # Laengere/wichtige Effekte bekommen einen EIGENEN Player, damit sie nicht vom

@@ -563,6 +563,7 @@ func _update(dt: float) -> void:
 				tgt.hp -= z.dmg * dt
 				if tgt.hp <= 0: _plant_dies(tgt)
 		elif tgt != null:
+			Music.play_sfx("eating", 0.5)   # gedrosselt -> ruhiges Kau-Geraeusch
 			tgt.hp -= z.dmg * dt
 			if float(tgt.s.get("thorns", 0.0)) > 0.0:
 				z.hp -= z.dmg * float(tgt.s.thorns) * dt
@@ -700,6 +701,7 @@ func _chain(z, dmg) -> void:
 # ---- Element-Effekte der Sonnenblume ----
 
 func _plant_dies(p) -> void:
+	Music.play_sfx("plant_died")
 	# Feuerblume: entzuendet beim Tod Zombies in der Naehe (Zuenderholz = groesser)
 	var fd := float(p.s.get("fire_death", 0.0))
 	if fd > 0.0:
@@ -872,6 +874,7 @@ func _place(col: int, row: int) -> void:
 	var x = Game.LAWN_X + col * Game.CELL + Game.CELL / 2.0
 	var y = Game.LAWN_Y + row * Game.CELL + Game.CELL / 2.0
 	plants.append({"ck": ck, "arch": s.arch, "row": row, "col": col, "x": x, "y": y, "hp": float(s.hp), "maxhp": float(s.hp), "s": s, "t": 0.0, "fuse": (0.7 if s.arch == "bomb" else 0.0), "done": false, "element": Game.seed_element(slot)})
+	Music.play_sfx("plant")
 	# Intuitiver Start: die allererste gesetzte Pflanze startet Welle 1
 	if Game.wave == 0 and Game.phase == "prep":
 		start_wave()
