@@ -29,6 +29,12 @@ var msg_t := 0.0
 # ---- Wetter ----
 var weather := "klar"      # klar / gewitter / nebel / frost
 var strike_t := 0.0        # Timer fuer Gewitter-Blitze
+# ---- Screenshake (Boss-Auftritt / Rasen-Umbruch) ----
+var shake_t := 0.0
+var shake_dur := 0.0
+var shake_mag := 0.0
+var sky_flash := 0.0        # kurzer Himmel-Aufhellblitz bei Gewitter
+var _hover := Vector2(-1000, -1000)   # Mausposition fuer die Platzierungs-Vorschau
 
 func _ready() -> void:
 	rng.randomize()
@@ -130,7 +136,7 @@ func reset_run() -> void:
 		mowers.append({"row": r, "x": float(Game.LAWN_X - 30), "active": false, "used": false})
 	sky_timer = 5.0; to_spawn = 0; idle_timer = 6.0; hazard_timer = 9.0
 	weather = "klar"; strike_t = 0.0
-	msg = "Pflanze eine Sonnenblume, um die erste Welle zu starten!"; msg_t = 6.0
+	msg = "Sammle Sonne (anklicken) & setze unten Pflanzen - die erste Pflanze startet Welle 1.  (Leertaste = Welle)"; msg_t = 8.0
 
 # Reihen nachziehen, wenn neue freigeschaltet wurden (mid-run kaufbar)
 func _sync_rows() -> void:
@@ -159,6 +165,8 @@ func start_wave() -> void:
 	if BAL.is_boss_wave(Game.wave):
 		var bk := Game.boss_key_for_wave(Game.wave)
 		_spawn(bk)   # Boss kommt SOFORT — waehrend du im Umbruch neu baust
+		add_shake(14.0, 0.5)
+		fx.append({"t": "flash", "life": 0.5, "col": Game.ZTYPES[bk].col})
 		to_spawn += int(Game.ZTYPES[bk].get("summon", 0))
 		var wo := world_of(Game.wave)
 		if umbruch:
@@ -183,6 +191,7 @@ func _do_umbruch() -> void:
 	var wo := world_of(Game.wave)
 	msg = "DER RASEN BRICHT UM — %s!  +%d Sonne erstattet · %d s Schonfrist" % [str(wo.name), int(back), int(BAL.UMBRUCH_GRACE)]
 	msg_t = float(BAL.UMBRUCH_GRACE)
+	add_shake(11.0, 0.7)
 
 func _roll_weather() -> void:
 	# Erste Welle & Boss-Wellen bleiben klar
@@ -215,6 +224,12 @@ func _storm_strike() -> void:
 	var t = alive[rng.randi() % alive.size()]
 	t.hp -= 70.0
 	fx.append({"t": "bolt", "x": t.x, "y": float(Game.LAWN_Y - 50), "x2": t.x, "y2": t.y, "life": 0.28})
+	sky_flash = 0.15   # Himmel zuckt kurz hell auf
+
+func add_shake(mag: float, dur: float) -> void:
+	shake_mag = max(shake_mag, mag)
+	shake_dur = max(shake_dur, dur)
+	shake_t = max(shake_t, dur)
 
 func _end_wave() -> void:
 	if Game.wave >= 100:
@@ -229,6 +244,8 @@ func _end_wave() -> void:
 	if Game.mower_fix():
 		for m in mowers: m.used = false; m.active = false; m.x = float(Game.LAWN_X - 30)
 	msg = "Welle %d geschafft! +%d FP" % [Game.wave, Game.wave]; msg_t = 2.0
+	if Game.wave == 1:
+		msg = "Welle 1 geschafft!  Zieh unten die Skill-Trees hoch (Pfeil) und investiere FP in deine Pflanze."; msg_t = 5.0
 
 func _spawn(kind: String) -> void:
 	var b = Game.ZTYPES[kind]
@@ -284,6 +301,12 @@ func _process(delta: float) -> void:
 	if not Game.paused and Game.phase != "won" and Game.phase != "dead":
 		_update(delta)
 	if msg_t > 0: msg_t -= delta
+	if shake_t > 0.0:
+		shake_t -= delta
+		var f: float = clamp(shake_t / max(0.01, shake_dur), 0.0, 1.0)
+		position = Vector2(rng.randf_range(-1.0, 1.0), rng.randf_range(-1.0, 1.0)) * shake_mag * f
+	elif position != Vector2.ZERO:
+		position = Vector2.ZERO
 	queue_redraw()
 
 func _update(dt: float) -> void:
@@ -411,6 +434,7 @@ func _update(dt: float) -> void:
 					z["shield"] = float(z.shield) - pe.dmg   # Schild absorbiert frontale Erbsen
 				else:
 					z.hp -= pe.dmg; _apply_fx(z, pe.effects, pe.dmg)
+				fx.append({"t": "spark", "x": pe.x, "y": pe.y, "life": 0.18, "col": _proj_col(pe.effects)})
 				pe.hit.append(z)
 				if int(pe.pierce) > 0:
 					pe.pierce = int(pe.pierce) - 1
@@ -530,6 +554,16 @@ func _update(dt: float) -> void:
 		popups[i].y -= 26.0 * dt
 		popups[i].life -= dt
 		if popups[i].life <= 0: popups.remove_at(i)
+	# Treffer-Aufblitzen (Game Juice): erkennt spuerbaren Schaden seit dem letzten Frame
+	for z in zombies:
+		var prev: float = float(z.get("_lhp", z.hp))
+		if not z.get("dying", false) and prev - float(z.hp) > 6.0:
+			z["flash"] = 0.14
+			_popup(z.x + rng.randf_range(-6.0, 6.0), z.y - 22.0, "-%d" % int(round(prev - float(z.hp))), Color(1.0, 0.6, 0.45))
+		z["_lhp"] = z.hp
+		if float(z.get("flash", 0.0)) > 0.0:
+			z["flash"] = max(0.0, float(z.flash) - dt)
+	if sky_flash > 0.0: sky_flash = max(0.0, sky_flash - dt)
 
 func _lane_has(p) -> bool:
 	var maxx := 1.0e9
@@ -622,7 +656,7 @@ func _plant_dies(p) -> void:
 		fx.append({"t": "boom", "x": p.x, "y": p.y, "life": 0.35})
 	# Nicht-Bomben landen im Friedhof (Necromancer kann sie wiederbeleben)
 	if p.arch != "bomb":
-		graveyard.append({"ck": p.ck, "arch": p.arch, "row": p.row, "col": p.col, "x": p.x, "y": p.y, "s": p.s, "maxhp": p.maxhp})
+		graveyard.append({"ck": p.ck, "arch": p.arch, "row": p.row, "col": p.col, "x": p.x, "y": p.y, "s": p.s, "maxhp": p.maxhp, "element": p.get("element", "")})
 		if graveyard.size() > 12: graveyard.pop_front()
 	plants.erase(p)
 
@@ -636,7 +670,7 @@ func _necro_revive():
 	while not graveyard.is_empty():
 		var g = graveyard.pop_back()
 		if _tile_free(int(g.row), int(g.col)):
-			return {"ck": g.ck, "arch": g.arch, "row": int(g.row), "col": int(g.col), "x": g.x, "y": g.y, "hp": float(g.maxhp) * 0.5, "maxhp": float(g.maxhp), "s": g.s, "t": 0.0, "fuse": (0.7 if g.arch == "bomb" else 0.0), "done": false}
+			return {"ck": g.ck, "arch": g.arch, "row": int(g.row), "col": int(g.col), "x": g.x, "y": g.y, "hp": float(g.maxhp) * 0.5, "maxhp": float(g.maxhp), "s": g.s, "t": 0.0, "fuse": (0.7 if g.arch == "bomb" else 0.0), "done": false, "element": g.get("element", "")}
 	return null
 
 func _zap_random(p) -> void:
@@ -727,6 +761,9 @@ func _lose() -> void:
 
 # ---- Eingabe ----
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_hover = event.position
+		return
 	if Game.paused: return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		lawn_click(event.position)
@@ -779,7 +816,7 @@ func _place(col: int, row: int) -> void:
 	Game.sun -= s.cost
 	var x = Game.LAWN_X + col * Game.CELL + Game.CELL / 2.0
 	var y = Game.LAWN_Y + row * Game.CELL + Game.CELL / 2.0
-	plants.append({"ck": ck, "arch": s.arch, "row": row, "col": col, "x": x, "y": y, "hp": float(s.hp), "maxhp": float(s.hp), "s": s, "t": 0.0, "fuse": (0.7 if s.arch == "bomb" else 0.0), "done": false})
+	plants.append({"ck": ck, "arch": s.arch, "row": row, "col": col, "x": x, "y": y, "hp": float(s.hp), "maxhp": float(s.hp), "s": s, "t": 0.0, "fuse": (0.7 if s.arch == "bomb" else 0.0), "done": false, "element": Game.seed_element(slot)})
 	# Intuitiver Start: die allererste gesetzte Pflanze startet Welle 1
 	if Game.wave == 0 and Game.phase == "prep":
 		start_wave()
@@ -815,10 +852,8 @@ func _draw() -> void:
 	draw_rect(Rect2(lx - 7, ly + lh, lw + 14, 10), Color(0, 0, 0, 0.30))  # Schatten an der Vorderkante
 	if bg == null and wo.night: draw_rect(lawn_rect, Color(0.08,0.12,0.25,0.30))
 	if wo.get("roof", false): draw_rect(lawn_rect, Color(0.5,0.35,0.18,0.14))
-	# Wetter-Overlay
-	if weather == "nebel": draw_rect(lawn_rect, Color(0.82, 0.84, 0.88, 0.24))
-	elif weather == "frost": draw_rect(lawn_rect, Color(0.55, 0.72, 1.0, 0.15))
-	elif weather == "gewitter": draw_rect(lawn_rect, Color(0.12, 0.12, 0.28, 0.22))
+	# Wetter-Overlay (animiert)
+	_draw_weather(lawn_rect)
 	draw_rect(Rect2(Game.LAWN_X - 14, Game.LAWN_Y, 9, rows * Game.CELL), Color(0.42,0.32,0.62))
 	# Tiefe: sanfter Verlauf (oben heller, unten dunkler)
 	var _lh := rows * Game.CELL
@@ -828,6 +863,19 @@ func _draw() -> void:
 	for m in mowers:
 		if m.used: continue
 		draw_rect(Rect2(m.x, Game.LAWN_Y + m.row * Game.CELL + Game.CELL * 0.55, 34, 20), Color(0.85,0.29,0.22))
+	# Platzierungs-Vorschau (Geist der gewaehlten Pflanze unter dem Cursor)
+	if not Game.paused and Game.place_slot >= 0 and not Game.shovel and Game.seed_chain(Game.place_slot) != "":
+		var hc := int((_hover.x - Game.LAWN_X) / Game.CELL)
+		var hr := int((_hover.y - Game.LAWN_Y) / Game.CELL)
+		if hc >= 0 and hc < Game.COLS and hr >= 0 and hr < rows:
+			var gcx := Game.LAWN_X + hc * Game.CELL + Game.CELL / 2.0
+			var gcy := Game.LAWN_Y + hr * Game.CELL + Game.CELL / 2.0
+			var pstats = Game.seed_stats(Game.place_slot)
+			var okc: bool = _tile_free(hr, hc) and Game.sun >= int(pstats.get("cost", 0))
+			var pgc: Color = Game.CHASSIS[Game.seed_chain(Game.place_slot)].col
+			draw_rect(Rect2(Game.LAWN_X + hc * Game.CELL, Game.LAWN_Y + hr * Game.CELL, Game.CELL, Game.CELL), Color(1, 1, 1, 0.10) if okc else Color(1, 0.3, 0.3, 0.12))
+			draw_circle(Vector2(gcx, gcy), 26.0, Color(pgc.r, pgc.g, pgc.b, 0.32 if okc else 0.16))
+			draw_arc(Vector2(gcx, gcy), 30.0, 0.0, TAU, 24, (Color(1, 1, 1, 0.40) if okc else Color(1, 0.45, 0.45, 0.40)), 2.0)
 	# Pflanzen
 	for p in plants:
 		var col: Color = Game.CHASSIS[p.ck].col
@@ -838,26 +886,37 @@ func _draw() -> void:
 		var pby: float = p.y + sin(float(p.t) * 2.2) * 1.5             # sanftes Wippen
 		_shadow(p.x, p.y, pr)
 		_draw_plant(p, col, pr, p.x, pby)
+		var _pel := str(p.get("element", ""))
+		if _pel != "": _elem_badge(p.x, pby - pr * 1.05, _pel, _elem_col(_pel), pr * 0.34)
 		_hp_bar(p.x, p.y + 30, p.hp / p.maxhp, Color(0.35,0.85,0.4))
 		# Nacht-Pilz: verbleibende Lebensdauer (lila Balken oben)
 		if p.has("age"):
 			var lifeleft: float = clamp(1.0 - float(p.age) / BAL.SHROOM_LIFESPAN, 0.0, 1.0)
 			_hp_bar(p.x, p.y - 34, lifeleft, Color(0.72, 0.5, 0.95))
-	# Erbsen
+	# Erbsen (nach Element eingefaerbt + Glow)
 	for pe in peas:
+		var pcol := _proj_col(pe.get("effects", []))
 		if pe.get("lob", false):
 			var arc = sin(PI * pe.pt) * Game.CELL * 0.7
-			draw_circle(Vector2(pe.x, Game.LAWN_Y + pe.row * Game.CELL + Game.CELL/2.0 - arc), 8, Color(0.6,0.9,0.4))
+			var lp := Vector2(pe.x, Game.LAWN_Y + pe.row * Game.CELL + Game.CELL/2.0 - arc)
+			draw_circle(lp, 12.0, Color(pcol.r, pcol.g, pcol.b, 0.25))
+			draw_circle(lp, 8, pcol)
 		else:
-			draw_circle(Vector2(pe.x, pe.y), 6, Color(0.62,0.95,0.4))
+			draw_circle(Vector2(pe.x, pe.y), 10.0, Color(pcol.r, pcol.g, pcol.b, 0.22))
+			draw_circle(Vector2(pe.x, pe.y), 6, pcol)
 	# Zombies
 	for z in zombies:
 		var zc: Color = z.col
 		if z.slow > 0: zc = zc.lerp(Color(0.6,0.8,1), 0.4)
+		if float(z.get("flash", 0.0)) > 0.0: zc = zc.lightened(0.55)
+		if z.burn > 0: zc = zc.lerp(Color(1.0, 0.5, 0.2), 0.22)
 		var sz = 60 if z.boss else 40
 		var zy: float = z.y
 		if z.get("fly", false): zy = z.y - Game.CELL * 0.32   # Ballon schwebt hoeher
 		_shadow(z.x, zy + sz * 0.5, sz * 0.5)
+		if z.boss:
+			var bap: float = 0.5 + 0.5 * sin(_anim_clock * 3.0)
+			draw_circle(Vector2(z.x, zy), sz * (1.05 + 0.12 * bap), Color(z.col.r, z.col.g, z.col.b, 0.10 + 0.10 * bap))
 		_draw_zombie(z, zc, float(sz), z.x, zy)
 		if z.get("fly", false):
 			draw_line(Vector2(z.x, zy - sz*0.55), Vector2(z.x, zy - sz*0.95), Color(0.25,0.25,0.25), 1.5)
@@ -866,9 +925,9 @@ func _draw() -> void:
 			# Schild vorne (links, Richtung Pflanzen)
 			draw_rect(Rect2(z.x - sz*0.62, zy - sz*0.5, 7, sz*1.0), Color(0.62,0.78,0.96,0.9))
 		_hp_bar(z.x, zy - sz*0.62, z.hp / z.maxhp, Color(0.9,0.3,0.3))
-		var ix = z.x + sz*0.4
-		if z.burn > 0: draw_circle(Vector2(ix, zy - sz*0.5), 4, Color(1,0.5,0.1))
-		if z.poison > 0: draw_circle(Vector2(ix, zy - sz*0.5 + 10), 4, Color(0.6,0.9,0.3))
+		if z.burn > 0: _draw_flames(z.x, zy + sz * 0.5, sz * 0.9, sz * 1.15, z.x * 0.05)
+		if z.poison > 0: _draw_poison(z.x - sz * 0.34, zy - sz * 0.5, sz * 0.5, z.x * 0.07)
+		if z.slow > 0: _draw_frost(z.x, zy, sz)
 	# Boss-Lebensbalken oben am Bildschirm
 	for bz in zombies:
 		if bz.boss and bz.hp > 0:
@@ -876,9 +935,15 @@ func _draw() -> void:
 			var bw := 520.0
 			var bx := Game.LAWN_X + (Game.COLS * Game.CELL - bw) / 2.0
 			var by := 70.0
-			draw_rect(Rect2(bx - 3, by - 3, bw + 6, 22), Color(0, 0, 0, 0.55))
+			var bpulse: float = 0.5 + 0.5 * sin(_anim_clock * 4.0)
+			draw_rect(Rect2(bx - 5, by - 5, bw + 10, 26), Color(0, 0, 0, 0.60))
 			draw_rect(Rect2(bx, by, bw, 16), Color(0.18, 0.05, 0.08))
 			draw_rect(Rect2(bx, by, bw * bfrac, 16), bz.col)
+			draw_rect(Rect2(bx, by, bw * bfrac, 8), Color(1, 1, 1, 0.18))
+			draw_rect(Rect2(bx - 5, by - 5, bw + 10, 26), Color(bz.col.r, bz.col.g, bz.col.b, 0.35 + 0.45 * bpulse), false, 2.0)
+			if _font != null:
+				var bnm := str(Game.ZTYPES.get(str(bz.kind), {}).get("n", "BOSS"))
+				draw_string(_font, Vector2(bx + 2, by - 9), bnm, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color(1, 0.85, 0.6))
 			break
 	# Sonne
 	for s in suns:
@@ -889,7 +954,20 @@ func _draw() -> void:
 		elif e.t == "beam": draw_line(Vector2(e.x, e.y), Vector2(Game.LAWN_X + Game.COLS*Game.CELL, e.y), Color(1,0.3,0.3, e.life/0.12), 5)
 		elif e.t == "fume": draw_rect(Rect2(e.x, e.y - Game.CELL*0.4, e.w, Game.CELL*0.8), Color(0.6,0.6,0.6, e.life/0.2*0.5))
 		elif e.t == "splat": draw_circle(Vector2(e.x, e.y), 11, Color(0.7,0.95,0.5, e.life/0.2))
-		elif e.t == "bolt": draw_line(Vector2(e.x, e.y), Vector2(e.x2, e.y2), Color(1,0.95,0.4, e.life/0.2), 3)
+		elif e.t == "bolt": _draw_bolt(Vector2(e.x, e.y), Vector2(e.x2, e.y2), float(e.life) / 0.22)
+		elif e.t == "spark":
+			var sa: float = clamp(float(e.life) / 0.18, 0.0, 1.0)
+			var scol: Color = e.get("col", Color(1, 1, 1))
+			for si in range(6):
+				var ang := deg_to_rad(si * 60.0)
+				var dir := Vector2(cos(ang), sin(ang))
+				draw_line(Vector2(e.x, e.y) + dir * 3.0, Vector2(e.x, e.y) + dir * (4.0 + 12.0 * (1.0 - sa)), Color(scol.r, scol.g, scol.b, sa), 2.0)
+			draw_circle(Vector2(e.x, e.y), 4.0 * sa + 1.0, Color(1, 1, 1, sa))
+		elif e.t == "flash":
+			var vp := get_viewport_rect().size
+			var fla: float = clamp(float(e.life) / 0.5, 0.0, 1.0)
+			var flc: Color = e.get("col", Color(1, 1, 1))
+			draw_rect(Rect2(-30, -30, vp.x + 60, vp.y + 60), Color(flc.r, flc.g, flc.b, 0.30 * fla))
 	# Schwebende Zahlen (+Sonne etc.)
 	if _font != null:
 		for pu in popups:
@@ -902,6 +980,121 @@ func _popup(x: float, y: float, text: String, col: Color) -> void:
 
 func _shadow(cx: float, cy: float, r: float) -> void:
 	draw_circle(Vector2(cx, cy + r * 0.7), r * 0.85, Color(0, 0, 0, 0.20))
+
+# ---- Element-Optik: Farbe je Element-Richtung (f/e/b/u) ----
+func _elem_col(el: String) -> Color:
+	match el:
+		"f": return Color(1.0, 0.45, 0.20)   # Feuer = rot/orange
+		"e": return Color(0.45, 0.72, 1.0)    # Eis = blau
+		"b": return Color(1.0, 0.90, 0.35)    # Blitz = gold
+		"u": return Color(0.72, 0.45, 1.0)    # Untod = lila
+	return Color(1, 1, 1, 0)
+
+# ---- Projektil-Farbe aus seinen Effekten ----
+func _proj_col(effects) -> Color:
+	if effects.has("burn"): return Color(1.0, 0.50, 0.20)
+	if effects.has("chain"): return Color(1.0, 0.90, 0.35)
+	if effects.has("slow"): return Color(0.50, 0.80, 1.0)
+	if effects.has("poison"): return Color(0.60, 0.90, 0.35)
+	return Color(0.62, 0.95, 0.40)
+
+# ---- Kleines Element-Abzeichen ueber der Pflanze (zeigt die gewaehlte Richtung) ----
+func _elem_badge(cx: float, cy: float, el: String, ecol: Color, s: float) -> void:
+	draw_circle(Vector2(cx, cy), s * 0.95, Color(0.05, 0.06, 0.08, 0.55))
+	match el:
+		"f":
+			draw_colored_polygon(PackedVector2Array([Vector2(cx, cy - s), Vector2(cx + s * 0.7, cy + s * 0.6), Vector2(cx - s * 0.7, cy + s * 0.6)]), ecol)
+		"e":
+			draw_colored_polygon(PackedVector2Array([Vector2(cx, cy - s), Vector2(cx + s * 0.7, cy), Vector2(cx, cy + s), Vector2(cx - s * 0.7, cy)]), ecol)
+		"b":
+			draw_line(Vector2(cx - s * 0.4, cy - s), Vector2(cx + s * 0.2, cy - s * 0.1), ecol, 2.0)
+			draw_line(Vector2(cx + s * 0.2, cy - s * 0.1), Vector2(cx - s * 0.2, cy + s * 0.1), ecol, 2.0)
+			draw_line(Vector2(cx - s * 0.2, cy + s * 0.1), Vector2(cx + s * 0.4, cy + s), ecol, 2.0)
+		"u":
+			draw_rect(Rect2(cx - s * 0.18, cy - s * 0.8, s * 0.36, s * 1.6), ecol)
+			draw_rect(Rect2(cx - s * 0.6, cy - s * 0.25, s * 1.2, s * 0.36), ecol)
+
+# ---- Brennender Zombie: zuengelnde, flackernde Flammen ----
+func _draw_flames(cx: float, base_y: float, w: float, h: float, phase: float) -> void:
+	# warmer Glow hinter/um den Koerper
+	draw_circle(Vector2(cx, base_y - h * 0.4), w * 0.6, Color(1.0, 0.5, 0.15, 0.14))
+	var n := 5
+	for i in range(n):
+		var fx0 := cx - w * 0.5 + w * (float(i) + 0.5) / float(n)
+		var flick: float = 0.5 + 0.5 * sin(_anim_clock * 12.0 + float(i) * 1.7 + phase)
+		var fh := h * (0.55 + 0.45 * flick)
+		var sway := sin(_anim_clock * 7.0 + float(i) * 2.1 + phase) * w * 0.07
+		var tip := Vector2(fx0 + sway, base_y - fh)
+		# aeussere orange Flamme
+		draw_colored_polygon(PackedVector2Array([Vector2(fx0 - w * 0.11, base_y), Vector2(fx0 + w * 0.11, base_y), tip]), Color(1.0, 0.42, 0.10, 0.55))
+		# innere gelbe Flamme
+		var tip2 := Vector2(fx0 + sway * 0.6, base_y - fh * 0.62)
+		draw_colored_polygon(PackedVector2Array([Vector2(fx0 - w * 0.055, base_y), Vector2(fx0 + w * 0.055, base_y), tip2]), Color(1.0, 0.85, 0.32, 0.75))
+	# aufsteigende Funken
+	for k in range(3):
+		var sp: float = fposmod(_anim_clock * 1.4 + float(k) * 0.37 + phase, 1.0)
+		var spx := cx + sin(_anim_clock * 3.0 + float(k) * 2.0) * w * 0.35
+		draw_circle(Vector2(spx, base_y - h * (0.6 + sp * 0.7)), 1.6, Color(1.0, 0.75, 0.3, 1.0 - sp))
+
+# ---- Vergifteter Zombie: aufsteigende, blubbernde Giftwolke ----
+func _draw_poison(cx: float, top_y: float, w: float, phase: float) -> void:
+	for k in range(3):
+		var bob := sin(_anim_clock * 3.0 + float(k) * 2.1 + phase) * 3.0
+		var ox := (float(k) - 1.0) * w * 0.28
+		var rr := 4.5 - float(k) * 0.7
+		draw_circle(Vector2(cx + ox, top_y - float(k) * 6.0 + bob), rr, Color(0.55, 0.88, 0.32, 0.45))
+
+# ---- Verlangsamter/vereister Zombie: Frost-Schimmer + kreisende Eiskristalle ----
+func _draw_frost(cx: float, cy: float, sz: float) -> void:
+	draw_circle(Vector2(cx, cy), sz * 0.62, Color(0.6, 0.85, 1.0, 0.12))
+	for i in range(3):
+		var ang := _anim_clock * 0.6 + float(i) * 2.09
+		var px := cx + cos(ang) * sz * 0.5
+		var py := cy - sz * 0.1 + sin(ang * 1.3) * sz * 0.3
+		var r := sz * 0.11
+		draw_colored_polygon(PackedVector2Array([Vector2(px, py - r), Vector2(px + r * 0.6, py), Vector2(px, py + r), Vector2(px - r * 0.6, py)]), Color(0.72, 0.9, 1.0, 0.75))
+		draw_line(Vector2(px - r * 0.6, py), Vector2(px + r * 0.6, py), Color(0.85, 0.95, 1.0, 0.55), 1.0)
+
+# ---- Elektrischer Blitz: gezackt, mit blauem Glow + Einschlag-Flash ----
+func _draw_bolt(a: Vector2, b: Vector2, al: float) -> void:
+	al = clamp(al, 0.0, 1.0)
+	var segs := 5
+	var dir := b - a
+	var perp := Vector2(-dir.y, dir.x).normalized()
+	var prev := a
+	for i in range(1, segs + 1):
+		var tt := float(i) / float(segs)
+		var base := a.lerp(b, tt)
+		var off := 0.0
+		if i < segs:
+			off = sin(_anim_clock * 45.0 + float(i) * 3.1 + a.x) * dir.length() * 0.06
+		var pt := base + perp * off
+		draw_line(prev, pt, Color(0.55, 0.8, 1.0, al * 0.45), 5.0)   # blauer Glow
+		draw_line(prev, pt, Color(1.0, 1.0, 0.75, al), 2.0)          # heller Kern
+		prev = pt
+	draw_circle(b, 6.0 * al + 2.0, Color(1.0, 1.0, 0.8, al))          # Einschlag-Flash
+	draw_circle(b, 11.0 * al, Color(0.7, 0.85, 1.0, al * 0.3))
+
+# ---- Animiertes Wetter-Overlay ueber dem Rasen ----
+func _draw_weather(rect: Rect2) -> void:
+	if weather == "nebel":
+		draw_rect(rect, Color(0.82, 0.84, 0.88, 0.18))
+		# treibende Nebelschwaden
+		for i in range(4):
+			var yy := rect.position.y + rect.size.y * (0.12 + 0.24 * float(i))
+			var off := fmod(_anim_clock * (14.0 + float(i) * 5.0) + float(i) * 140.0, rect.size.x + 280.0) - 140.0
+			draw_rect(Rect2(rect.position.x + off, yy, 240.0, 34.0), Color(0.92, 0.94, 0.98, 0.10))
+	elif weather == "frost":
+		draw_rect(rect, Color(0.55, 0.72, 1.0, 0.13))
+		# treibende Eispartikel
+		for i in range(16):
+			var px := rect.position.x + fmod(float(i) * 97.0 + _anim_clock * 12.0, rect.size.x)
+			var py := rect.position.y + fmod(float(i) * 53.0 + _anim_clock * 24.0, rect.size.y)
+			draw_circle(Vector2(px, py), 1.6, Color(0.85, 0.95, 1.0, 0.5))
+	elif weather == "gewitter":
+		draw_rect(rect, Color(0.10, 0.10, 0.26, 0.28))
+		if sky_flash > 0.0:
+			draw_rect(rect, Color(0.90, 0.92, 1.0, 0.35 * clamp(sky_flash / 0.15, 0.0, 1.0)))
 
 # ---- Gesicht: zwei Augen + Mund (mood: happy/neutral/angry) ----
 func _face(cx: float, cy: float, s: float, mood: String, eyecol := Color(0.1, 0.1, 0.12)) -> void:
@@ -925,12 +1118,21 @@ func _face(cx: float, cy: float, s: float, mood: String, eyecol := Color(0.1, 0.
 func _draw_plant(p, col: Color, pr: float, cx: float, cy: float) -> void:
 	var ck := str(p.ck)
 	var arch := str(p.arch)
-	# Eigenes Sprite? -> zeichnen und fertig
+	var el := str(p.get("element", ""))
+	var ecol := _elem_col(el)
+	# Element-Aura HINTER der Pflanze: sichtbar, welche Skill-Richtung geskillt ist
+	if el != "":
+		var pulse: float = 0.5 + 0.5 * sin(_anim_clock * 3.0 + cx * 0.04)
+		draw_circle(Vector2(cx, cy), pr * 1.42, Color(ecol.r, ecol.g, ecol.b, 0.07 + 0.05 * pulse))
+		draw_circle(Vector2(cx, cy), pr * 1.16, Color(ecol.r, ecol.g, ecol.b, 0.12))
+	# Eigenes Sprite? -> zeichnen und fertig (Aura bleibt sichtbar)
 	var tex := _tex("res://assets/sprites/plants/%s.png" % ck)
 	if tex != null:
 		var d := pr * 2.5
 		draw_texture_rect(tex, Rect2(cx - d * 0.5, cy - d * 0.5, d, d), false)
 		return
+	# Fallback-Zeichnung: Koerperfarbe leicht ins Element einfaerben
+	if el != "": col = col.lerp(ecol, 0.28)
 	if ck == "sonne":
 		# Sonnenblume: goldene Bluetenblaetter + brauner Kern + froehliches Gesicht
 		for i in range(10):
@@ -1007,6 +1209,35 @@ func _draw_zombie(z, zc: Color, sz: float, zx: float, zy: float) -> void:
 	for k in range(3):
 		var mx := zx - sz * 0.15 + k * sz * 0.15
 		draw_line(Vector2(mx, my), Vector2(mx + sz * 0.07, my - sz * 0.09), Color(0.1, 0.05, 0.05), 1.5)  # Zaehne
+	_zombie_gear(z, sz, zx, zy)
+
+# ---- Unterscheidbare Kopf-Aufsaetze/Props je Zombie-Typ (nur gezeichneter Fallback) ----
+func _zombie_gear(z, sz: float, zx: float, zy: float) -> void:
+	var top := zy - sz * 0.55
+	match str(z.kind):
+		"cone":   # orangenes Verkehrshuetchen
+			draw_colored_polygon(PackedVector2Array([Vector2(zx - sz * 0.30, top + sz * 0.02), Vector2(zx + sz * 0.30, top + sz * 0.02), Vector2(zx, top - sz * 0.52)]), Color(0.88, 0.46, 0.14))
+			draw_line(Vector2(zx - sz * 0.20, top - sz * 0.16), Vector2(zx + sz * 0.16, top - sz * 0.20), Color(1, 1, 1, 0.6), 2.0)
+		"bucket":   # Metall-Eimer
+			draw_rect(Rect2(zx - sz * 0.33, top - sz * 0.44, sz * 0.66, sz * 0.48), Color(0.72, 0.74, 0.78))
+			draw_rect(Rect2(zx - sz * 0.33, top - sz * 0.44, sz * 0.66, sz * 0.10), Color(0.86, 0.88, 0.92))
+			draw_rect(Rect2(zx - sz * 0.33, top - sz * 0.44, sz * 0.66, sz * 0.48), Color(0.40, 0.42, 0.46), false, 2.0)
+		"brainz":   # leuchtendes Gehirn
+			draw_circle(Vector2(zx, top - sz * 0.12), sz * 0.32, Color(0.82, 0.42, 0.98, 0.22))
+			draw_circle(Vector2(zx, top - sz * 0.10), sz * 0.20, Color(0.86, 0.50, 1.0))
+			draw_circle(Vector2(zx - sz * 0.08, top - sz * 0.13), sz * 0.09, Color(1, 0.78, 1.0))
+		"flag":   # Fahne
+			draw_line(Vector2(zx + sz * 0.32, top + sz * 0.05), Vector2(zx + sz * 0.32, top - sz * 0.50), Color(0.25, 0.18, 0.12), 2.0)
+			draw_colored_polygon(PackedVector2Array([Vector2(zx + sz * 0.32, top - sz * 0.50), Vector2(zx + sz * 0.66, top - sz * 0.40), Vector2(zx + sz * 0.32, top - sz * 0.30)]), Color(0.82, 0.22, 0.26))
+		"vaulter":   # Sprungstange
+			draw_line(Vector2(zx - sz * 0.45, zy + sz * 0.45), Vector2(zx + sz * 0.25, zy - sz * 0.75), Color(0.72, 0.60, 0.40), 3.0)
+		"sprinter":   # Geschwindigkeits-Linien
+			for i in range(3):
+				var ly := zy - sz * 0.20 + float(i) * sz * 0.22
+				draw_line(Vector2(zx + sz * 0.50, ly), Vector2(zx + sz * 0.90, ly), Color(0.92, 0.42, 0.36, 0.55), 2.0)
+		"brute":   # finstere Augenbrauen
+			draw_line(Vector2(zx - sz * 0.30, top + sz * 0.14), Vector2(zx - sz * 0.05, top + sz * 0.06), Color(0.08, 0.04, 0.06), 3.0)
+			draw_line(Vector2(zx + sz * 0.30, top + sz * 0.14), Vector2(zx + sz * 0.05, top + sz * 0.06), Color(0.08, 0.04, 0.06), 3.0)
 
 # ---- Richtige Sonne: Strahlen + Glow + Gesicht ----
 func _draw_sun_icon(cx: float, cy: float, r: float) -> void:
