@@ -17,11 +17,13 @@ var root: Control
 # HUD
 var sun_lbl: Label
 var fp_lbl: Label
+var coin_lbl: Label
 var brain_lbl: Label
 var wave_lbl: Label
 var wave_bar: Control
 var msg_lbl: Label
 var wave_btn: Button
+var speed_btn: Button
 var seed_box: HBoxContainer
 var tool_ham: Button
 var tool_sho: Button
@@ -89,9 +91,11 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	# HUD lebt jedes Frame (Spiel laeuft weiter, egal ob Drawer offen)
-	sun_lbl.text = "Sonne  %d" % int(Game.sun)
-	fp_lbl.text = "FP  %d" % Game.fp
-	brain_lbl.text = "Skulls  %d" % Game.brains
+	sun_lbl.text = "Sonne  %s" % _fmt(int(Game.sun))
+	fp_lbl.text = "FP  %s" % _fmt(Game.fp)
+	coin_lbl.text = "Muenzen  %s" % _fmt(Game.coins)
+	brain_lbl.text = "Skulls  %s" % _fmt(Game.brains)
+	if speed_btn != null: speed_btn.text = "Tempo %dx" % int(round(Engine.time_scale))
 	wave_lbl.text = "Welle %d / 100%s" % [Game.wave, lawn.weather_hud()]
 	wave_bar.queue_redraw()
 	if d_fp != null: d_fp.text = "%d FP" % Game.fp
@@ -166,6 +170,7 @@ func _build_hud() -> void:
 	root.add_child(pills)
 	sun_lbl = _hud_pill(pills, COL_GOLD)
 	fp_lbl = _hud_pill(pills, COL_CYAN)
+	coin_lbl = _hud_pill(pills, Color(0.95, 0.66, 0.22))
 	brain_lbl = _hud_pill(pills, COL_PINK)
 	# kleine Navigation
 	var nav := HBoxContainer.new()
@@ -211,6 +216,20 @@ func _build_hud() -> void:
 	wave_btn.add_theme_color_override("font_color", Color(0.15, 0.09, 0.02))
 	wave_btn.pressed.connect(_on_wave)
 	root.add_child(wave_btn)
+	# Spieltempo-Umschalter (1x/2x/3x) - QoL fuer den Idle-Loop
+	speed_btn = Button.new()
+	speed_btn.custom_minimum_size = Vector2(84, 38)
+	speed_btn.position = Vector2(SCREEN_W - 336, 58)
+	speed_btn.add_theme_font_size_override("font_size", 15)
+	speed_btn.tooltip_text = "Spieltempo umschalten (1x / 2x / 3x)"
+	speed_btn.pressed.connect(_cycle_speed)
+	root.add_child(speed_btn)
+
+func _cycle_speed() -> void:
+	var s := int(round(Engine.time_scale))
+	if s < 1: s = 1
+	s = s % 3 + 1   # 1 -> 2 -> 3 -> 1
+	Engine.time_scale = float(s)
 
 func _hud_pill(parent, col: Color) -> Label:
 	var pc := PanelContainer.new()
@@ -230,16 +249,33 @@ func _draw_wavebar(bar: Control) -> void:
 	bar.draw_rect(Rect2(0, 0, w, h), Color(0.1, 0.13, 0.16))
 	var frac: float = clamp(float(Game.wave) / 100.0, 0.0, 1.0)
 	bar.draw_rect(Rect2(0, 0, w * frac, h), Color(0.4, 0.82, 0.5))
+	bar.draw_rect(Rect2(0, 0, w * frac, h * 0.5), Color(1, 1, 1, 0.12))   # Glanz oben
 	var nb := _next_boss()
 	for m in [25, 50, 75, 100]:
 		var x: float = w * float(m) / 100.0
-		var c: Color = Color(1, 0.3, 0.3) if m == nb else Color(0.85, 0.8, 0.5)
-		bar.draw_rect(Rect2(x - 2, -3, 4, h + 6), c)
+		var passed: bool = Game.wave >= m
+		var c: Color = Color(1, 0.3, 0.3) if m == nb else (Color(0.55, 0.85, 0.6) if passed else Color(0.82, 0.78, 0.6))
+		bar.draw_rect(Rect2(x - 1, -2, 2, h + 4), Color(c.r, c.g, c.b, 0.5))
+		_draw_skull(bar, x, h * 0.5, 5.5, c)
+
+# Kleiner Totenkopf-Marker (Boss-Welle) auf dem Wellenbalken
+func _draw_skull(bar: Control, cx: float, cy: float, r: float, col: Color) -> void:
+	bar.draw_circle(Vector2(cx, cy - r * 0.15), r, col)                          # Schaedel
+	bar.draw_rect(Rect2(cx - r * 0.55, cy + r * 0.5, r * 1.1, r * 0.7), col)      # Kiefer
+	bar.draw_circle(Vector2(cx - r * 0.4, cy - r * 0.15), r * 0.28, Color(0.08, 0.05, 0.07))  # Auge L
+	bar.draw_circle(Vector2(cx + r * 0.4, cy - r * 0.15), r * 0.28, Color(0.08, 0.05, 0.07))  # Auge R
 
 func _next_boss() -> int:
 	for m in [25, 50, 75, 100]:
 		if Game.wave < m: return m
 	return 100
+
+# Kompakte Zahlen: ab 10k -> "12.3k", ab 1M -> "1.2M"
+func _fmt(n: int) -> String:
+	var a: int = abs(n)
+	if a >= 1000000: return "%.1fM" % (float(n) / 1000000.0)
+	if a >= 10000: return "%.1fk" % (float(n) / 1000.0)
+	return str(n)
 
 # Nav-Handler
 func _open_alm() -> void: open_overlay("almanac")
