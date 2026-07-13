@@ -794,6 +794,18 @@ func _tree_node(canvas, center: Vector2, title: String, subtitle: String, cost: 
 	t.add_theme_font_size_override("font_size", int(max(9, 13 * z))); t.modulate = Color(0.96, 0.99, 0.96)
 	box.add_child(t)
 	holder.add_child(box)
+	# Zustands-Abzeichen: Schloss (gesperrt) bzw. Haken (freigeschaltet)
+	var badge_mode := ""
+	if state == "lock" or state == "need" or state == "legend_lock": badge_mode = "lock"
+	elif state == "owned" or state == "legend_owned": badge_mode = "check"
+	if badge_mode != "":
+		var badge := NodeBadge.new(); badge.mode = badge_mode
+		var bs := 18.0 * z
+		badge.custom_minimum_size = Vector2(bs, bs)
+		badge.size = Vector2(bs, bs)
+		badge.position = Vector2(w - bs - 4.0 * z, 4.0 * z)
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		holder.add_child(badge)
 	if show_cost:
 		var pill := Label.new(); pill.text = "%d FP" % cost
 		pill.add_theme_font_size_override("font_size", int(max(8, 12 * z))); pill.modulate = Color(1, 0.96, 0.82)
@@ -817,16 +829,21 @@ func _style_tree_node(b: Button, state: String, selected: bool, ecol: Color) -> 
 	var bd := ecol
 	var bg := ecol.darkened(0.80)
 	if state == "owned" or state == "root" or state == "legend_owned":
-		bg = ecol.darkened(0.58)
+		bg = ecol.darkened(0.42); bd = ecol.lightened(0.15)   # satt gefuellt
 	elif state == "avail" or state == "legend_avail":
-		bg = ecol.darkened(0.74)
-	else:  # lock / need / legend_lock -> abgedunkelt
-		bd = ecol.darkened(0.5)
-		bg = ecol.darkened(0.88)
+		bg = ecol.darkened(0.72)
+	else:  # lock / need / legend_lock -> abgedunkelt/entsaettigt
+		bd = ecol.darkened(0.55)
+		bg = ecol.darkened(0.90)
 	var bw := 3 if state.begins_with("legend") else 2
 	if selected: bd = Color(1, 1, 1); bw = 3
 	for st in ["normal", "hover", "pressed", "disabled"]:
-		b.add_theme_stylebox_override(st, _sb(bg, bd, bw, 16, 6))
+		var sbf := _sb(bg, bd, bw, 16, 6)
+		if state.begins_with("legend"):
+			# Rare/Legendaer: lila Glow-Rahmen (Doppelrahmen-Optik)
+			sbf.shadow_color = Color(0.72, 0.42, 1.0, 0.5)
+			sbf.shadow_size = 5
+		b.add_theme_stylebox_override(st, sbf)
 
 func _draw_tree(canvas) -> void:
 	# ---- Themen-Hintergrund: 4 Quadranten + Deko ----
@@ -1485,3 +1502,23 @@ class MenuScene extends Control:
 		# Reagenzglaeser vor dem Labor
 		draw_rect(Rect2(lx + 20.0, ly + bh - 34.0, 12, 34), Color(0.6, 0.4, 0.9, 0.85))
 		draw_rect(Rect2(lx + 38.0, ly + bh - 26.0, 12, 26), Color(0.35, 0.9, 0.5, 0.85))
+
+
+# ================================================================
+# SKILL-NODE-ABZEICHEN — kleines Schloss (gesperrt) bzw. Haken
+# (freigeschaltet), prozedural gezeichnet.
+# ================================================================
+class NodeBadge extends Control:
+	var mode := "lock"
+	func _draw() -> void:
+		var w := size.x
+		var h := size.y
+		if mode == "lock":
+			# Buegel (oberer Halbkreis) + Schloss-Koerper
+			draw_arc(Vector2(w * 0.5, h * 0.45), w * 0.20, PI, TAU, 12, Color(0.86, 0.86, 0.92), 2.0)
+			draw_rect(Rect2(w * 0.28, h * 0.45, w * 0.44, h * 0.42), Color(0.86, 0.86, 0.92))
+			draw_circle(Vector2(w * 0.5, h * 0.63), w * 0.05, Color(0.18, 0.18, 0.24))
+		else:
+			# Haken
+			draw_line(Vector2(w * 0.20, h * 0.52), Vector2(w * 0.42, h * 0.74), Color(0.5, 1.0, 0.62), 3.0)
+			draw_line(Vector2(w * 0.42, h * 0.74), Vector2(w * 0.82, h * 0.28), Color(0.5, 1.0, 0.62), 3.0)
