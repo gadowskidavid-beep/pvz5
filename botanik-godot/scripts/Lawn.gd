@@ -311,10 +311,15 @@ func _end_wave() -> void:
 		return
 	Game.phase = "prep"
 	Game.fp += Game.wave
+	# Wellen-Abschluss-Bonus (skaliert mit der Welle) — belohnt Durchhalten
+	var bonus_sun := 25 + Game.wave * 5
+	Game.sun += bonus_sun
+	_add_shake(4.0)
+	_popup(Game.LAWN_X + Game.COLS * Game.CELL * 0.5, Game.LAWN_Y + 20.0, "Welle geschafft! +%d Sonne" % bonus_sun, Color(0.6, 1.0, 0.65))
 	# Maeher werden NUR mit der Werkstatt-Skill repariert (sonst bleiben verbrauchte Maeher weg)
 	if Game.mower_fix():
 		for m in mowers: m.used = false; m.active = false; m.x = float(Game.LAWN_X - 30)
-	msg = "Welle %d geschafft! +%d FP" % [Game.wave, Game.wave]; msg_t = 2.0
+	msg = "Welle %d geschafft! +%d FP · +%d Sonne" % [Game.wave, Game.wave, bonus_sun]; msg_t = 2.2
 
 func _make_zombie(kind: String) -> Dictionary:
 	var b = Game.ZTYPES[kind]
@@ -669,7 +674,12 @@ func _update(dt: float) -> void:
 		if su.falling and su.y < su.ty: su.y += su.vy * dt
 		else: su.falling = false
 		su.life -= dt
-		if su.life <= 0: suns.remove_at(i)
+		if su.life <= 0:
+			# Idle-freundlich: nicht eingesammelte Sonne wird automatisch gutgeschrieben
+			var av: int = int(su.value)
+			Game.sun += av
+			_popup(su.x, su.y, "+%d" % av, Color(1, 0.88, 0.4))
+			suns.remove_at(i)
 	# Effekte
 	for i in range(fx.size() - 1, -1, -1):
 		fx[i].life -= dt
@@ -1223,6 +1233,28 @@ func _draw_sky(night: bool) -> void:
 	for hx in [vp.x * 0.14, vp.x * 0.52, vp.x * 0.86]:
 		draw_circle(Vector2(hx, horizon + 34), 130, hillcol)
 
+# ---- Fallende Umgebungspartikel: Blaetter (Tag), Schnee (bei Frost) ----
+func _draw_ambient_fall(night: bool, vp: Vector2) -> void:
+	if weather == "gewitter": return          # bei Regen kein Extra-Gewusel
+	var snow := (weather == "frost")
+	if not snow and night: return             # nachts uebernehmen die Gluehwuermchen
+	var rngA := RandomNumberGenerator.new(); rngA.seed = 20260713
+	var n := 22 if snow else 13
+	for i in range(n):
+		var bx := rngA.randf() * vp.x
+		var spd := (30.0 + rngA.randf() * 42.0) if snow else (20.0 + rngA.randf() * 28.0)
+		var ph := rngA.randf()
+		var yy := fmod(ph * vp.y + _anim_clock * spd, vp.y)
+		var sway := sin(_anim_clock * (1.0 + ph) + float(i)) * (6.0 if snow else 11.0)
+		var px := bx + sway
+		if snow:
+			draw_circle(Vector2(px, yy), 2.0 + ph * 1.4, Color(0.9, 0.95, 1.0, 0.6))
+		else:
+			var lc := Color(0.85, 0.6, 0.25, 0.5) if (i % 2 == 0) else Color(0.62, 0.8, 0.35, 0.45)
+			var rot := _anim_clock * 2.0 + float(i)
+			var arm := Vector2(cos(rot), sin(rot)) * 4.0
+			draw_line(Vector2(px, yy) - arm, Vector2(px, yy) + arm, lc, 2.5)
+
 func _cloud(x: float, y: float, s: float) -> void:
 	var col := Color(1, 1, 1, 0.72)
 	draw_circle(Vector2(x, y), 22 * s, col)
@@ -1233,6 +1265,7 @@ func _cloud(x: float, y: float, s: float) -> void:
 # ---- Atmosphaere-Overlay: Gluehwuermchen (Nacht), Sonnenstrahlen (Tag), Vignette ----
 func _draw_atmosphere(night: bool) -> void:
 	var vp := get_viewport_rect().size
+	_draw_ambient_fall(night, vp)
 	if night:
 		var rng3 := RandomNumberGenerator.new(); rng3.seed = 5150
 		for i in range(16):
