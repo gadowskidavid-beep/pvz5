@@ -14,7 +14,7 @@ const LAWN_Y := 96
 # ---- CHASSIS = die 8 CHAINS (env: day/night/water/any) ----
 var CHASSIS := {
 	"sonne":       {"n":"Sonnenblume","arch":"sun","env":"day","fp":0,"req":"","col":Color(1,0.83,0.2),"cost":50,"hp":60,"cd":5,"amount":25,"interval":8.0,"d":"Tag · Oekonomie: produziert Sonne."},
-	"pea":         {"n":"Schütze","arch":"shooter","env":"day","fp":10,"req":"","col":Color(0.35,0.85,0.4),"cost":100,"hp":60,"cd":5,"dmg":22,"rate":0.9,"speed":340.0,"d":"Tag · Schaden/DPS: schießt Erbsen (langsam - skille die Feuerrate!)."},
+	"pea":         {"n":"Schütze","arch":"shooter","env":"day","fp":10,"req":"","col":Color(0.35,0.85,0.4),"cost":100,"hp":60,"cd":5,"dmg":22,"rate":1.1,"speed":340.0,"d":"Tag · Schaden/DPS: schießt Erbsen — skille die Feuerrate!"},
 	"wall":        {"n":"Panzer-Nuss","arch":"wall","env":"any","fp":18,"req":"pea","col":Color(0.62,0.44,0.26),"cost":50,"hp":340,"cd":14,"d":"Ueberall · Verteidigung: zaeher Blocker."},
 	"pilz":        {"n":"Pilz","arch":"fume","env":"night","fp":36,"req":"","col":Color(0.72,0.55,0.85),"cost":100,"hp":60,"cd":5,"dmg":16,"rate":1.6,"range":2.6,"d":"Nacht · Gift & Sporen-Flaeche. Stark bei Nacht, schwach am Tag."},
 	"sonnenpilz":  {"n":"Sonnenpilz","arch":"sun","env":"night","fp":20,"req":"sonne","col":Color(0.8,0.72,0.5),"cost":25,"hp":60,"cd":5,"amount":15,"interval":7.0,"d":"Nacht · Billige Sonne, produziert auch nachts."},
@@ -88,10 +88,10 @@ var ZTYPES := {
 	"sprinter": {"n":"Renn-Zombie","hp":200,"speed":22,"dmg":40,"fp":3,"rage":true,"col":Color(0.72,0.38,0.36)},
 	"shield":   {"n":"Schild-Zombie","hp":260,"speed":13,"dmg":42,"fp":3,"shield":260.0,"col":Color(0.5,0.58,0.72)},
 	"miniboss": {"n":"Mini-Boss","hp":1500,"speed":11,"dmg":80,"fp":6,"boss":true,"brain":3,"col":Color(0.7,0.4,0.5)},
-	"boss_a":   {"n":"Flammen-Gargantuar","hp":1300,"speed":9,"dmg":120,"fp":14,"boss":true,"brain":6,"smash":true,"element":"feuer","col":Color(0.95,0.4,0.2)},
-	"boss_b":   {"n":"Frost-Koloss","hp":1600,"speed":10,"dmg":130,"fp":18,"boss":true,"brain":10,"element":"eis","col":Color(0.4,0.68,1.0)},
-	"boss_c":   {"n":"Gewitter-Zerstörer","hp":1800,"speed":10,"dmg":150,"fp":24,"boss":true,"brain":16,"element":"blitz","col":Color(1.0,0.85,0.3)},
-	"megaboss": {"n":"Untoter Überlord","hp":2800,"speed":8,"dmg":220,"fp":60,"boss":true,"brain":35,"final":true,"smash":true,"summon":6,"element":"untot","col":Color(0.72,0.35,0.9)},
+	"boss_a":   {"n":"Flammen-Gargantuar","hp":2400,"speed":9,"dmg":120,"fp":14,"boss":true,"brain":6,"smash":true,"element":"feuer","col":Color(0.95,0.4,0.2)},
+	"boss_b":   {"n":"Frost-Koloss","hp":3000,"speed":10,"dmg":130,"fp":18,"boss":true,"brain":10,"element":"eis","col":Color(0.4,0.68,1.0)},
+	"boss_c":   {"n":"Gewitter-Zerstörer","hp":3600,"speed":10,"dmg":150,"fp":24,"boss":true,"brain":16,"element":"blitz","col":Color(1.0,0.85,0.3)},
+	"megaboss": {"n":"Untoter Überlord","hp":7000,"speed":8,"dmg":220,"fp":60,"boss":true,"brain":35,"final":true,"smash":true,"summon":6,"element":"untot","col":Color(0.72,0.35,0.9)},
 }
 
 # ================================================================
@@ -102,8 +102,9 @@ var brains := 0
 var prestige := {}
 var seen := {}          # Set: zombie-key -> true
 var carry_coins := 0
-var zlab := {"str":0,"arm":0,"spd":0}
 var unlocked_slots := 3           # Anzahl Samen-Slots (dauerhaft, via Gehirne erweiterbar)
+# --- Boss-Reihenfolge: pro Run neu gemischt (Finale bleibt fix) ---
+var boss_order: Array = ["boss_a", "boss_b", "boss_c"]
 # --- Skills (NICHT gespeichert, bleiben aber während der Sitzung) ---
 var fp := 0
 var research := {}
@@ -213,8 +214,16 @@ func seed_nodes(slot: int) -> Dictionary:
 	return seeds[slot].nodes
 func seed_set_chain(slot: int, ck: String) -> void:
 	if slot < 0 or slot >= seeds.size(): return
+	# Fairness: 50% FP-Erstattung fuer bereits gekaufte Skill-Knoten des alten Baus
+	var old := str(seeds[slot].chain)
+	if old != "" and old != ck:
+		var onodes := tree_nodes(old)
+		var back := 0.0
+		for id in seeds[slot].nodes:
+			back += float(onodes.get(id, {}).get("cost", 0)) * 0.5
+		fp += int(back)
 	seeds[slot].chain = ck
-	seeds[slot].nodes = {}       # neue Pflanze -> Skills weg (kein FP zurueck)
+	seeds[slot].nodes = {}       # neue Pflanze -> neue Skills (50% FP kamen zurueck)
 func seed_reset(slot: int) -> void:
 	if slot < 0 or slot >= seeds.size(): return
 	seeds[slot].chain = ""
@@ -382,10 +391,6 @@ func buy_pass(k: String) -> bool:
 	if coins < c: return false
 	coins -= c; run_shop[k] = int(run_shop.get(k, 0)) + 1
 	return true
-func zlab_change(key: String, delta: int) -> void:
-	zlab[key] = clamp(int(zlab.get(key, 0)) + delta, 0, 10)
-	save_game()
-
 # ================================================================
 # RUN
 # ================================================================
@@ -396,8 +401,16 @@ func new_run() -> void:
 	phase = "prep"
 	run_shop.clear()
 
+# Boss fuer eine Boss-Welle: Reihenfolge der 3 Hauptbosse ist pro Run gemischt, Finale fix.
+func boss_key_for_wave(w: int) -> String:
+	var idx := BAL.BOSS_WAVES.find(w)
+	if idx < 0: return ""
+	if idx >= 3: return "megaboss"
+	return str(boss_order[idx])
+
 # Wiedergeburt: ALLE Skills/Samen weg, Prestige (Gehirne) + Slot-Anzahl bleiben
 func rebirth() -> void:
+	boss_order.shuffle()                           # jeder Run: andere Boss-Reihenfolge
 	fp = 0                                         # Frischstart: alles auf 0
 	research = {}
 	run_shop = {}
@@ -423,7 +436,7 @@ func rebirth() -> void:
 # SPEICHERN / LADEN (nur Meta!)
 # ================================================================
 func save_game() -> void:
-	var data := {"brains": brains, "prestige": prestige, "carry_coins": carry_coins, "zlab": zlab, "seen": seen.keys(), "slots": unlocked_slots}
+	var data := {"brains": brains, "prestige": prestige, "carry_coins": carry_coins, "seen": seen.keys(), "slots": unlocked_slots}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(data))
@@ -439,8 +452,6 @@ func load_game() -> void:
 	unlocked_slots = int(data.get("slots", 3))
 	if data.has("prestige") and typeof(data.prestige) == TYPE_DICTIONARY: prestige = data.prestige
 	carry_coins = int(data.get("carry_coins", 0))
-	if data.has("zlab") and typeof(data.zlab) == TYPE_DICTIONARY:
-		zlab = {"str": int(data.zlab.get("str", 0)), "arm": int(data.zlab.get("arm", 0)), "spd": int(data.zlab.get("spd", 0))}
 	seen = {}
 	if data.has("seen"):
 		for k in data.seen: seen[k] = true

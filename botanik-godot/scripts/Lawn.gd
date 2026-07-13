@@ -146,20 +146,43 @@ func start_wave() -> void:
 	Game.phase = "fight"
 	_roll_weather()
 	_sync_rows()
+	# --- RASEN-UMBRUCH: neuer Akt (Welle 25/50/75) — die Map bricht um! ---
+	var umbruch := Game.wave > 1 and BAL.act_index(Game.wave) != BAL.act_index(Game.wave - 1)
+	if umbruch: _do_umbruch()
 	to_spawn = BAL.WAVE_BASE + int(Game.wave * BAL.WAVE_PER) + int(Game.wave / 6.0) * Game.lanes_count()
-	spawn_timer = 0.5
-	_spawn("flag")
-	to_spawn = max(0, to_spawn - 1)
+	spawn_timer = (BAL.UMBRUCH_GRACE if umbruch else 0.5)
+	if umbruch:
+		pass   # Flag-Zombie kommt erst nach der Schonfrist mit der Horde
+	else:
+		_spawn("flag")
+		to_spawn = max(0, to_spawn - 1)
 	if BAL.is_boss_wave(Game.wave):
-		var bk := BAL.boss_key(Game.wave)
-		_spawn(bk)
+		var bk := Game.boss_key_for_wave(Game.wave)
+		_spawn(bk)   # Boss kommt SOFORT — waehrend du im Umbruch neu baust
 		to_spawn += int(Game.ZTYPES[bk].get("summon", 0))
 		var wo := world_of(Game.wave)
-		msg = "%s  —  BOSS: %s!" % [wo.name, Game.ZTYPES[bk].n]; msg_t = 3.0
+		if umbruch:
+			msg = "RASEN-UMBRUCH: %s!  BOSS: %s  ·  Schonfrist: baue neu auf!" % [str(wo.name), str(Game.ZTYPES[bk].n)]
+			msg_t = float(BAL.UMBRUCH_GRACE)
+		else:
+			msg = "%s  —  BOSS: %s!" % [wo.name, Game.ZTYPES[bk].n]; msg_t = 3.0
 		return
 	elif Game.wave == BAL.MINIBOSS_WAVE:
 		_spawn("miniboss")
 	msg = "Welle %d startet!" % Game.wave; msg_t = 1.6
+
+# Der grosse Moment: Rasen bricht um. Pflanzen zerstoert (50% Sonne zurueck), kurze Schonfrist.
+func _do_umbruch() -> void:
+	var back := 0.0
+	for p in plants:
+		back += float(p.s.get("cost", 0)) * BAL.UMBRUCH_REFUND
+	plants.clear()
+	graveyard.clear()
+	peas.clear()
+	Game.sun += int(back)
+	var wo := world_of(Game.wave)
+	msg = "DER RASEN BRICHT UM — %s!  +%d Sonne erstattet · %d s Schonfrist" % [str(wo.name), int(back), int(BAL.UMBRUCH_GRACE)]
+	msg_t = float(BAL.UMBRUCH_GRACE)
 
 func _roll_weather() -> void:
 	# Erste Welle & Boss-Wellen bleiben klar

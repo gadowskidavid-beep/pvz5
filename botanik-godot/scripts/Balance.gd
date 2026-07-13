@@ -29,6 +29,10 @@ const BRAIN_CHANCE := 0.10
 const IDLE_MIN := 5.0
 const IDLE_MAX := 9.0
 
+# ---- Rasen-Umbruch (alle 25 Wellen: Map bricht um + Boss erscheint) ----
+const UMBRUCH_REFUND := 0.5   # 50% Sonnen-Erstattung fuer zerstoerte Pflanzen
+const UMBRUCH_GRACE := 8.0    # Sekunden Schonfrist, bevor die Horde nachrueckt
+
 # ---- Dynamische Zerstoerung ----
 const HAZARD_DMG := 65.0
 const HAZARD_MIN := 6.0
@@ -75,7 +79,8 @@ const ACTS := [
 # STATISCHE HELFER
 # ================================================================
 static func act_index(w: int) -> int:
-	return clampi(int((max(w, 1) - 1) / ACT_SIZE), 0, 3)
+	# Neuer Akt beginnt AUF der Boss-Welle (25/50/75): Umbruch + Boss im selben Moment.
+	return clampi(int(max(w, 1) / ACT_SIZE), 0, 3)
 static func act_of(w: int) -> Dictionary:
 	return ACTS[act_index(w)]
 static func is_boss_wave(w: int) -> bool:

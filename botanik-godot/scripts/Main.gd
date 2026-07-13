@@ -948,6 +948,23 @@ func _big(parent, text: String, size: int, col: Color) -> void:
 func _spacer(parent, h: int) -> void:
 	var sp := Control.new(); sp.custom_minimum_size = Vector2(0, h); parent.add_child(sp)
 
+# Grabstein-Form: oben stark gerundet, unten kantig
+func _stone_sb(bg: Color, border: Color) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = bg; s.border_color = border; s.set_border_width_all(3)
+	s.corner_radius_top_left = 48; s.corner_radius_top_right = 48
+	s.corner_radius_bottom_left = 8; s.corner_radius_bottom_right = 8
+	s.set_content_margin_all(14)
+	return s
+
+# Holzschild-Form fuer die Seiten-Buttons
+func _wood_sb(bg: Color, border: Color) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = bg; s.border_color = border; s.set_border_width_all(3)
+	s.set_corner_radius_all(9)
+	s.set_content_margin_all(10)
+	return s
+
 func _menu_btn(parent, text: String, cb: Callable) -> void:
 	var b := Button.new(); b.text = text; b.custom_minimum_size = Vector2(340, 48)
 	b.add_theme_font_size_override("font_size", 19); b.pressed.connect(cb)
@@ -995,20 +1012,49 @@ func _buy_item(key: String) -> void:
 func _buy_pass(key: String) -> void:
 	if Game.buy_pass(key): _post_buy("shop")
 
-# ---- STARTMENUE ----
+# ---- STARTMENUE: nächtliche Labor-Friedhof-Szene (prozedural gezeichnet) ----
 func _build_menu(vb) -> void:
-	_spacer(vb, 10)
-	_big(vb, "BOTANIK - LABOR", 44, COL_ACCENT)
-	_big(vb, "Ein idle Pflanzen-vs-Zombies Labor.  Ueberlebe bis Welle 100!", 15, Color(0.7, 0.85, 0.72))
-	_spacer(vb, 16)
-	_menu_btn(vb, "> Abenteuer starten", close_all)
-	_menu_btn(vb, "Almanach (Pflanzen)", _menu_open_alm)
-	_menu_btn(vb, "Zombie-Buch", _menu_open_zom)
-	_menu_btn(vb, "Optionen", _menu_open_opt)
-	_menu_btn(vb, "Entwickler-Menue (Regler & Cheats)", _menu_open_dev)
-	_spacer(vb, 16)
-	_big(vb, "Skulls (dauerhaft): %d     Prestige-Stufen: %d" % [Game.brains, _pres_total()], 14, COL_PURPLE)
-	_big(vb, "Tipp: Zieh unten das Skill-Trees-Panel hoch, waehrend oben das Spiel laeuft.", 13, Color(0.65, 0.8, 0.68))
+	var scene := MenuScene.new()
+	scene.custom_minimum_size = Vector2(1060, 500)
+	vb.add_child(scene)
+	# Titel
+	var ttl := Label.new(); ttl.text = "BOTANIK-LABOR"
+	ttl.add_theme_font_size_override("font_size", 52); ttl.modulate = COL_ACCENT
+	ttl.position = Vector2(40, 22); scene.add_child(ttl)
+	var sub := Label.new(); sub.text = "Ein Idle-Pflanzen-Labor gegen die Zombie-Nacht.  Ueberlebe bis Welle 100!"
+	sub.add_theme_font_size_override("font_size", 15); sub.modulate = Color(0.75, 0.85, 0.78)
+	sub.position = Vector2(43, 84); scene.add_child(sub)
+	# Grabstein-Hauptbutton
+	var start := Button.new(); start.text = "ABENTEUER\nSTARTEN"
+	start.custom_minimum_size = Vector2(250, 200)
+	start.position = Vector2(600, 175)
+	start.add_theme_font_size_override("font_size", 27)
+	start.add_theme_stylebox_override("normal", _stone_sb(Color(0.30, 0.32, 0.37), Color(0.15, 0.16, 0.19)))
+	start.add_theme_stylebox_override("hover", _stone_sb(Color(0.37, 0.40, 0.46), COL_ACCENT))
+	start.add_theme_stylebox_override("pressed", _stone_sb(Color(0.24, 0.26, 0.30), COL_ACCENT))
+	start.pressed.connect(close_all)
+	scene.add_child(start)
+	# Holzschild-Buttons links
+	var entries := [["Almanach (Pflanzen)", _menu_open_alm], ["Zombie-Buch", _menu_open_zom], ["Optionen", _menu_open_opt], ["Entwickler-Menue", _menu_open_dev]]
+	var y := 185.0
+	for e in entries:
+		var b := Button.new(); b.text = str(e[0])
+		b.custom_minimum_size = Vector2(280, 52); b.position = Vector2(58, y)
+		b.add_theme_font_size_override("font_size", 18)
+		b.add_theme_stylebox_override("normal", _wood_sb(Color(0.31, 0.22, 0.12), Color(0.15, 0.10, 0.05)))
+		b.add_theme_stylebox_override("hover", _wood_sb(Color(0.39, 0.28, 0.16), COL_ACCENT))
+		b.add_theme_stylebox_override("pressed", _wood_sb(Color(0.24, 0.17, 0.10), COL_ACCENT))
+		b.pressed.connect(e[1])
+		scene.add_child(b)
+		y += 62.0
+	# Fusszeile
+	var info := Label.new()
+	info.text = "Skulls (dauerhaft): %d     Prestige-Stufen: %d" % [Game.brains, _pres_total()]
+	info.modulate = COL_PURPLE; info.add_theme_font_size_override("font_size", 15)
+	info.position = Vector2(43, 452); scene.add_child(info)
+	var tip := Label.new(); tip.text = "Tipp: Zieh unten das Skill-Trees-Panel hoch, waehrend oben das Spiel laeuft."
+	tip.modulate = Color(0.62, 0.76, 0.66); tip.add_theme_font_size_override("font_size", 13)
+	tip.position = Vector2(43, 476); scene.add_child(tip)
 
 func _menu_open_alm() -> void: open_overlay("almanac", "menu")
 func _menu_open_zom() -> void: open_overlay("zombiebook", "menu")
@@ -1034,7 +1080,6 @@ func _build_options(vb) -> void:
 func _reset_progress() -> void:
 	Game.brains = 0
 	Game.prestige = {}
-	Game.zlab = {"str": 0, "arm": 0, "spd": 0}
 	Game.carry_coins = 0
 	Game.seen = {}
 	Game.unlocked_slots = 3
@@ -1330,3 +1375,77 @@ func _build_ztab(vb) -> void:
 	else: lure_b.text = "FP %d" % Game.lure_cost(); lure_b.disabled = Game.fp < Game.lure_cost()
 	lure_b.pressed.connect(_buy_lure)
 	lure_hb.add_child(lure_b); zc.add_child(lure_hb)
+
+
+# ================================================================
+# HAUPTMENUE-SZENE — Friedhof bei Nacht, komplett prozedural
+# gezeichnet (keine Bild-Dateien noetig). Eigenstaendiger Stil.
+# ================================================================
+class MenuScene extends Control:
+	var t := 0.0
+	func _process(delta: float) -> void:
+		t += delta
+		queue_redraw()
+	func _stone(p: Vector2, sw: float, sh: float, col: Color) -> void:
+		draw_rect(Rect2(p.x - sw * 0.5, p.y - sh + sw * 0.5, sw, sh - sw * 0.5), col)
+		draw_circle(Vector2(p.x, p.y - sh + sw * 0.5), sw * 0.5, col)
+	func _draw() -> void:
+		var w := size.x
+		var h := size.y
+		# Nachthimmel (lila, wie im Spiel)
+		draw_rect(Rect2(0, 0, w, h), Color(0.09, 0.05, 0.14))
+		draw_rect(Rect2(0, h * 0.40, w, h * 0.26), Color(0.12, 0.07, 0.18))
+		# Funkelnde Sterne
+		var rs := RandomNumberGenerator.new()
+		rs.seed = 7
+		for i in range(44):
+			var sx := rs.randf() * w
+			var sy := rs.randf() * h * 0.5
+			var tw := 0.5 + 0.5 * sin(t * 1.6 + float(i) * 1.3)
+			draw_circle(Vector2(sx, sy), 1.0 + rs.randf() * 1.2, Color(0.9, 0.92, 1.0, 0.2 + 0.5 * tw))
+		# Mondsichel
+		draw_circle(Vector2(w * 0.80, 74.0), 34, Color(0.93, 0.91, 0.80))
+		draw_circle(Vector2(w * 0.80 - 13.0, 66.0), 31, Color(0.09, 0.05, 0.14))
+		# Wolken
+		for c in [[0.18, 52.0], [0.52, 38.0], [0.93, 100.0]]:
+			var cx: float = w * float(c[0])
+			var cy: float = float(c[1])
+			var cc := Color(0.16, 0.10, 0.22, 0.9)
+			draw_circle(Vector2(cx, cy), 18, cc)
+			draw_circle(Vector2(cx + 22.0, cy + 4.0), 14, cc)
+			draw_circle(Vector2(cx - 22.0, cy + 5.0), 13, cc)
+		# Huegel + Boden
+		draw_polygon(PackedVector2Array([Vector2(0, h * 0.62), Vector2(w * 0.28, h * 0.52), Vector2(w * 0.6, h * 0.62), Vector2(w, h * 0.54), Vector2(w, h), Vector2(0, h)]), [Color(0.10, 0.12, 0.10)])
+		draw_rect(Rect2(0, h * 0.74, w, h * 0.26), Color(0.06, 0.09, 0.06))
+		# Friedhofszaun
+		var fy := h * 0.70
+		var fx0 := w * 0.34
+		var fx1 := w - 24.0
+		var fx := fx0
+		while fx < fx1:
+			draw_rect(Rect2(fx, fy, 5, 30), Color(0.13, 0.10, 0.08))
+			fx += 26.0
+		draw_rect(Rect2(fx0, fy + 8.0, fx1 - fx0, 4), Color(0.13, 0.10, 0.08))
+		# Deko-Grabsteine + Kreuz
+		_stone(Vector2(w * 0.46, h * 0.82), 46, 62, Color(0.22, 0.23, 0.27))
+		_stone(Vector2(w * 0.91, h * 0.88), 54, 74, Color(0.20, 0.21, 0.25))
+		var kx := w * 0.70
+		var ky := h * 0.84
+		draw_rect(Rect2(kx - 3.0, ky - 44.0, 6, 44), Color(0.20, 0.21, 0.25))
+		draw_rect(Rect2(kx - 16.0, ky - 34.0, 32, 6), Color(0.20, 0.21, 0.25))
+		# Labor links: Haus mit gruen gluehendem Fenster (pulsiert)
+		var lx := w * 0.055
+		var ly := h * 0.44
+		var bw := 190.0
+		var bh := 170.0
+		draw_rect(Rect2(lx, ly, bw, bh), Color(0.16, 0.13, 0.11))
+		draw_polygon(PackedVector2Array([Vector2(lx - 14.0, ly), Vector2(lx + bw * 0.5, ly - 64.0), Vector2(lx + bw + 14.0, ly)]), [Color(0.11, 0.09, 0.08)])
+		var glow := 0.55 + 0.45 * sin(t * 2.2)
+		draw_rect(Rect2(lx + 24.0, ly + 24.0, 58, 48), Color(0.35, 0.95, 0.5, 0.22 + 0.28 * glow))
+		draw_rect(Rect2(lx + 31.0, ly + 31.0, 44, 34), Color(0.45, 1.0, 0.55, 0.5 + 0.4 * glow))
+		draw_rect(Rect2(lx + 120.0, ly + 70.0, 44, 100), Color(0.10, 0.08, 0.07))
+		draw_line(Vector2(lx + bw * 0.5, ly - 64.0), Vector2(lx + bw * 0.5, ly - 96.0), Color(0.30, 0.30, 0.32), 3.0)
+		draw_circle(Vector2(lx + bw * 0.5, ly - 98.0), 4, Color(0.45, 0.85, 0.5, 0.5 + 0.5 * glow))
+		# Reagenzglaeser vor dem Labor
+		draw_rect(Rect2(lx + 20.0, ly + bh - 34.0, 12, 34), Color(0.6, 0.4, 0.9, 0.85))
+		draw_rect(Rect2(lx + 38.0, ly + bh - 26.0, 12, 26), Color(0.35, 0.9, 0.5, 0.85))
