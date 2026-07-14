@@ -579,6 +579,10 @@ func _update(dt: float) -> void:
 				else:
 					z.hp -= pe.dmg; _apply_fx(z, pe.effects, pe.dmg)
 					z["hitflash"] = 0.16   # kurzes weisses Aufblitzen beim Treffer
+					# Aufschlag-Spritzer am Treffpunkt
+					for _ik in range(2):
+						var ia := rng.randf() * TAU
+						fx.append({"t": "gib", "x": float(pe.x), "y": float(z.y), "vx": cos(ia) * 45.0 - 25.0, "vy": sin(ia) * 45.0, "life": 0.26, "col": Color(0.92, 1.0, 0.72), "sz": 2.0})
 				Music.play_sfx("pea_hit", 0.09)
 				pe.hit.append(z)
 				if int(pe.pierce) > 0:
@@ -1142,9 +1146,25 @@ func _draw() -> void:
 			# Schild vorne (links, Richtung Pflanzen)
 			draw_rect(Rect2(z.x - sz*0.62, zy - sz*0.5, 7, sz*1.0), Color(0.62,0.78,0.96,0.9))
 		_hp_bar(z.x, zy - sz*0.62, z.hp / z.maxhp, Color(0.9,0.3,0.3))
-		var ix = z.x + sz*0.4
-		if z.burn > 0: draw_circle(Vector2(ix, zy - sz*0.5), 4, Color(1,0.5,0.1))
-		if z.poison > 0: draw_circle(Vector2(ix, zy - sz*0.5 + 10), 4, Color(0.6,0.9,0.3))
+		if z.burn > 0:
+			# aufsteigende Flammen
+			for fi in range(3):
+				var fph := fmod(_anim_clock * 3.0 + float(fi) * 0.4, 1.0)
+				var fxp := z.x + (float(fi) - 1.0) * sz * 0.26 + sin(_anim_clock * 8.0 + float(fi)) * 2.0
+				var fyp := zy - sz * 0.2 - fph * sz * 0.75
+				draw_circle(Vector2(fxp, fyp), (1.0 - fph) * 6.0, Color(1.0, 0.45 + 0.35 * fph, 0.1, 0.7 * (1.0 - fph)))
+		if z.poison > 0:
+			# aufsteigende Gift-Blasen
+			for bi in range(3):
+				var bph := fmod(_anim_clock * 2.0 + float(bi) * 0.45, 1.0)
+				var bxp := z.x + sz * 0.28 + sin(_anim_clock * 4.0 + float(bi)) * 3.0
+				var byp := zy - sz * 0.2 - bph * sz * 0.65
+				draw_circle(Vector2(bxp, byp), (1.0 - bph) * 3.5 + 1.0, Color(0.55, 0.9, 0.35, 0.6 * (1.0 - bph)))
+		if z.get("eating", false) and not z.get("dying", false):
+			# kauendes Maul auf der Pflanzen-Seite (links)
+			var ch := 0.5 + 0.5 * sin(_anim_clock * 14.0)
+			var mxp := z.x - sz * 0.4
+			draw_colored_polygon(PackedVector2Array([Vector2(mxp, zy - 4.0 - ch * 3.0), Vector2(mxp - 7.0, zy), Vector2(mxp, zy + 4.0 + ch * 3.0)]), Color(0.95, 0.95, 0.95, 0.8))
 		if z.slow > 0:
 			# Eis-Splitter um verlangsamte Zombies
 			for si in range(3):
