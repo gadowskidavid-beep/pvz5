@@ -27,7 +27,7 @@ var speed_btn: Button
 var auto_btn: Button
 var seed_box: VBoxContainer
 var seed_panel: Panel
-var chain_bar: HBoxContainer      # Chain-Schnellwahl rund um die Sonne
+var chain_bar: VBoxContainer      # Chain-Schnellwahl (vertikale Spalte rechts)
 var chain_panel: Panel
 var tool_ham: Button
 var tool_sho: Button
