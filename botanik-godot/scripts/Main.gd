@@ -430,11 +430,15 @@ func _draw_wavebar(bar: Control) -> void:
 	bar.draw_rect(Rect2(0, 0, w, h), Color(0.1, 0.13, 0.16))
 	var frac: float = clamp(float(Game.wave) / 100.0, 0.0, 1.0)
 	bar.draw_rect(Rect2(0, 0, w * frac, h), Color(0.4, 0.82, 0.5))
+	bar.draw_rect(Rect2(0, 0, w * frac, h * 0.4), Color(1, 1, 1, 0.16))   # Glanzlinie oben
 	var nb := _next_boss()
 	for m in [25, 50, 75, 100]:
 		var x: float = w * float(m) / 100.0
 		var c: Color = Color(1, 0.3, 0.3) if m == nb else Color(0.85, 0.8, 0.5)
 		bar.draw_rect(Rect2(x - 2, -3, 4, h + 6), c)
+		# kleiner Totenkopf-Punkt an den Boss-Marken
+		var sc: Color = Color(1, 0.35, 0.35) if m == nb else Color(0.8, 0.78, 0.6)
+		bar.draw_circle(Vector2(x, -7), 3.0, sc)
 
 func _next_boss() -> int:
 	for m in [25, 50, 75, 100]:

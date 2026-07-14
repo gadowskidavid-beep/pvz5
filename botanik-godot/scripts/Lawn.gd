@@ -1087,6 +1087,12 @@ func _draw() -> void:
 		_shadow(p.x, p.y, pr)
 		_draw_plant(p, col, pr, p.x - rk, pby)
 		_draw_evo(p, p.x - rk, pby, pr)
+		if float(p.get("frozen", 0.0)) > 0.0:
+			# Eis-Kristalle auf eingefrorener Pflanze
+			draw_circle(Vector2(p.x, pby), pr * 0.95, Color(0.7, 0.9, 1.0, 0.25))
+			for ci in range(4):
+				var ca := float(ci) * TAU / 4.0 + 0.4
+				draw_line(Vector2(p.x, pby), Vector2(p.x + cos(ca) * pr * 0.6, pby + sin(ca) * pr * 0.5), Color(0.85, 0.95, 1.0, 0.6), 2.0)
 		# Muendungsblitz beim Schuss (nutzt den vorhandenen Rueckstoss-Wert, Element-gefaerbt)
 		var _rc := clamp(float(p.get("recoil", 0.0)), 0.0, 1.0)
 		if _rc > 0.35 and (str(p.arch) == "shooter" or str(p.arch) == "beam"):
