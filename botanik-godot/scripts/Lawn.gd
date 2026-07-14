@@ -954,6 +954,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.keycode == KEY_H:
 			if Game.has("u_hammer"):
 				Game.place_slot = -1; Game.shovel = false
+		elif event.keycode == KEY_A:
+			Game.auto_wave = not Game.auto_wave
+		elif event.keycode == KEY_F:
+			Game.game_speed = Game.game_speed % 3 + 1
 		elif event.keycode >= KEY_1 and event.keycode <= KEY_9:
 			var idx := int(event.keycode) - int(KEY_1)
 			if idx < Game.slot_count() and Game.seed_chain(idx) != "":

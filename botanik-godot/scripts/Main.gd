@@ -80,6 +80,8 @@ var _scroll_restore_frames := 0
 # HUD-Sync: erkennt Auswahl-Aenderungen (z.B. per Tastatur) und aktualisiert die Karten
 var _last_place_slot := -99
 var _last_shovel := false
+var _last_speed := -1
+var _last_auto := false
 
 const SCREEN_W := 1152
 const SCREEN_H := 648
@@ -133,6 +135,15 @@ func _process(_delta: float) -> void:
 		_last_place_slot = Game.place_slot
 		_last_shovel = Game.shovel
 		refresh_seeds()
+	# Tempo-/Auto-Buttons synchron halten (auch bei Bedienung per Tastatur)
+	if Game.game_speed != _last_speed:
+		_last_speed = Game.game_speed
+		if speed_btn != null: speed_btn.text = "%dx" % Game.game_speed
+	if Game.auto_wave != _last_auto:
+		_last_auto = Game.auto_wave
+		if auto_btn != null:
+			auto_btn.text = "Auto *" if Game.auto_wave else "Auto"
+			auto_btn.add_theme_color_override("font_color", Color(0.5, 1, 0.6) if Game.auto_wave else Color(0.9, 0.98, 0.9))
 	sun_display.amount = int(Game.sun)
 	sun_display.queue_redraw()
 	fp_lbl.text = "FP  %s" % _fmt(Game.fp)
