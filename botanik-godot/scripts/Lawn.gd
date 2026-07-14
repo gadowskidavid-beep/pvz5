@@ -1136,7 +1136,9 @@ func _draw() -> void:
 		if _hf > 0.0: zc = zc.lerp(Color(1, 1, 1), clamp(_hf / 0.16, 0.0, 1.0) * 0.8)   # Treffer-Aufblitzen
 		_draw_zombie(z, zc, float(sz), z.x, zy)
 		if z.boss:
+			draw_circle(Vector2(z.x, zy), sz * 0.92, Color(zc.r, zc.g, zc.b, 0.12))   # weicher Aura-Schein
 			draw_arc(Vector2(z.x, zy), sz * 0.78 + sin(_anim_clock * 3.0) * 2.5, 0.0, TAU, 30, Color(zc.r, zc.g, zc.b, 0.5), 3.0)
+			draw_arc(Vector2(z.x, zy), sz * 0.96 + sin(_anim_clock * 2.0) * 3.0, 0.0, TAU, 34, Color(1, 1, 1, 0.22), 2.0)
 		if str(z.kind) == "brainz":
 			draw_circle(Vector2(z.x, zy - sz * 0.62), 9.0 + sin(_anim_clock * 5.0) * 2.0, Color(1.0, 0.5, 0.75, 0.35))
 		if z.get("fly", false):
@@ -1192,6 +1194,8 @@ func _draw() -> void:
 			break
 	# Sonne
 	for s in suns:
+		if s.get("falling", false):
+			draw_line(Vector2(s.x, s.y - 16), Vector2(s.x, s.y - 32), Color(1, 0.9, 0.4, 0.22), 3.0)   # Fall-Schweif
 		_draw_sun_icon(s.x, s.y, 16.0)
 	# Effekte
 	for e in fx:
