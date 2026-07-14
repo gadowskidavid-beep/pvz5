@@ -1098,7 +1098,7 @@ func _draw() -> void:
 				var ca := float(ci) * TAU / 4.0 + 0.4
 				draw_line(Vector2(p.x, pby), Vector2(p.x + cos(ca) * pr * 0.6, pby + sin(ca) * pr * 0.5), Color(0.85, 0.95, 1.0, 0.6), 2.0)
 		# Muendungsblitz beim Schuss (nutzt den vorhandenen Rueckstoss-Wert, Element-gefaerbt)
-		var _rc := clamp(float(p.get("recoil", 0.0)), 0.0, 1.0)
+		var _rc: float = clamp(float(p.get("recoil", 0.0)), 0.0, 1.0)
 		if _rc > 0.35 and (str(p.arch) == "shooter" or str(p.arch) == "beam"):
 			var ms: Dictionary = p.s
 			var mcol := Color(1.0, 0.95, 0.6, _rc)
@@ -1162,20 +1162,20 @@ func _draw() -> void:
 			# aufsteigende Flammen
 			for fi in range(3):
 				var fph := fmod(_anim_clock * 3.0 + float(fi) * 0.4, 1.0)
-				var fxp := z.x + (float(fi) - 1.0) * sz * 0.26 + sin(_anim_clock * 8.0 + float(fi)) * 2.0
-				var fyp := zy - sz * 0.2 - fph * sz * 0.75
+				var fxp: float = float(z.x) + (float(fi) - 1.0) * float(sz) * 0.26 + sin(_anim_clock * 8.0 + float(fi)) * 2.0
+				var fyp: float = zy - float(sz) * 0.2 - fph * float(sz) * 0.75
 				draw_circle(Vector2(fxp, fyp), (1.0 - fph) * 6.0, Color(1.0, 0.45 + 0.35 * fph, 0.1, 0.7 * (1.0 - fph)))
 		if z.poison > 0:
 			# aufsteigende Gift-Blasen
 			for bi in range(3):
 				var bph := fmod(_anim_clock * 2.0 + float(bi) * 0.45, 1.0)
-				var bxp := z.x + sz * 0.28 + sin(_anim_clock * 4.0 + float(bi)) * 3.0
-				var byp := zy - sz * 0.2 - bph * sz * 0.65
+				var bxp: float = float(z.x) + float(sz) * 0.28 + sin(_anim_clock * 4.0 + float(bi)) * 3.0
+				var byp: float = zy - float(sz) * 0.2 - bph * float(sz) * 0.65
 				draw_circle(Vector2(bxp, byp), (1.0 - bph) * 3.5 + 1.0, Color(0.55, 0.9, 0.35, 0.6 * (1.0 - bph)))
 		if z.get("eating", false) and not z.get("dying", false):
 			# kauendes Maul auf der Pflanzen-Seite (links)
 			var ch := 0.5 + 0.5 * sin(_anim_clock * 14.0)
-			var mxp := z.x - sz * 0.4
+			var mxp: float = float(z.x) - float(sz) * 0.4
 			draw_colored_polygon(PackedVector2Array([Vector2(mxp, zy - 4.0 - ch * 3.0), Vector2(mxp - 7.0, zy), Vector2(mxp, zy + 4.0 + ch * 3.0)]), Color(0.95, 0.95, 0.95, 0.8))
 		if z.slow > 0:
 			# Eis-Splitter um verlangsamte Zombies
@@ -1237,7 +1237,7 @@ func _draw() -> void:
 	if combo >= 3 and _font != null:
 		var ctxt := "COMBO x%d" % combo
 		var cc := Color(1.0, 0.72, 0.28).lerp(Color(1.0, 0.4, 0.2), clamp(float(combo) / 25.0, 0.0, 1.0))
-		var frac := clamp(combo_t / COMBO_WINDOW, 0.0, 1.0)
+		var frac: float = clamp(combo_t / COMBO_WINDOW, 0.0, 1.0)
 		var fsz := int(20 + 6.0 * frac)
 		var cpos := Vector2(_fcx - float(ctxt.length()) * 6.0, 106.0)
 		draw_string_outline(_font, cpos, ctxt, HORIZONTAL_ALIGNMENT_LEFT, -1, fsz, 5, Color(0, 0, 0, 0.7))
@@ -1344,7 +1344,7 @@ func _draw_sky(night: bool) -> void:
 			var cx := fmod(cd[0] * vp.x + _anim_clock * 7.0 * cd[2], vp.x + 160.0) - 80.0
 			_cloud(cx, cd[1] * vp.y, cd[2])
 	# Boden/Feld am Horizont fuer Tiefe (unter dem Rasen-Sockel)
-	var horizon := min(vp.y * 0.5, float(Game.LAWN_Y) - 22.0)
+	var horizon: float = min(vp.y * 0.5, float(Game.LAWN_Y) - 22.0)
 	var field := Color(0.11, 0.16, 0.12) if night else Color(0.33, 0.54, 0.27)
 	draw_rect(Rect2(0, horizon, vp.x, vp.y - horizon), field)
 	var hillcol := field.lightened(0.07)
@@ -1501,7 +1501,7 @@ func _draw_house_danger() -> void:
 		if z.get("dying", false): continue
 		nearest = min(nearest, float(z.x) - float(Game.LAWN_X))
 	if nearest > Game.CELL * 2.2: return
-	var t := 1.0 - clamp(nearest / (Game.CELL * 2.2), 0.0, 1.0)
+	var t: float = 1.0 - clamp(nearest / (Game.CELL * 2.2), 0.0, 1.0)
 	var pulse := 0.5 + 0.5 * sin(_anim_clock * 8.0)
 	var a := (0.15 + 0.30 * t) * (0.6 + 0.4 * pulse)
 	draw_rect(Rect2(Game.LAWN_X - 20, Game.LAWN_Y - 10, 26, rows * Game.CELL + 40), Color(1.0, 0.15, 0.1, a))
