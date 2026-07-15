@@ -15,7 +15,7 @@ var ui: CanvasLayer
 var root: Control
 
 # HUD
-var sun_lbl: Label
+var sun_display: SunDisplay
 var fp_lbl: Label
 var coin_lbl: Label
 var brain_lbl: Label
@@ -23,7 +23,12 @@ var wave_lbl: Label
 var wave_bar: Control
 var msg_lbl: Label
 var wave_btn: Button
-var seed_box: HBoxContainer
+var speed_btn: Button
+var auto_btn: Button
+var seed_box: VBoxContainer
+var seed_panel: Panel
+var chain_bar: VBoxContainer      # Chain-Schnellwahl (vertikale Spalte rechts)
+var chain_panel: Panel
 var tool_ham: Button
 var tool_sho: Button
 
@@ -68,6 +73,15 @@ var _tree_ref := 0        # Slot-Index bei mode "slot"
 var _tree_zoom := 1.0     # Zoom-Faktor fuer den Skill-Baum
 var _tree_panning := false # Linksklick-Ziehen zum Umschauen im Baum
 var info_node := ""       # aktuell gewaehlter Knoten (im aktuellen Baum)
+# Kamera/Scroll im Baum halten (kein Zurueckspringen beim Skillen)
+var _keep_scroll_next := false
+var _scroll_keep := Vector2.ZERO
+var _scroll_restore_frames := 0
+# HUD-Sync: erkennt Auswahl-Aenderungen (z.B. per Tastatur) und aktualisiert die Karten
+var _last_place_slot := -99
+var _last_shovel := false
+var _last_speed := -1
+var _last_auto := false
 
 const SCREEN_W := 1152
 const SCREEN_H := 648
@@ -110,12 +124,36 @@ func _process(_delta: float) -> void:
 	if _tree_needs_rebuild and drawer_open:
 		_tree_needs_rebuild = false
 		_rebuild_drawer()
+	# Baum-Ansicht nach dem Skillen an Ort und Stelle halten (kein Zurueckspringen)
+	if _scroll_restore_frames > 0 and is_instance_valid(d_treewrap):
+		d_treewrap.scroll_horizontal = int(_scroll_keep.x)
+		d_treewrap.scroll_vertical = int(_scroll_keep.y)
+		_scroll_restore_frames -= 1
 	# HUD lebt jedes Frame (Spiel laeuft weiter, egal ob Drawer offen)
-	sun_lbl.text = "Sonne  %s" % _fmt(int(Game.sun))
+	# Auswahl-Aenderung (Tastatur/Chain-Leiste) -> Samen-Karten neu hervorheben
+	if Game.place_slot != _last_place_slot or Game.shovel != _last_shovel:
+		_last_place_slot = Game.place_slot
+		_last_shovel = Game.shovel
+		refresh_seeds()
+	# Tempo-/Auto-Buttons synchron halten (auch bei Bedienung per Tastatur)
+	if Game.game_speed != _last_speed:
+		_last_speed = Game.game_speed
+		if speed_btn != null: speed_btn.text = "%dx" % Game.game_speed
+	if Game.auto_wave != _last_auto:
+		_last_auto = Game.auto_wave
+		if auto_btn != null:
+			auto_btn.text = "Auto *" if Game.auto_wave else "Auto"
+			auto_btn.add_theme_color_override("font_color", Color(0.5, 1, 0.6) if Game.auto_wave else Color(0.9, 0.98, 0.9))
+	sun_display.amount = int(Game.sun)
+	sun_display.queue_redraw()
 	fp_lbl.text = "FP  %s" % _fmt(Game.fp)
 	coin_lbl.text = "Muenzen  %s" % _fmt(Game.coins)
 	brain_lbl.text = "Skulls  %s" % _fmt(Game.brains)
-	wave_lbl.text = "Welle %d / 100%s" % [Game.wave, lawn.weather_hud()]
+	var _boss_in := _next_boss() - Game.wave
+	if _boss_in > 0 and Game.wave < 100:
+		wave_lbl.text = "Welle %d / 100%s  ·  Boss in %d" % [Game.wave, lawn.weather_hud(), _boss_in]
+	else:
+		wave_lbl.text = "Welle %d / 100%s" % [Game.wave, lawn.weather_hud()]
 	wave_bar.queue_redraw()
 	if d_fp != null: d_fp.text = "%d FP" % Game.fp
 	msg_lbl.text = str(lawn.msg) if lawn.msg_t > 0 else ""
@@ -188,18 +226,26 @@ func _build_hud() -> void:
 	topbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	topbar.add_theme_stylebox_override("panel", _sb(Color(0.07, 0.09, 0.13, 0.96), Color(0.28, 0.45, 0.36), 2, 0, 0))
 	root.add_child(topbar)
-	# Waehrungs-Pills oben links
+	# Grosse Sonne oben links: zeigt die Sonnen-Zahl UND oeffnet per Klick die Skill-Trees
+	sun_display = SunDisplay.new()
+	sun_display.position = Vector2(10, 12)
+	sun_display.size = Vector2(68, 68)
+	sun_display.custom_minimum_size = Vector2(68, 68)
+	sun_display.mouse_filter = Control.MOUSE_FILTER_STOP
+	sun_display.tooltip_text = "Skill-Trees oeffnen (Garage + alle Chains)"
+	sun_display.setup(_open_skilltrees)
+	root.add_child(sun_display)
+	# Waehrungs-Pills (FP / Muenzen / Skulls) rechts neben der Sonne
 	var pills := HBoxContainer.new()
-	pills.position = Vector2(14, 10)
+	pills.position = Vector2(88, 10)
 	pills.add_theme_constant_override("separation", 8)
 	root.add_child(pills)
-	sun_lbl = _hud_pill(pills, COL_GOLD)
 	fp_lbl = _hud_pill(pills, COL_CYAN)
 	coin_lbl = _hud_pill(pills, Color(0.95, 0.66, 0.22))
 	brain_lbl = _hud_pill(pills, COL_PINK)
 	# kleine Navigation
 	var nav := HBoxContainer.new()
-	nav.position = Vector2(14, 46)
+	nav.position = Vector2(88, 48)
 	nav.add_theme_constant_override("separation", 5)
 	root.add_child(nav)
 	_nav(nav, "Menue", _open_menu)
@@ -207,6 +253,21 @@ func _build_hud() -> void:
 	_nav(nav, "Almanach", _open_alm)
 	_nav(nav, "Buch", _open_zom)
 	_nav(nav, "Dev", _open_dev)
+	# Spiel-Tempo (Fast-Forward fuer Idle): 1x / 2x / 3x
+	speed_btn = Button.new()
+	speed_btn.text = "%dx" % Game.game_speed
+	speed_btn.custom_minimum_size = Vector2(46, 0)
+	speed_btn.tooltip_text = "Spiel-Tempo umschalten (1x / 2x / 3x)"
+	speed_btn.add_theme_color_override("font_color", Color(1, 0.9, 0.4))
+	speed_btn.pressed.connect(_cycle_speed)
+	nav.add_child(speed_btn)
+	# Auto-Welle (Idle): naechste Welle automatisch starten
+	auto_btn = Button.new()
+	auto_btn.text = "Auto"
+	auto_btn.custom_minimum_size = Vector2(58, 0)
+	auto_btn.tooltip_text = "Naechste Welle automatisch starten (Idle)"
+	auto_btn.pressed.connect(_toggle_auto)
+	nav.add_child(auto_btn)
 	# Meldung mittig
 	msg_lbl = Label.new()
 	msg_lbl.position = Vector2(SCREEN_W / 2.0 - 200, 44)
@@ -241,6 +302,121 @@ func _build_hud() -> void:
 	wave_btn.add_theme_color_override("font_color", Color(0.15, 0.09, 0.02))
 	wave_btn.pressed.connect(_on_wave)
 	root.add_child(wave_btn)
+	# Chain-Schnellwahl rund um die Sonne (Klick = freischalten + in naechsten freien Slot)
+	_build_chainbar()
+
+# ================= CHAIN-SCHNELLWAHL (rund um die Sonne) =================
+# Alle 8 Chains als kleine Bild-Buttons. Klick: schaltet die Chain frei (FP)
+# und legt sie automatisch in den naechsten freien Samen-Slot.
+func _build_chainbar() -> void:
+	# Rechte Randspalte (x>960 ist frei vom Spielfeld) — kollidiert nie mit dem Rasen
+	var cx := SCREEN_W - 182.0
+	chain_panel = Panel.new()
+	chain_panel.position = Vector2(cx - 6, 100)
+	chain_panel.size = Vector2(176, 402)
+	chain_panel.custom_minimum_size = Vector2(176, 402)
+	chain_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chain_panel.add_theme_stylebox_override("panel", _sb(Color(0.06, 0.09, 0.12, 0.9), Color(0.30, 0.48, 0.38), 2, 12, 0))
+	root.add_child(chain_panel)
+	var hdr := Label.new()
+	hdr.text = "CHAINS"
+	hdr.position = Vector2(cx + 4, 106)
+	hdr.add_theme_font_size_override("font_size", 13)
+	hdr.add_theme_color_override("font_color", Color(0.72, 0.92, 0.78))
+	hdr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(hdr)
+	chain_bar = VBoxContainer.new()
+	chain_bar.position = Vector2(cx, 128)
+	chain_bar.add_theme_constant_override("separation", 4)
+	root.add_child(chain_bar)
+	refresh_chains()
+
+func _chain_slot(ck: String) -> int:
+	for i in range(Game.slot_count()):
+		if Game.seed_chain(i) == ck: return i
+	return -1
+
+func _next_free_slot() -> int:
+	for i in range(Game.slot_count()):
+		if Game.seed_chain(i) == "": return i
+	return -1
+
+func _toast(t: String) -> void:
+	lawn.msg = t; lawn.msg_t = 1.8
+
+func refresh_chains() -> void:
+	if chain_bar == null: return
+	for c in chain_bar.get_children(): c.queue_free()
+	for ck in Game.CH_ORDER:
+		var btn := Button.new()
+		btn.custom_minimum_size = Vector2(164, 42)
+		var unlocked: bool = Game.plant_unlocked(ck)
+		var slot := _chain_slot(ck)
+		var tip := "%s\n%s" % [Game.CHASSIS[ck].n, Game.CHASSIS[ck].d]
+		if not unlocked: tip += "\nFreischalten: %d FP" % Game.plant_unlock_cost(ck)
+		elif slot >= 0: tip += "\nLiegt in Samen-Slot %d (Klick = auswaehlen)" % (slot + 1)
+		else: tip += "\nKlick: in naechsten freien Samen-Slot legen"
+		btn.tooltip_text = tip
+		if slot >= 0:
+			btn.add_theme_stylebox_override("normal", _sb(Color(0.16, 0.42, 0.24), Color(0.6, 1, 0.7), 2, 9, 2))
+		elif not unlocked:
+			btn.add_theme_stylebox_override("normal", _sb(Color(0.11, 0.12, 0.15), Color(0.38, 0.4, 0.45), 1, 9, 2))
+		var pcol: Color = Game.CHASSIS[ck].col
+		if not unlocked: pcol = pcol.lerp(Color(0.22, 0.22, 0.26), 0.62)
+		var port := Portrait.new(); port.kind = ck; port.col = pcol
+		port.position = Vector2(5, 5); port.size = Vector2(32, 32)
+		port.custom_minimum_size = Vector2(32, 32)
+		port.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		btn.add_child(port)
+		# Name der Chain
+		var name_lbl := Label.new()
+		name_lbl.text = str(Game.CHASSIS[ck].n)
+		name_lbl.position = Vector2(42, 3)
+		name_lbl.add_theme_font_size_override("font_size", 12)
+		name_lbl.modulate = Color(0.92, 0.97, 0.9) if unlocked else Color(0.6, 0.62, 0.65)
+		name_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		btn.add_child(name_lbl)
+		# Status: FP-Kosten (gesperrt) oder Slot-Nummer (aktiv)
+		var tag := Label.new()
+		tag.position = Vector2(42, 22)
+		tag.add_theme_font_size_override("font_size", 11)
+		tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if not unlocked:
+			tag.text = "%d FP" % Game.plant_unlock_cost(ck)
+			tag.modulate = COL_CYAN
+		elif slot >= 0:
+			tag.text = "Samen-Slot %d" % (slot + 1)
+			tag.modulate = Color(0.72, 1, 0.78)
+		else:
+			tag.text = "frei — Klick"
+			tag.modulate = Color(0.85, 0.85, 0.6)
+		btn.add_child(tag)
+		btn.pressed.connect(_chain_quick.bind(ck))
+		chain_bar.add_child(btn)
+
+func _chain_quick(ck: String) -> void:
+	# 1) Freischalten, falls noetig
+	if not Game.plant_unlocked(ck):
+		if not Game.unlock_plant(ck):
+			_toast("Zu wenig FP fuer %s (%d FP)" % [Game.CHASSIS[ck].n, Game.plant_unlock_cost(ck)])
+			return
+		_toast("%s freigeschaltet!" % Game.CHASSIS[ck].n)
+	# 2) Schon in einem Slot? -> diesen zum Setzen waehlen
+	var existing := _chain_slot(ck)
+	if existing >= 0:
+		Game.place_slot = existing
+		Game.shovel = false
+		refresh_seeds(); return
+	# 3) In den naechsten freien Slot legen
+	var free := _next_free_slot()
+	if free < 0:
+		_toast("Kein freier Samen-Slot — kaufe im Labor einen neuen")
+		refresh_seeds(); return
+	Game.seed_set_chain(free, ck)
+	Game.place_slot = free
+	Game.shovel = false
+	_toast("%s  ->  Samen-Slot %d" % [Game.CHASSIS[ck].n, free + 1])
+	refresh_seeds()
 
 func _hud_pill(parent, col: Color) -> Label:
 	var pc := PanelContainer.new()
@@ -248,6 +424,11 @@ func _hud_pill(parent, col: Color) -> Label:
 	var l := Label.new(); l.text = "0"; l.modulate = col; l.add_theme_font_size_override("font_size", 16)
 	pc.add_child(l); parent.add_child(pc)
 	return l
+
+func _open_skilltrees() -> void:
+	_tree_sel = "spiel"   # Labor-Tab: Garage + alle Chains freischalten/leveln
+	if not drawer_open: _toggle_drawer()
+	else: _rebuild_drawer()
 
 func _nav(parent, text: String, cb: Callable) -> void:
 	var b := Button.new(); b.text = text; b.pressed.connect(cb)
@@ -260,11 +441,15 @@ func _draw_wavebar(bar: Control) -> void:
 	bar.draw_rect(Rect2(0, 0, w, h), Color(0.1, 0.13, 0.16))
 	var frac: float = clamp(float(Game.wave) / 100.0, 0.0, 1.0)
 	bar.draw_rect(Rect2(0, 0, w * frac, h), Color(0.4, 0.82, 0.5))
+	bar.draw_rect(Rect2(0, 0, w * frac, h * 0.4), Color(1, 1, 1, 0.16))   # Glanzlinie oben
 	var nb := _next_boss()
 	for m in [25, 50, 75, 100]:
 		var x: float = w * float(m) / 100.0
 		var c: Color = Color(1, 0.3, 0.3) if m == nb else Color(0.85, 0.8, 0.5)
 		bar.draw_rect(Rect2(x - 2, -3, 4, h + 6), c)
+		# kleiner Totenkopf-Punkt an den Boss-Marken
+		var sc: Color = Color(1, 0.35, 0.35) if m == nb else Color(0.8, 0.78, 0.6)
+		bar.draw_circle(Vector2(x, -7), 3.0, sc)
 
 func _next_boss() -> int:
 	for m in [25, 50, 75, 100]:
@@ -284,6 +469,14 @@ func _open_zom() -> void: open_overlay("zombiebook")
 func _open_shop() -> void: open_overlay("shop")
 func _open_menu() -> void: open_overlay("menu")
 func _open_dev() -> void: open_overlay("dev")
+func _cycle_speed() -> void:
+	Game.game_speed = Game.game_speed % 3 + 1
+	if speed_btn != null: speed_btn.text = "%dx" % Game.game_speed
+func _toggle_auto() -> void:
+	Game.auto_wave = not Game.auto_wave
+	if auto_btn != null:
+		auto_btn.text = "Auto *" if Game.auto_wave else "Auto"
+		auto_btn.add_theme_color_override("font_color", Color(0.5, 1, 0.6) if Game.auto_wave else Color(0.9, 0.98, 0.9))
 
 # ================= UNTERE LEISTE =================
 func _build_bottom() -> void:
@@ -295,9 +488,23 @@ func _build_bottom() -> void:
 	botbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	botbar.add_theme_stylebox_override("panel", _sb(Color(0.07, 0.09, 0.13, 0.96), Color(0.28, 0.45, 0.36), 2, 0, 0))
 	root.add_child(botbar)
-	# Pflanzen-Karten links
-	seed_box = HBoxContainer.new()
-	seed_box.position = Vector2(12, SCREEN_H - 60)
+	# Pflanzen-Karten in einer sauberen Spalte links am Bildschirmrand
+	seed_panel = Panel.new()
+	seed_panel.position = Vector2(8, 92)
+	seed_panel.size = Vector2(140, 8)
+	seed_panel.custom_minimum_size = Vector2(140, 8)
+	seed_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	seed_panel.add_theme_stylebox_override("panel", _sb(Color(0.06, 0.09, 0.12, 0.92), Color(0.30, 0.48, 0.38), 2, 12, 0))
+	root.add_child(seed_panel)
+	var seed_hdr := Label.new()
+	seed_hdr.text = "SAMEN"
+	seed_hdr.position = Vector2(20, 98)
+	seed_hdr.add_theme_font_size_override("font_size", 13)
+	seed_hdr.add_theme_color_override("font_color", Color(0.75, 0.95, 0.78))
+	seed_hdr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(seed_hdr)
+	seed_box = VBoxContainer.new()
+	seed_box.position = Vector2(16, 120)
 	seed_box.add_theme_constant_override("separation", 6)
 	root.add_child(seed_box)
 	# Werkzeuge rechts
@@ -322,9 +529,10 @@ func refresh_seeds() -> void:
 	for c in seed_box.get_children():
 		c.queue_free()
 	# Ein Kaertchen je Samen-Slot
-	for i in range(Game.slot_count()):
+	var _slots := Game.slot_count()
+	for i in range(_slots):
 		var card := Button.new()
-		card.custom_minimum_size = Vector2(112, 52)
+		card.custom_minimum_size = Vector2(124, 58)
 		card.add_theme_font_size_override("font_size", 12)
 		var ck: String = Game.seed_chain(i)
 		if ck == "":
@@ -333,12 +541,38 @@ func refresh_seeds() -> void:
 			card.pressed.connect(_edit_slot_open.bind(i))
 		else:
 			var s = Game.seed_stats(i)
-			card.text = "%s\nSonne %d · Lv%d" % [Game.CHASSIS[ck].n, int(s.cost), _plant_level(i)]
+			card.text = ""   # kein Name -> stattdessen Bild
 			if Game.place_slot == i and not Game.shovel:
 				card.add_theme_stylebox_override("normal", _sb(Color(0.2, 0.45, 0.28), Color(0.6, 1, 0.7), 3, 8))
-				card.add_theme_color_override("font_color", Color(1, 1, 0.85))
+			# Pflanzen-Bild (Portrait), nach Element eingefaerbt
+			var pcol: Color = Game.CHASSIS[ck].col
+			match Game.seed_element(i):
+				"e": pcol = pcol.lerp(Color(0.35, 0.65, 1.0), 0.5)
+				"f": pcol = pcol.lerp(Color(1.0, 0.30, 0.15), 0.5)
+				"b": pcol = pcol.lerp(Color(0.35, 1.0, 0.55), 0.5)
+				"u": pcol = pcol.lerp(Color(0.62, 0.35, 0.95), 0.45)
+			var port := Portrait.new(); port.kind = ck; port.col = pcol
+			port.position = Vector2(4, 4); port.size = Vector2(46, 46)
+			port.custom_minimum_size = Vector2(46, 46)
+			port.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			card.add_child(port)
+			# kleine Kosten/Level rechts
+			var info := Label.new()
+			info.text = "%d\nLv%d" % [int(s.cost), _plant_level(i)]
+			info.position = Vector2(56, 8)
+			info.add_theme_font_size_override("font_size", 12)
+			info.modulate = Color(1, 0.96, 0.72)
+			info.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			card.add_child(info)
 			card.pressed.connect(_pick_slot.bind(i))
 		seed_box.add_child(card)
+	# Hintergrund-Panel an die Spaltenhoehe anpassen
+	if seed_panel:
+		var h := 34.0 + float(_slots) * 64.0
+		seed_panel.size = Vector2(140, h)
+		seed_panel.custom_minimum_size = Vector2(140, h)
+	# Chain-Schnellwahl mit aktualisieren (Freischalt-/Slot-Zustand)
+	refresh_chains()
 
 func _plant_level(slot: int) -> int:
 	var n := 0
@@ -465,6 +699,9 @@ func _animate_drawer() -> void:
 	_dtween.tween_property(drawer, "position:y", ty, 0.3).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 func _rebuild_drawer() -> void:
+	# Kamera/Scroll merken, damit das Skillen die Ansicht nicht zurueckspringt
+	if _keep_scroll_next and is_instance_valid(d_treewrap):
+		_scroll_keep = Vector2(d_treewrap.scroll_horizontal, d_treewrap.scroll_vertical)
 	# Tabs: die Samen-Slots + Element + Spiel + Zombies
 	for c in d_tabs.get_children(): c.queue_free()
 	for i in range(Game.slot_count()):
@@ -495,6 +732,10 @@ func _rebuild_drawer() -> void:
 				_header(holder, "FOKUS-BAUM GESPERRT", Color(1, 0.7, 0.4))
 				_header(holder, "Schalte im Tab 'Labor' die GARAGE mit Sonne frei (%d), um Elemente zu skillen." % Game.GARAGE_COST, Color(0.85, 0.8, 0.6))
 	_rebuild_info()
+	# Scroll-Position nach dem Neuaufbau ein paar Frames lang wiederherstellen
+	if _keep_scroll_next:
+		_scroll_restore_frames = 4
+		_keep_scroll_next = false
 
 # Leerer Slot -> 8 Chains zur Auswahl (Ursprung)
 func _build_origin_picker(holder) -> void:
@@ -638,8 +879,23 @@ func _select_node(id: String) -> void:
 
 func _buy_selected() -> void:
 	if _n_buy(info_node):
+		_keep_scroll_next = true
 		_rebuild_drawer()
 		refresh_seeds()
+
+# Ein Klick auf einen Skill-Knoten: sofort kaufen (keine Bestaetigung).
+# Nicht kaufbar -> nur auswaehlen; der Grund steht im Hover-Panel.
+func _node_click(id: String) -> void:
+	info_node = id
+	if id == "root" or _n_owned(id):
+		_rebuild_info(); return
+	if _n_can(id) and Game.fp >= _n_cost(id):
+		if _n_buy(id):
+			_keep_scroll_next = true
+			_rebuild_drawer()
+			refresh_seeds()
+		return
+	_rebuild_info()
 
 # ---- Info-Feld rechts ----
 func _rebuild_info() -> void:
@@ -759,7 +1015,8 @@ func _build_tree_canvas(parent) -> void:
 			elif can and Game.fp >= cost: state = "legend_avail" if rare else "avail"
 			elif can: state = "legend_lock" if rare else "need"
 			else: state = "legend_lock" if rare else "lock"
-			_tree_node(canvas, center, str(nd.n), str(nd.d), cost, not owned, state, selected, ecol, _select_node.bind(id))
+			# Ein Klick kauft sofort (kein Bestaetigen); Hover zeigt die Info
+			_tree_node(canvas, center, str(nd.n), str(nd.d), cost, not owned, state, selected, ecol, _node_click.bind(id))
 	# Grosse Element-Ueberschriften an den Armspitzen (wie im Referenzbild)
 	_dir_label(canvas, "GEWITTER", Color(1, 0.9, 0.4), Vector2(ox - 44 * z, oy - maxr * sy - 26 * z))
 	_dir_label(canvas, "UNTOD", Color(0.82, 0.55, 1), Vector2(ox - 30 * z, oy - minr * sy + 12 * z))
@@ -1627,7 +1884,7 @@ func _build_general(vb) -> void:
 	if Game.lane_count_max():
 		_card(gl, "* Alle Reihen frei", "%d / %d Reihen aktiv" % [Game.LANE_MAX, Game.LANE_MAX], "", false, Callable())
 	else:
-		_card(gl, "Neue Rasen-Reihe", "Schaltet die naechste Reihe frei (max %d)" % Game.LANE_MAX, "FP %d" % Game.lane_cost(), Game.fp >= Game.lane_cost(), _buy_lane)
+		_card(gl, "Rasen ausbauen (+2 Reihen)", "Erweitert den Rasen um 2 Reihen (bleibt mittig, max %d)" % Game.LANE_MAX, "FP %d" % Game.lane_cost(), Game.fp >= Game.lane_cost(), _buy_lane)
 	_header(vb, "Ausruestung (FP)", Color(0.55, 0.7, 1))
 	var g3 := _grid(vb, 3)
 	for k in Game.EQ_ORDER:
@@ -2048,3 +2305,48 @@ class ZombiePortrait extends Control:
 				for i in range(3):
 					var ly := c.y - s * 0.2 + float(i) * s * 0.24
 					draw_line(Vector2(c.x + s * 0.5, ly), Vector2(c.x + s * 0.95, ly), Color(0.92, 0.42, 0.36, 0.7), 2.0)
+
+
+# ================================================================
+# SONNE OBEN LINKS — echte gezeichnete Sonne mit Zahl drin,
+# klickbar -> oeffnet die Skill-Trees (Garage + alle Chains)
+# ================================================================
+class SunDisplay extends Control:
+	var amount := 0
+	var _cb: Callable
+	var _t := 0.0
+	func setup(cb: Callable) -> void:
+		_cb = cb
+	func _process(delta: float) -> void:
+		_t += delta
+		queue_redraw()
+	func _gui_input(e: InputEvent) -> void:
+		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+			if _cb.is_valid():
+				_cb.call()
+	func _draw() -> void:
+		var c := size * 0.5
+		var r: float = min(size.x, size.y) * 0.34
+		var pulse := 1.0 + 0.06 * sin(_t * 2.2)
+		# weicher Glow
+		draw_circle(c, r * 1.7 * pulse, Color(1.0, 0.85, 0.25, 0.14))
+		draw_circle(c, r * 1.35 * pulse, Color(1.0, 0.82, 0.22, 0.18))
+		# Strahlen
+		for i in range(12):
+			var a := deg_to_rad(i * 30.0 + _t * 18.0)
+			var d := Vector2(cos(a), sin(a))
+			draw_line(c + d * r * 1.02, c + d * r * 1.42 * pulse, Color(1.0, 0.86, 0.28), 2.4)
+		# Sonnen-Koerper
+		draw_circle(c, r * 1.04, Color(1.0, 0.72, 0.12))
+		draw_circle(c, r * 0.94, Color(1.0, 0.84, 0.24))
+		draw_circle(c - Vector2(r * 0.28, r * 0.28), r * 0.34, Color(1.0, 0.95, 0.55, 0.8))
+		# Zahl mittig
+		var f := ThemeDB.fallback_font
+		var txt := str(amount)
+		var fs := 20
+		if txt.length() >= 4: fs = 15
+		elif txt.length() == 3: fs = 17
+		var tw := f.get_string_size(txt, HORIZONTAL_ALIGNMENT_CENTER, -1, fs)
+		var pos := c - tw * 0.5 + Vector2(0, tw.y * 0.32)
+		draw_string_outline(f, pos, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0.35, 0.2, 0.02))
+		draw_string(f, pos, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(1, 1, 1))

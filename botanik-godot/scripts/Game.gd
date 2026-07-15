@@ -8,7 +8,9 @@ extends Node
 const COLS := 9
 const CELL := 90
 const LAWN_X := 150
-const LAWN_Y := 96
+var LAWN_Y := 96                 # vertikal zentriert -> wird von update_lawn_y() gesetzt
+const LAWN_TOP := 96             # Spielfeld-Obergrenze (unter dem oberen HUD)
+const LAWN_BOTTOM := 576         # Spielfeld-Untergrenze (ueber der unteren Leiste)
 
 # ---- CHASSIS (Pflanzen) ----
 # ---- CHASSIS = die 8 CHAINS (env: day/night/water/any) ----
@@ -126,6 +128,8 @@ var wave := 0
 var phase := "prep"     # "prep" | "fight"
 var shovel := false
 var paused := false      # true wenn ein Overlay offen ist
+var game_speed := 1      # Spiel-Tempo: 1x / 2x / 3x (Fast-Forward fuer Idle)
+var auto_wave := false   # naechste Welle automatisch starten (Idle-Komfort)
 
 const SAVE_PATH := "user://botanik_save.json"
 
@@ -152,7 +156,11 @@ func field_lanes() -> int:
 	return (1 if has("f_lane2") else 0) + (1 if has("f_lane3") else 0)
 const LANE_MAX := 5
 func lanes_count() -> int:
-	return clampi(1 + lanes_bought, 1, LANE_MAX)   # Start = 1 Reihe, bis 5 mit FP freischaltbar
+	return clampi(1 + lanes_bought * 2, 1, LANE_MAX)   # Start 1 Reihe, +2 je Ausbau -> 1 / 3 / 5
+# Rasen vertikal mittig: LAWN_Y so setzen, dass die Reihen zentriert auf dem Bildschirm sitzen
+func update_lawn_y(row_count: int) -> void:
+	var center: float = (LAWN_TOP + LAWN_BOTTOM) * 0.5
+	LAWN_Y = int(round(center - row_count * CELL * 0.5))
 func lane_count_max() -> bool: return lanes_count() >= LANE_MAX
 func lane_cost() -> int: return int(30 * pow(2.0, lanes_bought))   # 30, 60, 120, 240
 func buy_lane() -> bool:
@@ -397,7 +405,7 @@ func buy_pass(k: String) -> bool:
 func new_run() -> void:
 	sun = start_sun()
 	coins = 0
-	fp = BAL.START_FP          # Tutorial-Starthilfe: genau genug fuer 1 Schuetzen
+	fp = 0                     # Start ohne Forschungspunkte
 	wave = 0
 	phase = "prep"
 	run_shop.clear()
