@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://oqntvcscsasp"
+path="res://.godot/imported/Zombie Eating plant.mp3-e4a12374a2c2bc95e2ed47a3c3c3867b.mp3str"
+
+[deps]
+
+source_file="res://Musik/Soundeffect/Zombie Eating plant.mp3"
+dest_files=["res://.godot/imported/Zombie Eating plant.mp3-e4a12374a2c2bc95e2ed47a3c3c3867b.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4
