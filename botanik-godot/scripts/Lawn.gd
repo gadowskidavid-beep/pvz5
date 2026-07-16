@@ -949,11 +949,19 @@ func _unhandled_input(event: InputEvent) -> void:
 			else: start_wave()
 		elif event.keycode == KEY_X:
 			if Game.has("u_shovel"):
-				Game.shovel = not Game.shovel
-				if Game.shovel: Game.place_slot = -1
+				if Game.shovel:
+					Game.shovel = false
+					Game.place_slot = Game.SELECT_NONE
+				else:
+					Game.shovel = true
+					Game.place_slot = Game.SELECT_NONE
 		elif event.keycode == KEY_H:
 			if Game.has("u_hammer"):
-				Game.place_slot = -1; Game.shovel = false
+				if Game.place_slot == Game.SELECT_HAMMER and not Game.shovel:
+					Game.place_slot = Game.SELECT_NONE
+				else:
+					Game.place_slot = Game.SELECT_HAMMER
+					Game.shovel = false
 		elif event.keycode == KEY_A:
 			Game.auto_wave = not Game.auto_wave
 		elif event.keycode == KEY_F:
@@ -961,7 +969,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.keycode >= KEY_1 and event.keycode <= KEY_9:
 			var idx := int(event.keycode) - int(KEY_1)
 			if idx < Game.slot_count() and Game.seed_chain(idx) != "":
-				Game.place_slot = idx; Game.shovel = false
+				if Game.place_slot == idx and not Game.shovel:
+					Game.place_slot = Game.SELECT_NONE
+				else:
+					Game.place_slot = idx
+					Game.shovel = false
 
 # ---- Klick-Steuerung ----
 func lawn_click(pos: Vector2) -> void:
@@ -991,8 +1003,8 @@ func lawn_click(pos: Vector2) -> void:
 					_popup(p.x, p.y - 10, "+%d" % refund, Color(1, 0.9, 0.4))
 				plants.erase(p); return
 		return
-	# Hammer/Faust (kein Samen gewählt) — nur wenn freigeschaltet
-	if Game.place_slot < 0:
+	# Hammer/Faust aktiv
+	if Game.place_slot == Game.SELECT_HAMMER:
 		if not Game.has("u_hammer"): return
 		var best = null; var bd := 1.0e9
 		for z in zombies:
@@ -1003,6 +1015,8 @@ func lawn_click(pos: Vector2) -> void:
 			best.hp -= Game.click_dmg()
 			if Game.has_click_coin(): Game.coins += int(max(1, round(Game.coin_mul())))
 		return
+	# Normale Hand: nichts auswaehlen und keine Aktion auf dem Rasen
+	if Game.place_slot == Game.SELECT_NONE: return
 	# Pflanze aus dem gewaehlten Samen-Slot setzen
 	_place(col, row)
 

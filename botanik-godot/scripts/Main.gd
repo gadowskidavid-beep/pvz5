@@ -32,6 +32,10 @@ var chain_panel: Panel
 var tool_ham: Button
 var tool_sho: Button
 
+# Immer sichtbarer Spielcursor (Hand / Pflanze / Schaufel / Hammer)
+var cursor_layer: CanvasLayer
+var game_cursor: GameCursor
+
 # Drawer (Skill-Trees)
 var drawer: Control
 var d_fp: Label
@@ -112,7 +116,47 @@ func _ready() -> void:
 	for n in ["prestige", "almanac", "zombiebook", "shop", "menu", "death", "options", "dev"]:
 		_make_overlay(n)
 	refresh_seeds()
+	_build_game_cursor()
 	open_overlay("menu")
+
+# ================= SICHTBARER SPIELCURSOR =================
+func _build_game_cursor() -> void:
+	cursor_layer = CanvasLayer.new()
+	cursor_layer.layer = 100   # immer ueber HUD, Drawer und Overlays
+	add_child(cursor_layer)
+	game_cursor = GameCursor.new()
+	game_cursor.size = Vector2(58, 58)
+	game_cursor.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cursor_layer.add_child(game_cursor)
+	Input.set_mouse_mode(Input.MOUSE_MODE_HIDDEN)
+	_sync_game_cursor()
+
+func _sync_game_cursor() -> void:
+	if game_cursor == null or not is_instance_valid(game_cursor): return
+	# Spitze des gezeichneten Zeigers liegt wenige Pixel vor dem echten Hotspot
+	game_cursor.position = get_viewport().get_mouse_position() - Vector2(6, 5)
+	var mode := "hand"
+	var kind := ""
+	var pcol := Color(0.45, 0.85, 0.5)
+	if Game.shovel:
+		mode = "shovel"
+	elif Game.place_slot == Game.SELECT_HAMMER:
+		mode = "hammer"
+	elif Game.place_slot >= 0:
+		kind = Game.seed_chain(Game.place_slot)
+		if kind != "" and Game.CHASSIS.has(kind):
+			mode = "plant"
+			pcol = Game.CHASSIS[kind].col
+			match Game.seed_element(Game.place_slot):
+				"e": pcol = pcol.lerp(Color(0.35, 0.65, 1.0), 0.5)
+				"f": pcol = pcol.lerp(Color(1.0, 0.30, 0.15), 0.5)
+				"b": pcol = pcol.lerp(Color(0.35, 1.0, 0.55), 0.5)
+				"u": pcol = pcol.lerp(Color(0.62, 0.35, 0.95), 0.45)
+	game_cursor.set_state(mode, kind, pcol)
+
+func _exit_tree() -> void:
+	# Betriebssystem-Cursor beim Schliessen/Neuladen wieder freigeben
+	Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 
 func _process(_delta: float) -> void:
 	_tree_time += _delta
@@ -144,6 +188,7 @@ func _process(_delta: float) -> void:
 		if auto_btn != null:
 			auto_btn.text = "Auto *" if Game.auto_wave else "Auto"
 			auto_btn.add_theme_color_override("font_color", Color(0.5, 1, 0.6) if Game.auto_wave else Color(0.9, 0.98, 0.9))
+	_sync_game_cursor()
 	sun_display.amount = int(Game.sun)
 	sun_display.queue_redraw()
 	fp_lbl.text = "FP  %s" % _fmt(Game.fp)
@@ -170,7 +215,7 @@ func _process(_delta: float) -> void:
 		var ham_ok := Game.has("u_hammer")
 		tool_ham.disabled = not ham_ok
 		tool_ham.text = "Hammer" if ham_ok else "Hammer (gesperrt)"
-		tool_ham.modulate = Color(1, 1, 0.6) if (ham_ok and Game.place_slot < 0 and not Game.shovel) else Color(1, 1, 1)
+		tool_ham.modulate = Color(1, 1, 0.6) if (ham_ok and Game.place_slot == Game.SELECT_HAMMER and not Game.shovel) else Color(1, 1, 1)
 	if tool_sho != null:
 		var sho_ok := Game.has("u_shovel")
 		tool_sho.disabled = not sho_ok
@@ -404,9 +449,14 @@ func _chain_quick(ck: String) -> void:
 	# 2) Schon in einem Slot? -> diesen zum Setzen waehlen
 	var existing := _chain_slot(ck)
 	if existing >= 0:
-		Game.place_slot = existing
-		Game.shovel = false
-		refresh_seeds(); return
+		# Zweiter Klick auf dieselbe Chain -> normale Hand
+		if Game.place_slot == existing and not Game.shovel:
+			Game.place_slot = Game.SELECT_NONE
+		else:
+			Game.place_slot = existing
+			Game.shovel = false
+		refresh_seeds()
+		return
 	# 3) In den naechsten freien Slot legen
 	var free := _next_free_slot()
 	if free < 0:
@@ -586,14 +636,22 @@ func _plant_level(slot: int) -> int:
 func _pick_slot(i: int) -> void:
 	if Game.seed_chain(i) == "":
 		_edit_slot_open(i); return
-	Game.place_slot = i
-	Game.shovel = false
+	# Zweiter Klick auf dasselbe Samenpaket -> Auswahl loesen, normale Hand
+	if Game.place_slot == i and not Game.shovel:
+		Game.place_slot = Game.SELECT_NONE
+	else:
+		Game.place_slot = i
+		Game.shovel = false
 	refresh_seeds()
 
 func _pick_hammer() -> void:
 	if not Game.has("u_hammer"): return   # erst im Labor freischalten
-	Game.place_slot = -1
-	Game.shovel = false
+	# Zweiter Klick auf Hammer -> Auswahl loesen, normale Hand
+	if Game.place_slot == Game.SELECT_HAMMER and not Game.shovel:
+		Game.place_slot = Game.SELECT_NONE
+	else:
+		Game.place_slot = Game.SELECT_HAMMER
+		Game.shovel = false
 	refresh_seeds()
 
 func _edit_slot_open(i: int) -> void:
@@ -604,8 +662,13 @@ func _edit_slot_open(i: int) -> void:
 
 func _toggle_shovel() -> void:
 	if not Game.has("u_shovel"): return   # erst im Labor freischalten
-	Game.shovel = not Game.shovel
-	if Game.shovel: Game.place_slot = -1
+	# Zweiter Klick auf Schaufel -> Auswahl loesen, normale Hand
+	if Game.shovel:
+		Game.shovel = false
+		Game.place_slot = Game.SELECT_NONE
+	else:
+		Game.shovel = true
+		Game.place_slot = Game.SELECT_NONE
 	refresh_seeds()
 
 func _on_wave() -> void:
@@ -764,6 +827,7 @@ func _choose_chain(ck: String) -> void:
 	if not Game.plant_unlocked(ck): return
 	Game.seed_set_chain(Game.edit_slot, ck)
 	Game.place_slot = Game.edit_slot
+	Game.shovel = false
 	_rebuild_drawer(); refresh_seeds()
 
 func _unlock_plant(ck: String) -> void:
@@ -2350,3 +2414,95 @@ class SunDisplay extends Control:
 		var pos := c - tw * 0.5 + Vector2(0, tw.y * 0.32)
 		draw_string_outline(f, pos, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, 4, Color(0.35, 0.2, 0.02))
 		draw_string(f, pos, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color(1, 1, 1))
+
+
+# ================================================================
+# CUSTOM-CURSOR — zeigt immer Hand oder die aktive Auswahl
+# ================================================================
+class GameCursor extends Control:
+	var mode: String = "hand"
+	var plant_kind: String = ""
+	var plant_col: Color = Color(0.45, 0.85, 0.5)
+
+	func set_state(next_mode: String, next_kind: String, next_col: Color) -> void:
+		if mode == next_mode and plant_kind == next_kind and plant_col == next_col: return
+		mode = next_mode
+		plant_kind = next_kind
+		plant_col = next_col
+		queue_redraw()
+
+	func _draw() -> void:
+		# Kleine weisse Pfeilspitze markiert den exakten Klickpunkt.
+		draw_colored_polygon(PackedVector2Array([Vector2(5, 4), Vector2(5, 18), Vector2(10, 13), Vector2(14, 21), Vector2(18, 19), Vector2(14, 11), Vector2(21, 11)]), Color(0.05, 0.06, 0.07, 0.9))
+		draw_colored_polygon(PackedVector2Array([Vector2(6, 5), Vector2(6, 15), Vector2(10, 11), Vector2(14, 18), Vector2(16, 17), Vector2(12, 10), Vector2(18, 10)]), Color(1, 1, 1, 0.96))
+		if mode == "hand":
+			_draw_hand()
+		elif mode == "shovel":
+			_draw_badge(Color(0.16, 0.24, 0.22, 0.94), Color(0.65, 0.9, 0.78))
+			_draw_shovel()
+		elif mode == "hammer":
+			_draw_badge(Color(0.24, 0.18, 0.12, 0.94), Color(1.0, 0.76, 0.34))
+			_draw_hammer()
+		elif mode == "plant":
+			_draw_badge(Color(0.08, 0.16, 0.11, 0.94), plant_col.lightened(0.3))
+			_draw_plant_icon()
+
+	func _draw_badge(bg: Color, edge: Color) -> void:
+		var c := Vector2(35, 34)
+		draw_circle(c, 20.0, Color(0, 0, 0, 0.28))
+		draw_circle(c, 18.0, bg)
+		draw_arc(c, 18.0, 0.0, TAU, 28, edge, 2.0)
+
+	func _draw_hand() -> void:
+		var skin := Color(0.98, 0.78, 0.56)
+		var edge := Color(0.27, 0.16, 0.10)
+		# Handschuh/Hand rechts neben der Pfeilspitze.
+		draw_circle(Vector2(35, 36), 13.0, Color(0, 0, 0, 0.24))
+		draw_colored_polygon(PackedVector2Array([Vector2(25, 31), Vector2(25, 21), Vector2(30, 21), Vector2(30, 29), Vector2(33, 18), Vector2(38, 19), Vector2(37, 30), Vector2(41, 23), Vector2(45, 25), Vector2(42, 36), Vector2(38, 46), Vector2(27, 43)]), edge)
+		draw_colored_polygon(PackedVector2Array([Vector2(27, 31), Vector2(27, 23), Vector2(29, 23), Vector2(29, 33), Vector2(35, 20), Vector2(36, 21), Vector2(34, 34), Vector2(42, 26), Vector2(43, 27), Vector2(40, 36), Vector2(37, 43), Vector2(29, 41)]), skin)
+		draw_circle(Vector2(34, 35), 8.0, skin)
+
+	func _draw_hammer() -> void:
+		var c := Vector2(35, 34)
+		draw_line(c + Vector2(-8, 12), c + Vector2(6, -7), Color(0.48, 0.27, 0.12), 6.0)
+		draw_line(c + Vector2(-8, 12), c + Vector2(6, -7), Color(0.78, 0.49, 0.22), 3.0)
+		draw_rect(Rect2(c.x - 3, c.y - 14, 22, 10), Color(0.14, 0.15, 0.17))
+		draw_rect(Rect2(c.x - 1, c.y - 12, 18, 6), Color(0.68, 0.71, 0.75))
+
+	func _draw_shovel() -> void:
+		var c := Vector2(35, 34)
+		draw_line(c + Vector2(-7, 9), c + Vector2(8, -10), Color(0.38, 0.22, 0.11), 5.0)
+		draw_line(c + Vector2(-7, 9), c + Vector2(8, -10), Color(0.72, 0.48, 0.24), 2.5)
+		draw_arc(c + Vector2(10, -12), 5.0, 0.0, TAU, 14, Color(0.72, 0.48, 0.24), 3.0)
+		draw_colored_polygon(PackedVector2Array([c + Vector2(-13, 8), c + Vector2(-3, 11), c + Vector2(-8, 20), c + Vector2(-17, 14)]), Color(0.67, 0.72, 0.76))
+		draw_polyline(PackedVector2Array([c + Vector2(-13, 8), c + Vector2(-3, 11), c + Vector2(-8, 20), c + Vector2(-17, 14), c + Vector2(-13, 8)]), Color(0.16, 0.18, 0.2), 2.0)
+
+	func _draw_plant_icon() -> void:
+		var c := Vector2(35, 34)
+		var r := 10.0
+		if plant_kind == "sonne":
+			for i in range(8):
+				var a := float(i) * TAU / 8.0
+				draw_circle(c + Vector2(cos(a), sin(a)) * 9.0, 4.2, Color(1.0, 0.82, 0.2))
+			draw_circle(c, 7.0, Color(0.55, 0.34, 0.12))
+		elif plant_kind == "pilz" or plant_kind == "sonnenpilz" or plant_kind == "wasserpilz":
+			draw_rect(Rect2(c.x - 3, c.y, 6, 10), Color(0.9, 0.84, 0.72))
+			draw_arc(c, r, PI, TAU, 18, plant_col, 7.0)
+		elif plant_kind == "wall":
+			draw_circle(c + Vector2(0, 2), 10.0, plant_col)
+			draw_line(c + Vector2(-5, -3), c + Vector2(-3, 0), Color(0.25, 0.16, 0.09), 1.5)
+		elif plant_kind == "lilypad":
+			draw_circle(c, 11.0, plant_col.darkened(0.2))
+			draw_line(c, c + Vector2(10, -3), Color(0.08, 0.22, 0.12), 2.0)
+		elif plant_kind == "frostbluete":
+			for i in range(6):
+				var a2 := float(i) * TAU / 6.0
+				draw_line(c, c + Vector2(cos(a2), sin(a2)) * 12.0, Color(0.7, 0.9, 1.0), 3.0)
+			draw_circle(c, 4.0, Color(0.9, 0.98, 1.0))
+		else:
+			draw_line(c + Vector2(0, 10), c + Vector2(0, 2), plant_col.darkened(0.3), 3.0)
+			draw_circle(c, 9.0, plant_col)
+			draw_rect(Rect2(c.x + 6, c.y - 3, 10, 6), plant_col.darkened(0.25))
+		# Gesicht fuer alle Pflanzen-Icons.
+		draw_circle(c + Vector2(-3, -1), 1.4, Color(0.08, 0.09, 0.1))
+		draw_circle(c + Vector2(3, -1), 1.4, Color(0.08, 0.09, 0.1))

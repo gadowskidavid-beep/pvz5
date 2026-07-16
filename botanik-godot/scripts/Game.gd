@@ -113,7 +113,9 @@ var research := {}
 var unlocked := {}                # nur EQUIP-ids (Schaufel/Reihen/Almanach ...)
 var seeds := []                   # Samen-Slots: [{chain, nodes}] — je Slot ein eigener Bau
 var edit_slot := 0                # welcher Slot wird im Drawer bearbeitet
-var place_slot := 0               # welcher Slot ist zum Setzen gewaehlt (-1 = Hammer/Faust)
+const SELECT_NONE := -1           # normale Hand: nichts ausgewaehlt
+const SELECT_HAMMER := -2         # Hammer/Faust aktiv
+var place_slot := 0               # >=0 Samen-Slot, SELECT_NONE Hand, SELECT_HAMMER Hammer
 var run_shop := {}
 var lure := 0                     # Lockstoff-Stufe: Idle-Zombies zwischen Wellen
 var god := false                  # Dev: Rasen kann nicht verloren gehen
@@ -236,7 +238,7 @@ func seed_reset(slot: int) -> void:
 	if slot < 0 or slot >= seeds.size(): return
 	seeds[slot].chain = ""
 	seeds[slot].nodes = {}
-	if place_slot == slot: place_slot = -1
+	if place_slot == slot: place_slot = SELECT_NONE
 func slot_count() -> int: return seeds.size()
 # Welches Element hat dieser Samen schon gewaehlt? ("" = noch keins) — Knoten-Praefix f/e/b/u
 func seed_element(slot: int) -> String:
